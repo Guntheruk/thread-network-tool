@@ -1,8 +1,10 @@
 # Google Home integration — research and next implementation
 
 Reviewed 25 October 2026 against Google's Android and iOS documentation.
-This is a planned integration. The app currently has no Google account connection,
-Google SDK bridge, or verified Nest router support.
+Google Home device control remains planned: there is no Google account connection
+or verified Nest router support. A separate Android Thread Network SDK credential
+bridge is implemented in source, with consent and cancellation; it remains
+uncompiled and unverified on a device. See [ANDROID-BUILD.md](ANDROID-BUILD.md).
 
 ## Documented routes
 
@@ -11,7 +13,7 @@ Google SDK bridge, or verified Nest router support.
 | Android Thread Network SDK | User-consented retrieval of preferred or network-specific credentials from Google Play services. App-owned credentials have a separate direct-access route. | Credentials alone do not establish control of a border router. [Google Thread SDK](https://developers.home.google.com/thread), [ThreadNetworkClient](https://developers.home.google.com/reference/com/google/android/gms/threadnetwork/ThreadNetworkClient) |
 | Google Home APIs for Android and iOS | Read border-router capabilities; where supported, activate temporary credential sharing and request a network join. | Check each device's actual traits and commands. Do not infer Nest support from a network advertisement. [Android guide](https://developers.home.google.com/apis/android/device/border-router), [iOS guide](https://developers.home.google.com/apis/ios/device/border-router) |
 | Apple Thread credentials on iOS | Apple's ThreadNetwork framework provides credential access with consent and distribution entitlement requirements. | Separate from a Google Home account connection. [Apple guide](https://developer.apple.com/documentation/threadnetwork/managing-thread-network-credentials), [Google iOS commissioning](https://developers.home.google.com/apis/ios/commissioning) |
-| Mac and Windows | Existing local discovery/read adapters are independent of a Google Home SDK. | No desktop Google Home SDK route was established by this research. Mobile-assisted desktop credentials would need a separately designed secure transfer. |
+| Mac and Windows | The Mac local discovery/read adapter is independent of a Google Home SDK; Windows networking is not implemented. | No desktop Google Home SDK route was established by this research. Mobile-assisted desktop credentials would need a separately designed secure transfer. |
 
 Google Home access requires account authorization and consent for the chosen home
 and devices. Google-made device support also has a Google consent approval gate.

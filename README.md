@@ -32,7 +32,7 @@ dart run tool/local_server.dart \
 
 Open the private URL in the session file. The helper binds only to `127.0.0.1:5188`; the URL fragment contains a temporary access token, not Thread credentials. Treat the URL and session file as private. The file is published with owner-only permissions and is never overwritten. Use a new filename for a new session. Closing the helper invalidates that session.
 
-Choose **Find routers**, import an authorized operational dataset, then **Check** on one discovered router. The helper retains credentials only in process memory and passes them to the native engine through stdin. The preview distinguishes advertisements, authenticated reads, identity mismatches and failures. It cannot change networks. A new discovery clears earlier reads, and endpoint handles expire after five minutes. See [the live-read contract](docs/LIVE-READ-CONTRACT.md).
+Choose **Find routers**, then **Set up network access**. The guided eero route explains how to copy its Active operational dataset; manual hex entry is under Advanced. The macOS app also offers a consent-based Apple credential bridge, which reports unavailable when the required entitlement is absent. After setup, use **Check** on one discovered router to verify its identity. The helper retains credentials only in process memory and passes them to the native engine through stdin. The preview distinguishes advertisements, authenticated reads, identity mismatches and failures. It cannot change networks. A new discovery clears earlier reads, and endpoint handles expire after five minutes. See [the live-read contract](docs/LIVE-READ-CONTRACT.md).
 
 For an existing trusted credential provider, `--credential-stdin` imports one dataset line before startup. This is optional; the app does not require Home Assistant. `--discovery-engine` can select a separate discovery executable during development, for example while retaining an already-approved probe executable's firewall rule.
 
@@ -96,11 +96,17 @@ Run helper regression checks with `dart run tool/local_server_test.dart` from `a
 ## Scope and progress
 
 - [Current build scope](docs/BUILD-SCOPE.md)
+- [First-release completion plan](docs/RELEASE-PLAN.md)
+- [Compatibility and evidence](docs/COMPATIBILITY.md)
+- [Candidate pilot gates](docs/PILOT.md)
 - [Engine contract](docs/ENGINE-CONTRACT.md)
 - [Accessory-transfer assessment](docs/DEVICE-TRANSFER-ASSESSMENT.md)
 - [Google Home research and integration route](docs/GOOGLE-HOME.md)
 - [Interface direction](docs/INTERFACE.md)
 - [Proposed migration beta](docs/MIGRATION-BETA.md)
+- [Synthetic join assessment and recovery](docs/JOIN-LAB.md)
+- [Android credential bridge and build limits](docs/ANDROID-BUILD.md)
+- [Dependency notice inventory](docs/DEPENDENCY-INVENTORY.md)
 - [Progress and evidence](PROGRESS.md)
 
 Source and pull requests are in the private [GitHub repository](https://github.com/Guntheruk/thread-network-tool). PR checks are configured to cover native core builds on macOS/Linux and Flutter analysis, tests and web compilation. The initial hosted run was blocked before execution by an account billing/spending restriction. Those checks do not establish device compatibility or a working native desktop package. No public release exists; project licensing and platform-provider distribution requirements remain open.

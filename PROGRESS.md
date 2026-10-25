@@ -9,8 +9,73 @@ No home-network writes, resets, accessory removal, credential regeneration, publ
 The owner also clarified that ordinary users must not need to understand or find
 hex datasets unaided. Planned credential setup combines supported consent-based
 retrieval with guided vendor-app copying; the observed eero app exposes an
-Active operational dataset field. See docs/INTERFACE.md. The current manual
-dialog has not yet been replaced, and no credential provider is implemented.
+Active operational dataset field. See docs/INTERFACE.md. The continuation below
+implements guided copying and native credential bridges; real provider access
+and platform runtime evidence remain separate gates.
+
+## First-release continuation
+
+The owner explicitly requested an active completion goal, focused agents and
+continued implementation beyond a working window. `docs/RELEASE-PLAN.md` records
+the full acceptance. The pasted strategy informs local/no-account operation,
+compatibility evidence, recovery and a small debugging pilot; it does not
+authorize licence selection, publication, analytics or signup collection.
+
+- Guided eero setup and Advanced manual entry replace the raw-only live dialog.
+  Copying uses the observed Active operational dataset field, with no fixed
+  vendor menu path or credential regeneration. Narrow layouts, large text,
+  cancelled requests, malformed input and generic errors are covered.
+- The macOS Apple bridge checks availability separately from an explicit
+  credential request, bounds calls, drops late responses after cancellation and
+  prevents overlapping native prompts. Missing entitlement has an explicit
+  fallback. ThreadNetwork is weak-linked for the macOS 12 deployment target;
+  final packaged load commands and runtime are recorded separately when checked.
+  Real credential retrieval remains unverified and no entitlement was granted.
+- The Android bridge uses the pinned Google Thread Network SDK 16.3.0 with
+  explicit consent, operation IDs, bounded calls and cancellation. API signatures
+  were checked against the official AAR. Kotlin compilation and device consent
+  remain unverified; the Android SDK and JDK are not installed on this Mac.
+  The bridge is not yet connected to a usable Android discovery/read workflow.
+- A pure join assessment, confirmation snapshot and synthetic actuator harness
+  distinguish readiness, command acceptance, pending observation and verified
+  completion. Review repairs bind confirmation to the selected source/target,
+  prevent duplicate dispatch, invalidate confirmation on restart and require
+  fresh accessory evidence. This adds no live device command or UI join route.
+- Network-wide Pending Dataset migration and a vendor single-router join are
+  separate operations. The earlier Eero approach was network-wide. Work on an
+  isolated OpenThread simulation must not be represented as vendor compatibility.
+- The local notice collector resolves source revisions and SDK package licence
+  provenance, copies deterministic inputs and refuses overwrite. Thirteen focused
+  tests pass and local collection completed without missing inputs. This does
+  not choose a project or dependency licence or certify distribution notices.
+- `docs/COMPATIBILITY.md` and `docs/PILOT.md` distinguish source, package,
+  runtime and external gates. No telemetry collection, account or AI service
+  was added. The active goal is not complete.
+- Combined continuation validation: Flutter analysis has no issues and all 80
+  tests pass. These include mocked provider outcomes, cancellation, join-state
+  evidence and consumer layouts. They do not prove Apple/Android device access
+  or a real join. The dependency collector's eight tests pass separately.
+- Independent review of committed head `7874ce0` found no new credential/setup
+  defect and three join/notice issues. The repairs keep incomplete observations
+  pending until the observation period ends, reserve a source router across
+  distinct operation IDs, and reject missing/dirty dependency revision evidence.
+  The repaired working tree has clean analysis, 84 passing Flutter tests and 13
+  passing collector tests. Fresh collection against the new package completed.
+- Source `7874ce0` built a new universal Mac app at
+  `build/macos-guided-7874ce0/Thread Network Tool.app`. App/helper signatures pass
+  strict recursive checks, and both architectures load ThreadNetwork with
+  `LC_LOAD_WEAK_DYLIB`. The native window shows all guided choices, reports the
+  missing Apple entitlement, and rejects a malformed synthetic input with a
+  cleared field. The valid TestMesh fixture was entered and visibly masked;
+  the Mac locked before its submit/restart check, so those checks for this
+  package remain incomplete. No household credentials or network change was used.
+- Draft PR #2 is stacked on #1 for source review. The protocol simulation runs
+  separately from the application and has not yet yielded a recorded result.
+- GitHub Codex review of `7874ce0` found that the synthetic harness could ignore
+  a stop-observation transition. A regression reproduced `complete` after stop;
+  the fix updates the authoritative reservation and rejects stale callbacks.
+  Final continuation analysis is clean and all 86 Flutter tests pass. This
+  repairs simulated control flow, without enabling any network write.
 
 ## Implemented
 

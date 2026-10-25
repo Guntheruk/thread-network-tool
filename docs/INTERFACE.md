@@ -30,9 +30,8 @@ icon, not colour alone. Network joining stays disabled and has one modest footer
 control rather than repeated promotional panels.
 
 Google Home has a documented mobile integration route but is not connected in this
-build. See GOOGLE-HOME.md. Future credential providers should remove manual dataset
-entry from the ordinary path; until implemented, the interface must say what is
-actually available.
+build. See GOOGLE-HOME.md. Credential providers and guided vendor copying reduce
+manual dataset handling; the interface must say which routes are actually available.
 
 Verification includes narrow and desktop layouts, long names, enlarged text,
 loading/error/unsupported states, detail disclosure, credential clearing, report
@@ -41,8 +40,11 @@ redaction and the disabled join control. Visual checks are separate from unit te
 ## Credential setup for ordinary users
 
 Owner correction: asking people to find a hexadecimal dataset is not a finished
-consumer setup flow. The current manual dialog remains a development capability;
-the following flow is planned, not implemented.
+consumer setup flow. The live dialog now implements guided eero copying and an
+Advanced route. The Mac Apple bridge is integrated with explicit unavailable
+states; real retrieval remains gated by its entitlement and runtime verification.
+The Android bridge is implemented separately but not yet wired to a usable phone
+discovery/read workflow.
 
 The primary action should be **Set up network access**. Explain that access lets
 the app check the selected network and does not change it. Offer only working

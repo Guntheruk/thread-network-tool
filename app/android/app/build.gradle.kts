@@ -47,3 +47,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Preferred Thread credentials are held by Google Play services, not Home APIs.
+    implementation("com.google.android.gms:play-services-threadnetwork:16.3.0")
+}
