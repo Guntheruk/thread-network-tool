@@ -2,7 +2,7 @@
 
 A local application for understanding Thread networks and joining compatible border routers to a chosen existing network.
 
-**Initial development build.** The C++ engine performs dataset inspection, macOS DNS-SD discovery, and optional authenticated read-only probes. The Flutter interface can show discovered routers and verified reads. A direct native desktop adapter and a loopback web development preview share the same session logic. Native application packaging is not yet validated; no joining command exists. Automatic accessory transfer is optional for the first release; Home Assistant and AI are not required by the core.
+**Initial development build.** The C++ engine performs dataset inspection, macOS DNS-SD discovery, and optional authenticated read-only probes. The Flutter interface can show discovered routers and verified reads. A direct native desktop adapter and a loopback web development preview share the same session logic. The packaged macOS app has passed native launch, sandboxed discovery and synthetic credential-import checks; no joining command exists. Automatic accessory transfer is optional for the first release; Home Assistant and AI are not required by the core.
 
 ## Run the interface
 
@@ -32,7 +32,7 @@ dart run tool/local_server.dart \
 
 Open the private URL in the session file. The helper binds only to `127.0.0.1:5188`; the URL fragment contains a temporary access token, not Thread credentials. Treat the URL and session file as private. The file is published with owner-only permissions and is never overwritten. Use a new filename for a new session. Closing the helper invalidates that session.
 
-Choose **Refresh discovery**, import an authorized operational dataset, then **Read this router** on one discovered router. The helper retains credentials only in process memory and passes them to the native engine through stdin. The preview distinguishes advertisements, authenticated reads, identity mismatches and failures. It cannot change networks. A new discovery clears earlier reads, and endpoint handles expire after five minutes. See [the live-read contract](docs/LIVE-READ-CONTRACT.md).
+Choose **Find routers**, import an authorized operational dataset, then **Check** on one discovered router. The helper retains credentials only in process memory and passes them to the native engine through stdin. The preview distinguishes advertisements, authenticated reads, identity mismatches and failures. It cannot change networks. A new discovery clears earlier reads, and endpoint handles expire after five minutes. See [the live-read contract](docs/LIVE-READ-CONTRACT.md).
 
 For an existing trusted credential provider, `--credential-stdin` imports one dataset line before startup. This is optional; the app does not require Home Assistant. `--discovery-engine` can select a separate discovery executable during development, for example while retaining an already-approved probe executable's firewall rule.
 
@@ -46,7 +46,7 @@ flutter run -d macos \
   --dart-define=TNT_ENGINE_PATH="$PWD/../build/probe/thread-network"
 ```
 
-The bundle lookup is `Contents/Helpers/thread-network`, with its core library in `Contents/Frameworks`. The [macOS packaging workflow](docs/MACOS-BUILD.md) builds a universal native helper, bundles it with Flutter, and applies a local ad hoc signature or an explicitly selected Developer ID identity. Helper relocation and local signature checks are tested; the complete Flutter package and native window remain unverified because the current development Mac has Command Line Tools rather than full Xcode.
+The bundle lookup is `Contents/Helpers/thread-network`, with its core library in `Contents/Frameworks`. The [macOS packaging workflow](docs/MACOS-BUILD.md) builds a universal native helper, bundles it with Flutter, and applies a local ad hoc signature or an explicitly selected Developer ID identity. The complete package built with Xcode 27.1 and launched on the development Apple Silicon Mac. Its sandboxed helper completed live discovery, accepted a synthetic dataset and rejected malformed input. Quitting and reopening cleared the imported test credentials. Authenticated router reads from this packaged app and Intel execution remain unverified.
 
 A missing helper is shown as unavailable; it does not silently become demo data. Windows and phone launch paths explicitly report unsupported until their native integrations are implemented. Developer ID signing and notarization are separate distribution gates.
 
@@ -103,4 +103,4 @@ Run helper regression checks with `dart run tool/local_server_test.dart` from `a
 - [Proposed migration beta](docs/MIGRATION-BETA.md)
 - [Progress and evidence](PROGRESS.md)
 
-Source and pull requests are in the private [GitHub repository](https://github.com/Guntheruk/thread-network-tool). PR checks cover native core builds on macOS/Linux and Flutter analysis, tests and web compilation. Those checks do not establish device compatibility or a working native desktop package. No public release exists; project licensing and platform-provider distribution requirements remain open.
+Source and pull requests are in the private [GitHub repository](https://github.com/Guntheruk/thread-network-tool). PR checks are configured to cover native core builds on macOS/Linux and Flutter analysis, tests and web compilation. The initial hosted run was blocked before execution by an account billing/spending restriction. Those checks do not establish device compatibility or a working native desktop package. No public release exists; project licensing and platform-provider distribution requirements remain open.

@@ -1,7 +1,8 @@
 # macOS native app packaging
 
 This builds a local macOS Flutter app with the read-only native helper. It does
-not publish, notarize, or validate a native Flutter window on this Mac.
+not publish or notarize. Building alone does not establish runtime support;
+the separate native-window checks below record the current evidence.
 
 ## Prerequisites
 
@@ -72,8 +73,9 @@ valid and invalid dataset inspections from `/`. It also builds a separate
 synthetic app, signs its nested native code with the local ad hoc identity,
 checks the sandbox-inheritance entitlements, and verifies the signatures.
 Its signed parent then launches the inherited helper for valid and invalid
-synthetic inspections. This verifies the native sandbox inheritance path;
-native Flutter launch and sandboxed networking still need a packaged-app run.
+synthetic inspections. This verifies the native sandbox inheritance path.
+The packaged-app checks below add native Flutter launch and sandboxed discovery;
+authenticated DTLS reads from that app remain unverified.
 
 Run this test from a normal macOS shell. In this development environment,
 running inside Codex's process sandbox aborts the signed synthetic parent
@@ -82,3 +84,32 @@ test deliberately fails on that condition instead of skipping signed execution.
 
 No test invokes discovery or probe against a home device. The full app build
 uses the pinned Commissioner source but does not perform a network read.
+
+## Packaged application verification — 25 October 2026
+
+Source `dfa41386139710a63ed81fdcaa1c75c9272bda31` built successfully with
+Xcode 27.1 (27A9275), Flutter 3.47.8 and the pinned Commissioner source.
+`DEVELOPER_DIR` selected Xcode for the build without changing the system default.
+Both the app executable and helper contain `arm64` and `x86_64` slices.
+Recursive strict signature verification passed with the local ad hoc identity;
+the parent retains App Sandbox and the helper retains sandbox inheritance.
+
+On the development Apple Silicon Mac:
+
+- The packaged app opened a native Flutter window with the live read-only view.
+- Bounded discovery completed with eight unverified router advertisements,
+  both before and after restarting the app.
+  Process inspection confirmed the app launched its bundled helper, which exited
+  after the scan. No browser or HTTP helper handled this request.
+- The native import dialog accepted a synthetic dataset and rejected malformed
+  input with a generic error and cleared input. No household credentials were
+  imported, and no router probe or network change was attempted.
+- The report showed discovery counts and zero authenticated reads while excluding
+  network names, device identities, endpoints and credentials.
+- Quitting and reopening the app returned to the initial state without imported
+  credentials or discovery results.
+
+Authenticated reads from the packaged sandbox, Intel execution, Developer ID
+signing and notarization remain unverified. Earlier direct Dart-adapter reads
+are separate evidence, not proof of the packaged app's DTLS path. Build logs and
+screenshots remain ignored local artifacts; do not publish household screenshots.
