@@ -264,3 +264,18 @@ Known limits: the native Mac app is a locally signed development build, without 
   radio access. The older privacy/lighting and open-source strategy context
   informs simple local operation; historical assistant proposals are not new
   requirements or verified market claims.
+- Final combined source `04f3b852e8f4f3257bac1c64bbcddf81e6cfbf24` passed
+  clean Flutter analysis, all 105 Flutter tests, 39 execution checks and all
+  71 tooling/process tests with real source reproducibility enabled. Independent
+  delivery/raw-Pending review found no actionable blocker. Draft PR #8 records
+  this candidate; the full app execution flow remains a separate integration.
+- The universal Mac package at `build/macos-review-04f3b85/Thread Network Tool.app`
+  built and passed strict recursive signature checks. Its exact executable
+  launched; the guided setup and safe Apple-unavailable fallback were verified
+  in the native window. This check used no household credentials or discovery.
+  The package retains the exact dependency patch/tree provenance alongside it.
+- Hosted unsigned iOS run `40241323165` passed, including the enabled-provider
+  compile branch. In run `40241323050`, both native OS jobs and the complete
+  Flutter job passed; the tooling job failed because its journal tests lacked
+  the helper executable environment. CI now builds those fixtures and provides
+  their paths before the full tooling suite. Fresh hosted proof is pending.

@@ -21,7 +21,14 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: Build native journal fixtures for tooling tests
+        run: |
+          cmake -S . -B build/ci-tooling -DCMAKE_BUILD_TYPE=Release -DTNT_WITH_COMMISSIONER=OFF -DTNT_BUILD_TESTS=ON -DTNT_BUILD_MOVE_JOURNAL=ON
+          cmake --build build/ci-tooling --target thread-move-journal tnt-move-journal-fault --parallel 2
       - name: Test notice collector and isolated lab driver
+        env:
+          TNT_JOURNAL_CLI: ${{ github.workspace }}/build/ci-tooling/thread-move-journal
+          TNT_JOURNAL_FAULT: ${{ github.workspace }}/build/ci-tooling/tnt-move-journal-fault
         run: python3 -m unittest discover -s tests/tools -v
 
   native-core:
