@@ -4,6 +4,11 @@ Owner direction, 25 October 2026: keep building toward a usable application,
 use focused agents and PR review, and take the supplied product strategy into
 account. A working window is a milestone, not completion.
 
+Credential routes and the optional phone companion are distinguished in
+`CREDENTIAL-ACCESS.md`. Existing authorized credentials can avoid a new phone
+app. The owner's suggestion of a useful mobile product remains an open
+possibility; a companion is not required for every desktop user.
+
 ## Product acceptance
 
 - A person can discover routers and set up access without understanding hex:
