@@ -12,6 +12,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -51,4 +52,5 @@ flutter {
 dependencies {
     // Preferred Thread credentials are held by Google Play services, not Home APIs.
     implementation("com.google.android.gms:play-services-threadnetwork:16.3.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }
