@@ -299,3 +299,37 @@ Known limits: the native Mac app is a locally signed development build, without 
   requests are on hold; implementation and verification continue on the Mac and
   the existing Linux machine. The completed hosted checks remain historical
   evidence, not permission to trigger more jobs.
+
+## Local application integration continuation
+
+- PR #8 at `51a2eae9d218abcec92f05c934be38205d0040c7` completed its already
+  requested Codex review with no unresolved findings. Its two already-triggered
+  hosted workflows passed. No later push/review was requested after the cost hold.
+- Local branch `feat/app-move-candidate` assembles the actual screen/API/session,
+  journal and native worker. Startup recovery was repaired to precede discovery;
+  an actual journal plus unavailable fixture regression passed. Native ownership
+  checks now bind the actual IPv6 destination and reject shared sockets. Both
+  Linux regressions failed on the old verifier and passed with the repair.
+- The `313ebeb` Mac package built and passed recursive signature verification;
+  its native window displayed Network to keep / Network to move. Full local
+  Flutter analysis was clean; 109 tests passed with two explicit skips. The
+  startup regression was then run with its actual helper and passed separately.
+- The local Linux Flutter runner is pinned to image
+  `sha256:fb2cad7152fcaa07415e9fa1ab14a64374a60996b60fcd4a16f317adb4948994`.
+  Its synthetic widget smoke passed offline, unprivileged and with a read-only
+  root. Preparation evidence is on linuxbox under `/tmp/tnt-flutter-runner-20261025`.
+- The first complete app fixture at `313ebeb` failed during simulator setup,
+  before launching the app: random numeric node IDs exceeded the pinned 1..33
+  range. `801328c` fixes this with namespace-local IDs; its regression reproduced
+  the failure and all nine fixture tests then passed.
+- The first `801328c` app attempt exposed missing derived package_graph metadata
+  in the runner command. A no-fixture compile smoke verified the corrected
+  command after checking the cached pubspec/lock match. The corrected attempt
+  reached real dialogs, role-bound router reads and the review, then failed
+  during native preparation before confirmation. It is not a completed move.
+  Task-owned evidence and exact command hashes remain on linuxbox under
+  `/tmp/tnt-full-app-lab-313ebeb1` and `/tmp/tnt-full-app-lab-801328c4`.
+- `8f47fa4` adds only fixed, correlated preparation-failure diagnostics to the
+  explicit lab test and records optional credential/phone scope. A fresh local
+  diagnostic candidate is being tested. No actual app convergence, vendor
+  compatibility, real iPhone retrieval or phone-to-Mac transfer is claimed.
