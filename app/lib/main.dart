@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'engine_service.dart';
+import 'app_theme.dart';
 import 'live_screen.dart';
 import 'live_api.dart';
 import 'platform_api_stub.dart' if (dart.library.io) 'platform_api_io.dart'
@@ -34,36 +35,10 @@ class ThreadNetworkApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF253D42);
-    const teal = Color(0xFF136F70);
     return MaterialApp(
       title: 'Thread Network Tool',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF8F5ED),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: teal,
-          primary: teal,
-          surface: const Color(0xFFFFFDF7),
-          onSurface: ink,
-        ),
-        textTheme: ThemeData.light().textTheme.apply(
-              bodyColor: ink,
-              displayColor: ink,
-            ),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          color: const Color(0xFFFFFDF7),
-          shape: RoundedRectangleBorder(
-            side: const BorderSide(color: Color(0xFFE4E4D9)),
-            borderRadius: BorderRadius.circular(20),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
+      theme: threadTheme(),
       home: liveSession != null
           ? LiveScreen(session: liveSession!)
           : liveApi != null
@@ -172,10 +147,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFDAECE7),
-              borderRadius: BorderRadius.circular(13),
+              color: ThreadColors.blueSoft,
+              borderRadius: BorderRadius.circular(4),
             ),
-            child: const Icon(Icons.hub_outlined, color: Color(0xFF136F70)),
+            child: const Icon(Icons.hub_outlined, color: ThreadColors.blue),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -187,7 +162,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   style: Theme.of(context)
                       .textTheme
                       .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -205,14 +180,14 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
         key: const Key('synthetic-demo-banner'),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE6F2EC),
-          border: Border.all(color: const Color(0xFF9FCEBE)),
-          borderRadius: BorderRadius.circular(16),
+          color: ThreadColors.subtle,
+          border: Border.all(color: ThreadColors.border),
+          borderRadius: BorderRadius.circular(4),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.science_outlined, color: Color(0xFF136F70)),
+            Icon(Icons.science_outlined, color: ThreadColors.blue),
             SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -238,11 +213,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           bottom: vertical ? 8 : 0,
         ),
         child: Material(
-          color: selected ? const Color(0xFFDAECE7) : Colors.transparent,
-          borderRadius: BorderRadius.circular(13),
+          color: selected ? ThreadColors.blueSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
           child: InkWell(
             key: Key('step-$i'),
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(4),
             onTap: () => setState(() => _step = i),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -251,15 +226,13 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 children: [
                   CircleAvatar(
                     radius: 13,
-                    backgroundColor: selected
-                        ? const Color(0xFF136F70)
-                        : const Color(0xFFE6E8E1),
+                    backgroundColor:
+                        selected ? ThreadColors.blue : ThreadColors.border,
                     child: Text(
                       '${i + 1}',
                       style: TextStyle(
                         fontSize: 12,
-                        color:
-                            selected ? Colors.white : const Color(0xFF253D42),
+                        color: selected ? Colors.white : ThreadColors.ink,
                       ),
                     ),
                   ),
@@ -308,8 +281,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           Text(
             eyebrow.toUpperCase(),
             style: const TextStyle(
-              color: Color(0xFF136F70),
-              fontWeight: FontWeight.w800,
+              color: ThreadColors.blue,
+              fontWeight: FontWeight.w600,
               letterSpacing: 1.4,
             ),
           ),
@@ -319,7 +292,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             style: Theme.of(context)
                 .textTheme
                 .headlineMedium
-                ?.copyWith(fontWeight: FontWeight.w800),
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text(description, style: Theme.of(context).textTheme.bodyLarge),
@@ -363,7 +336,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     return Card(
       child: InkWell(
         key: Key('target-$index'),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(4),
         onTap: () => setState(() => _target = index),
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -374,7 +347,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 selected
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
-                color: const Color(0xFF136F70),
+                color: ThreadColors.blue,
               ),
               const SizedBox(width: 5),
               Expanded(
@@ -431,7 +404,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 children: [
                   const Icon(
                     Icons.key_outlined,
-                    color: Color(0xFF136F70),
+                    color: ThreadColors.blue,
                     size: 31,
                   ),
                   const SizedBox(height: 13),
@@ -572,7 +545,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   const Text(
                     'Dataset was not inspected. Check the input or use the synthetic fixture.',
                     key: Key('import-error'),
-                    style: TextStyle(color: Color(0xFF9B3D29)),
+                    style: TextStyle(color: ThreadColors.error),
                   ),
                 ],
               ],
@@ -726,7 +699,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: const Color(0xFF136F70)),
+              Icon(icon, color: ThreadColors.blue),
               const SizedBox(width: 13),
               Expanded(
                 child: Column(
@@ -802,8 +775,8 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0F2EB),
-          borderRadius: BorderRadius.circular(8),
+          color: ThreadColors.subtle,
+          borderRadius: BorderRadius.circular(4),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -831,7 +804,7 @@ class _ReviewLine extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 19, color: const Color(0xFF136F70)),
+            Icon(icon, size: 19, color: ThreadColors.blue),
             const SizedBox(width: 10),
             SizedBox(
               width: 145,

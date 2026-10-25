@@ -15,4 +15,11 @@ Acceptance for this build:
 4. Flutter screens cover discovery, credential import, assessment, and a disabled migration review; demo data is visibly labelled.
 5. Build/test evidence distinguishes Mac native core, Flutter web preview, native desktop packaging, and other-platform gaps.
 
-Use a fresh separate repo; do not modify Recursive Systems. No remote repository exists yet. Release licensing and vendor entitlements remain decisions before publication.
+Use a separate repo; do not modify Recursive Systems. The owner requested the private GitHub repository `Guntheruk/thread-network-tool` for PR review. Release licensing and vendor entitlements remain decisions before public distribution.
+
+Later owner direction: use Recursive Systems' visual style for a simpler interface,
+document Google Home integration, and plan separate beta flows for router/network
+and individual-device moves. These are described in INTERFACE.md, GOOGLE-HOME.md
+and MIGRATION-BETA.md. Joining remains disabled in this implementation. The owner
+also requested a GitHub repository and PR review workflow; the initial repository
+is private while release licensing and compatibility remain unresolved.

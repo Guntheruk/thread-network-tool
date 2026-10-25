@@ -98,6 +98,9 @@ Run helper regression checks with `dart run tool/local_server_test.dart` from `a
 - [Current build scope](docs/BUILD-SCOPE.md)
 - [Engine contract](docs/ENGINE-CONTRACT.md)
 - [Accessory-transfer assessment](docs/DEVICE-TRANSFER-ASSESSMENT.md)
+- [Google Home research and integration route](docs/GOOGLE-HOME.md)
+- [Interface direction](docs/INTERFACE.md)
+- [Proposed migration beta](docs/MIGRATION-BETA.md)
 - [Progress and evidence](PROGRESS.md)
 
-No remote repository or release has been published. Project licensing and platform-provider distribution requirements will be finalized before publication.
+Source and pull requests are in the private [GitHub repository](https://github.com/Guntheruk/thread-network-tool). PR checks cover native core builds on macOS/Linux and Flutter analysis, tests and web compilation. Those checks do not establish device compatibility or a working native desktop package. No public release exists; project licensing and platform-provider distribution requirements remain open.

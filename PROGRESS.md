@@ -4,11 +4,11 @@
 
 Build the four-platform Flutter/C++ application. Automatic transfer of existing accessories from the source Eero network is optional for the first release and must not block the core border-router joining product. Investigate inexpensive fixes separately. Current initial-build acceptance is in docs/BUILD-SCOPE.md.
 
-No home-network writes, resets, accessory removal, credential regeneration, publication, or purchases were performed during this build.
+No home-network writes, resets, accessory removal, credential regeneration, public release or purchases were performed during this build. The owner subsequently authorized a private GitHub repository and PR reviews.
 
 ## Implemented
 
-Previous source milestone: `4768a7215fc381983f218b6f5f3f6b183881dacd`. This continuation prepares macOS helper bundling and local application packaging on top of the live discovery and read adapters.
+Previous source milestone: `563ffe0df6a092246aa72e847734b8e7eafdb03a`. This continuation simplifies the interface using the Recursive Systems visual direction, records Google Home and migration beta scope, and sets up GitHub PR checks.
 
 - Bounded C++ dataset parser and C ABI; rejects malformed/duplicate/missing/oversized TLVs, invalid UTF-8 and unsupported page/channel combinations. Page-0 channel mask follows raw MeshCoP MSB-first encoding.
 - CLI inspect and optional pinned OpenThread Commissioner read-only probe. Credentials enter via stdin; reports omit Network Key, PSKc and raw datasets.
@@ -24,6 +24,9 @@ Previous source milestone: `4768a7215fc381983f218b6f5f3f6b183881dacd`. This cont
 - macOS runner now resolves `Contents/Helpers/thread-network`. CMake installs the helper and its core library with relative load paths. The parent retains App Sandbox with client/server network access for UDP; the helper has only sandbox/inherit entitlements. Local-network purpose and Bonjour service are declared.
 - Native `capabilities` command reports compiled read support without credentials or network activity. Packaging requires a read-only authenticated-probe build, defaults to Intel/Apple Silicon universal output, checks app/helper architecture compatibility and refuses to overwrite an existing package.
 - Packaging signs nested code before the app, supports local ad hoc signatures and an explicitly selected Developer ID identity, and verifies nested signatures. Developer ID signing requests secure timestamps. It does not install Xcode, change the selected toolchain, notarize or publish.
+- Shared Flutter theme follows the inspected Recursive Systems Elixir neutral/blue palette, flat surfaces and compact controls. The live screen gives router checks priority and puts technical fields behind disclosure; read-only scope and distinct outcomes remain visible.
+- Google Home Android/iOS capability, consent and credential routes are documented in docs/GOOGLE-HOME.md. No Google account bridge or Nest model is implemented/verified. Separate router/network/accessory beta flows, sleepy timing, controller authority and recovery requirements are planned in docs/MIGRATION-BETA.md; no mutation command was added.
+- Private repository `https://github.com/Guntheruk/thread-network-tool` created at the owner's request, with committed baseline `563ffe0` on main. Work continues on `feat/clear-interface`. PR workflow uses read-only GitHub token permissions, pinned action revisions and synthetic/core checks without home access.
 
 ## Verification
 
@@ -46,14 +49,17 @@ Previous source milestone: `4768a7215fc381983f218b6f5f3f6b183881dacd`. This cont
 - Full universal authenticated-probe payload staging passed after correcting the dependency scanner to ignore each architecture's `otool` filename heading. Installed capabilities ran successfully without credentials or network calls.
 - Full Flutter analysis is clean and all 24 tests pass, including bundled-helper lookup, missing-helper handling and explicit override behavior. Plists/project file and scheme pass static syntax checks. Independent packaging review findings on timestamps and recursive verification were fixed and verified; the UDP receive entitlement was corrected against current Apple documentation.
 - The full macOS build command stops at its Xcode preflight: only Command Line Tools are installed. No complete Flutter app package, native window or Developer ID distribution signature has been produced.
+- Interface continuation: full Flutter analysis passed, all 26 tests passed, and the release web build succeeded. Tests cover collapsed details, distinct verification/failure states, narrow screens and enlarged text under the shared theme. The existing unused Cupertino font warning remains; displayed icons are Material icons.
+- Updated the running preview's generated web assets without restarting its private session. The narrow browser view visibly shows compact router rows; opening and closing details worked. Screenshot: `build/evidence/interface-compact.png` (ignored, local only). This used existing session observations, not new household discovery or reads. Native desktop-window verification remains pending Xcode.
+- PR workflow YAML and command paths were validated locally. Hosted GitHub checks are a separate result and must be read from the PR; no CI pass is implied by local tests.
 
 ## Running preview and reproducibility
 
 Synthetic preview remains available at http://127.0.0.1:5187/. The live development helper uses http://127.0.0.1:5188/ with its private session fragment; opening the bare URL intentionally selects the synthetic preview. The browser tab holds the live session. Both modes keep network changes disabled.
 
-Current source workspace is `/Users/richard/thread`, cloned locally from the clean committed source in `/Users/richard/thread-network-tool`. The earlier folder and its running preview remain intact; prior UI screenshots and preview build artifacts remain there. Git origin is that local source path, not a hosted repository. The ignored Flutter SDK link currently resolves to the earlier workspace's SDK; portable builds can set `TNT_FLUTTER_BIN` explicitly.
+Current source workspace is `/Users/richard/thread`, cloned locally from the clean committed source in `/Users/richard/thread-network-tool`. The earlier folder and its running preview remain intact; prior UI screenshots and preview build artifacts remain there. Git origin is the private GitHub repository; the earlier local source remote is retained as `source-local`. The ignored Flutter SDK link currently resolves to the earlier workspace's SDK; portable builds can set `TNT_FLUTTER_BIN` explicitly.
 
-Build instructions: README.md, docs/LIVE-READ-CONTRACT.md and docs/MACOS-BUILD.md. Current optional-probe output is `build/native-probe`; `build/native-payload/Contents` is an installed helper/library payload, not a complete application. Earlier live checks used the firewall-approved probe executable plus a separate discovery executable. This packaging continuation made no home-network calls or configuration changes. No remote Git repository or release exists.
+Build instructions: README.md, docs/LIVE-READ-CONTRACT.md and docs/MACOS-BUILD.md. Current optional-probe output is `build/native-probe`; `build/native-payload/Contents` is an installed helper/library payload, not a complete application. Earlier live checks used the firewall-approved probe executable plus a separate discovery executable. Packaging and interface work made no home-network calls or configuration changes. No public release exists.
 
 ## Next work and gates
 

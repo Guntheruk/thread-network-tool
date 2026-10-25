@@ -77,7 +77,7 @@ void main() {
         .pumpWidget(const ThreadNetworkApp(liveApi: UnsupportedLiveApi()));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('live-banner')), findsOneWidget);
-    expect(find.textContaining('unsupported'), findsWidgets);
+    expect(find.textContaining('Live discovery is unavailable'), findsOneWidget);
     expect(find.byKey(const Key('synthetic-demo-banner')), findsNothing);
     expect(
         tester

@@ -161,7 +161,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: LiveScreen(api: api)));
+    await tester.pumpWidget(ThreadNetworkApp(liveApi: api));
     await tester.pumpAndSettle();
   }
 
@@ -171,23 +171,22 @@ void main() {
     await pumpLive(tester, api);
     expect(find.byKey(const Key('live-banner')), findsOneWidget);
     expect(find.textContaining('unverified'), findsWidgets);
-    expect(find.text('No authenticated read yet'), findsOneWidget);
+    expect(find.text('Not checked'), findsOneWidget);
     api.onProbe = () async => LiveState.fromJson(fixture(
         probeStatus: 'completed', authenticated: true, identityMatch: 'match'));
     await tester.tap(find.byKey(const Key('live-read-0')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('imported network identity matches'),
-        findsOneWidget);
+    expect(find.text('Verified · network matches'), findsOneWidget);
     api.onProbe = () async => LiveState.fromJson(fixture(
         probeStatus: 'completed',
         authenticated: true,
         identityMatch: 'mismatch'));
     await tester.tap(find.byKey(const Key('live-read-0')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Identity mismatch'), findsOneWidget);
+    expect(find.text('Different network'), findsOneWidget);
     expect(
         tester
-            .widget<FilledButton>(find.byKey(const Key('live-join-disabled')))
+            .widget<OutlinedButton>(find.byKey(const Key('live-join-disabled')))
             .onPressed,
         isNull);
   });
@@ -205,7 +204,11 @@ void main() {
         fixture(probeStatus: 'timeout', authenticated: 'unknown'));
     await tester.tap(find.byKey(const Key('live-discover')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Read timed out'), findsOneWidget);
+    expect(find.text('Check timed out'), findsOneWidget);
+    api.current = LiveState.fromJson(fixture(probeStatus: 'error'));
+    await tester.tap(find.byKey(const Key('live-discover')));
+    await tester.pumpAndSettle();
+    expect(find.text('Check failed'), findsOneWidget);
     api.onProbe = () async => throw const LiveApiException();
     api.current = LiveState.fromJson(fixture());
     await tester.tap(find.byKey(const Key('live-discover')));
@@ -253,6 +256,46 @@ void main() {
         .widget<SelectableText>(find.byKey(const Key('live-report-text')))
         .data!;
     expect(report, isNot(contains('PrivateMesh')));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('technical details stay collapsed until requested',
+      (tester) async {
+    final api = FixtureApi(LiveState.fromJson(fixture(
+        probeStatus: 'partial', authenticated: true, identityMatch: 'match')));
+    await pumpLive(tester, api);
+    expect(find.text('Check incomplete'), findsOneWidget);
+    expect(find.textContaining('Authenticated read completed'), findsNothing);
+    expect(find.textContaining('Thread version:'), findsNothing);
+    expect(find.textContaining('2026-10-25T10:01:00'), findsNothing);
+    await tester.tap(find.byKey(const Key('live-details-0')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('live-full-name-0')), findsOneWidget);
+    expect(find.textContaining('Authentication succeeded'), findsOneWidget);
+    expect(find.textContaining('Thread version:'), findsOneWidget);
+    expect(find.textContaining('2026-10-25T10:01:00'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('live-how-it-works')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('advertisements only suggest'), findsOneWidget);
+  });
+
+  testWidgets('long router name fits narrow screen and enlarged text',
+      (tester) async {
+    final data = fixture();
+    ((data['routers'] as List).single as Map)['service_name'] =
+        'A very long border router name that should not hide the check action';
+    final api = FixtureApi(LiveState.fromJson(data));
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MediaQuery(
+      data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+      child: ThreadNetworkApp(liveApi: api),
+    ));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('live-read-0')), 200);
+    expect(find.byKey(const Key('live-read-0')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -41,6 +41,7 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _busy = true;
   String? _busyRouter;
   String? _notice;
+  final Set<String> _expandedRouters = {};
 
   @override
   void initState() {
@@ -85,7 +86,7 @@ class _LiveScreenState extends State<LiveScreen> {
         context: context,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, updateDialog) => AlertDialog(
-            title: const Text('Import authorized credentials'),
+            title: const Text('Import network credentials'),
             content: SizedBox(
               width: 450,
               child: Column(
@@ -93,7 +94,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                      'Dataset stays in helper memory for this session. Input is masked.'),
+                      'Paste a dataset you are authorized to use. It stays in memory for this session.'),
                   const SizedBox(height: 14),
                   TextField(
                     key: const Key('live-dataset-input'),
@@ -101,7 +102,8 @@ class _LiveScreenState extends State<LiveScreen> {
                     obscureText: true,
                     enableSuggestions: false,
                     autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'Dataset hex'),
+                    decoration: const InputDecoration(
+                        labelText: 'Dataset hex (advanced)'),
                   ),
                   if (failed) ...[
                     const SizedBox(height: 12),
@@ -163,23 +165,35 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   String _probeSummary(LiveProbe? probe) {
-    if (probe == null) return 'No authenticated read yet';
+    if (probe == null) return 'Not checked';
+    if (probe.verified) return 'Verified · network matches';
+    if (probe.identityMatch == 'mismatch') return 'Different network';
+    if (probe.probeStatus == 'timeout') return 'Check timed out';
+    if (probe.probeStatus == 'unsupported') return 'Check unavailable';
+    if (probe.probeStatus == 'error') return 'Check failed';
+    return 'Check incomplete';
+  }
+
+  String _probeDetail(LiveProbe? probe) {
+    if (probe == null) return 'No authenticated read yet.';
     if (probe.verified) {
-      return 'Authenticated read · imported network identity matches';
+      return 'Authenticated read completed and the imported network identity matches.';
     }
     if (probe.identityMatch == 'mismatch') {
-      return 'Identity mismatch · do not treat this router as the imported network';
+      return 'The read reported a different network identity. Do not treat this router as part of the imported network.';
     }
     if (probe.probeStatus == 'timeout') {
-      return 'Read timed out · authentication and identity remain unverified';
+      return 'The read timed out. Authentication and network identity remain unverified.';
     }
     if (probe.probeStatus == 'unsupported') {
-      return 'Read unsupported on this helper or router';
+      return 'The helper or router does not support this read.';
     }
-    if (probe.authenticated == true) {
-      return 'Read incomplete · authenticated, but network identity remains unverified';
+    if (probe.probeStatus == 'error') {
+      return 'The read failed. Network identity remains unverified.';
     }
-    return 'Read incomplete · authentication and identity unverified';
+    return probe.authenticated == true
+        ? 'Authentication succeeded, but the read was incomplete. The network is not verified.'
+        : 'The read was incomplete. Authentication and network identity remain unverified.';
   }
 
   Future<void> _showReport() async {
@@ -216,39 +230,52 @@ class _LiveScreenState extends State<LiveScreen> {
   @override
   Widget build(BuildContext context) {
     final state = _state;
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
+            constraints: const BoxConstraints(maxWidth: 840),
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               children: [
-                Text('Thread Network Tool',
-                    style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 12),
-                Card(
-                  key: const Key('live-banner'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('LIVE · READ ONLY',
-                            style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 5),
-                        const Text(
-                            'Local discovery and authorized router reads. Advertisements are unverified until an authenticated read matches imported credentials. Joining remains disabled.'),
-                      ],
-                    ),
+                Row(children: [
+                  Expanded(
+                    child: Text('Thread Network Tool',
+                        style: Theme.of(context).textTheme.headlineSmall),
                   ),
+                  IconButton(
+                    key: const Key('live-report'),
+                    tooltip: 'Redacted report',
+                    onPressed: state == null ? null : _showReport,
+                    icon: const Icon(Icons.description_outlined),
+                  ),
+                ]),
+                const SizedBox(height: 5),
+                Wrap(
+                  key: const Key('live-banner'),
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 2,
+                  children: [
+                    Icon(Icons.visibility_outlined,
+                        size: 18, color: colors.primary),
+                    const Text('Live · Read only'),
+                    const Text('No network changes'),
+                  ],
                 ),
+                const SizedBox(height: 16),
                 if (_busy) const LinearProgressIndicator(key: Key('live-busy')),
                 if (_notice != null) ...[
                   const SizedBox(height: 10),
-                  Text(_notice!, key: const Key('live-error')),
+                  Text(_notice!,
+                      key: const Key('live-error'),
+                      style: TextStyle(color: colors.error)),
                 ],
-                const SizedBox(height: 15),
+                Text(_nextAction(state),
+                    key: const Key('live-next-action'),
+                    style: Theme.of(context).textTheme.bodyLarge),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 9,
                   runSpacing: 8,
@@ -259,8 +286,8 @@ class _LiveScreenState extends State<LiveScreen> {
                           _busy || state?.discoveryStatus == 'unsupported'
                               ? null
                               : () => _run(_api.discover),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Refresh discovery'),
+                      icon: const Icon(Icons.search),
+                      label: const Text('Find routers'),
                     ),
                     OutlinedButton.icon(
                       key: const Key('live-import'),
@@ -271,15 +298,9 @@ class _LiveScreenState extends State<LiveScreen> {
                       icon: const Icon(Icons.key_outlined),
                       label: const Text('Import credentials'),
                     ),
-                    OutlinedButton.icon(
-                      key: const Key('live-report'),
-                      onPressed: state == null ? null : _showReport,
-                      icon: const Icon(Icons.description_outlined),
-                      label: const Text('Redacted report'),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 if (state == null)
                   const Text('Waiting for the local helper.')
                 else ...[
@@ -287,44 +308,51 @@ class _LiveScreenState extends State<LiveScreen> {
                     const Padding(
                       padding: EdgeInsets.only(bottom: 10),
                       child: Text(
-                        'Native helper unavailable or this platform is not supported. Live reads cannot run here.',
+                        'Live discovery is unavailable on this device. Check the local helper or platform support.',
                         key: Key('live-unsupported'),
                       ),
                     ),
-                  Text(
-                      'Discovery: ${state.discoveryStatus} · ${state.routers.length} advertised routers',
+                  Text('Routers (${state.routers.length})',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 3),
+                  Text(_discoverySummary(state),
                       key: const Key('live-discovery-status')),
                   Text(
-                      'Discovery observed: ${state.observedAt?.toUtc().toIso8601String() ?? 'not yet'}',
-                      key: const Key('live-observed-at')),
-                  const SizedBox(height: 6),
-                  Text(
-                      state.credentialAvailable
-                          ? 'Credentials ready for ${state.credentialNetworkName ?? 'an authorized network'}'
-                          : 'No credentials available. Import an authorized dataset to read routers.',
-                      key: const Key('live-credentials-status')),
-                  const SizedBox(height: 14),
+                    state.credentialAvailable
+                        ? 'Credentials ready for ${state.credentialNetworkName ?? 'your network'}'
+                        : 'Import credentials to check a router.',
+                    key: const Key('live-credentials-status'),
+                  ),
+                  const SizedBox(height: 10),
                   for (var i = 0; i < state.routers.length; i++)
                     _routerCard(state.routers[i], i, state.credentialAvailable),
                   if (state.routers.isEmpty)
-                    const Card(
-                        child: Padding(
-                      padding: EdgeInsets.all(18),
-                      child: Text(
-                          'No routers are listed. Refresh discovery to check the local network.'),
-                    )),
-                  const SizedBox(height: 12),
-                  const Card(
-                      child: Padding(
-                    padding: EdgeInsets.all(18),
-                    child: Text(
-                        'Join router unavailable · compatibility and safe lab joining have not been validated.'),
-                  )),
-                  FilledButton.icon(
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text('No routers found. Try Find routers again.'),
+                    ),
+                  const SizedBox(height: 14),
+                  ExpansionTile(
+                    key: const Key('live-how-it-works'),
+                    tilePadding: EdgeInsets.zero,
+                    title: const Text('How this works'),
+                    children: [
+                      const Text(
+                          'Router advertisements only suggest a network name. A router is verified only after an authenticated read completes and its identity matches imported credentials. This screen cannot change your network.'),
+                      Text(
+                          'Discovery observed: ${_localTime(state.observedAt)}',
+                          key: const Key('live-observed-at')),
+                      Text(
+                          'Discovery time (UTC): ${state.observedAt?.toUtc().toIso8601String() ?? 'not yet'}'),
+                      Text('Discovery code: ${state.discoveryStatus}'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
                     key: const Key('live-join-disabled'),
                     onPressed: null,
                     icon: const Icon(Icons.lock_outline),
-                    label: const Text('Join router unavailable'),
+                    label: const Text('Join router · unavailable'),
                   ),
                 ],
               ],
@@ -335,44 +363,132 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
+  String _localTime(DateTime? value) {
+    if (value == null) return 'not yet';
+    return TimeOfDay.fromDateTime(value.toLocal()).format(context);
+  }
+
+  String _discoverySummary(LiveState state) {
+    final time =
+        state.observedAt == null ? '' : ' · ${_localTime(state.observedAt)}';
+    switch (state.discoveryStatus) {
+      case 'completed':
+        return 'Search complete$time · advertisements are unverified';
+      case 'partial':
+        return 'Search incomplete$time · some routers may be missing';
+      case 'error':
+        return 'Search failed$time · try again';
+      case 'unsupported':
+        return 'Search unavailable';
+      default:
+        return 'Search has not run yet';
+    }
+  }
+
+  String _nextAction(LiveState? state) {
+    if (state == null) return 'Connecting to the local helper…';
+    if (state.discoveryStatus == 'unsupported') {
+      return 'Live checks are unavailable here.';
+    }
+    if (state.routers.isEmpty) {
+      return 'Find border routers on your local network.';
+    }
+    if (!state.credentialAvailable) {
+      return 'Import credentials, then check a router.';
+    }
+    if (state.routers.any((router) => router.probe?.verified == true)) {
+      return 'A router matches your imported network. Check others individually.';
+    }
+    return 'Choose a router to check against your imported network.';
+  }
+
   Widget _routerCard(LiveRouter router, int index, bool credentialAvailable) {
     final probe = router.probe;
+    final colors = Theme.of(context).colorScheme;
+    final expanded = _expandedRouters.contains(router.id);
+    final statusIcon = probe?.verified == true
+        ? Icons.verified_outlined
+        : probe?.identityMatch == 'mismatch'
+            ? Icons.warning_amber_outlined
+            : probe == null
+                ? Icons.help_outline
+                : Icons.info_outline;
     return Card(
+      margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(router.serviceName,
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-                'Advertised network: ${router.networkName ?? 'unknown'} · unverified'),
-            Text(
-                'Thread version: ${router.threadVersion ?? 'unknown'} · endpoint ${router.endpointUsable ? 'available' : 'unavailable'}'),
-            const SizedBox(height: 8),
-            Text(_probeSummary(probe), key: Key('live-probe-status-$index')),
-            if (probe != null) ...[
-              const SizedBox(height: 3),
+            Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(router.serviceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium),
+                    Text('Advertised: ${router.networkName ?? 'unknown'}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: Key('live-details-$index'),
+                tooltip: expanded ? 'Hide router details' : 'Router details',
+                onPressed: () => setState(() {
+                  if (expanded) {
+                    _expandedRouters.remove(router.id);
+                  } else {
+                    _expandedRouters.add(router.id);
+                  }
+                }),
+                icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
+              ),
+            ]),
+            const SizedBox(height: 3),
+            Row(children: [
+              Icon(statusIcon, size: 18, color: colors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                  child: Text(_probeSummary(probe),
+                      key: Key('live-probe-status-$index'))),
+              const SizedBox(width: 6),
+              OutlinedButton(
+                key: Key('live-read-$index'),
+                onPressed: _busy ||
+                        !credentialAvailable ||
+                        !router.endpointUsable
+                    ? null
+                    : () =>
+                        _run(() => _api.probe(router.id), routerId: router.id),
+                child: _busyRouter == router.id
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Check'),
+              ),
+            ]),
+            if (!router.endpointUsable)
+              const Text('No usable address was advertised for this router.'),
+            if (expanded) ...[
+              const SizedBox(height: 8),
+              Text(router.serviceName, key: Key('live-full-name-$index')),
+              Text(_probeDetail(probe)),
+              Text('Thread version: ${router.threadVersion ?? 'unknown'}'),
               Text(
-                  'Active read: ${probe.activeStatus} · pending read: ${probe.pendingStatus}'),
-              Text('Read checked: ${probe.checkedAt.toUtc().toIso8601String()}',
-                  key: Key('live-checked-at-$index')),
+                  'Endpoint: ${router.endpointUsable ? 'available' : 'unavailable'}'),
+              if (probe != null) ...[
+                Text('Read code: ${probe.probeStatus}'),
+                Text('Active read: ${probe.activeStatus}'),
+                Text('Pending read: ${probe.pendingStatus}'),
+                Text('Read checked: ${_localTime(probe.checkedAt)}',
+                    key: Key('live-checked-at-$index')),
+                Text(
+                    'Read time (UTC): ${probe.checkedAt.toUtc().toIso8601String()}'),
+              ],
             ],
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              key: Key('live-read-$index'),
-              onPressed: _busy || !credentialAvailable || !router.endpointUsable
-                  ? null
-                  : () =>
-                      _run(() => _api.probe(router.id), routerId: router.id),
-              icon: _busyRouter == router.id
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.lock_open_outlined),
-              label: const Text('Read this router'),
-            ),
           ],
         ),
       ),
