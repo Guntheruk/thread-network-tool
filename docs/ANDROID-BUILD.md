@@ -85,6 +85,13 @@ requires AGP 8.2.0 or newer; this project pins AGP 9.1.0. A new hosted run is
 required to establish whether Kotlin compilation and APK packaging pass; the
 first run did not.
 
+The next hosted Android run, `40221882673` at `8563d39`, passed dependency
+metadata checks but stopped at `:app:processDebugMainManifest`: the app's
+generated minimum SDK was 24 while the pinned Thread Network AAR declares
+minimum SDK 26. The app now pins `minSdk = 26` (Android 8.0), matching the
+SDK's manifest and its [Android support guidance](https://developers.home.google.com/thread).
+This is a build configuration repair; another hosted APK run is required.
+
 The Dart channel contract can be tested with
 `cd app && ../.tooling/flutter/bin/flutter test test/android_credentials_test.dart`.
 This uses mock channel responses and does not establish device support.
