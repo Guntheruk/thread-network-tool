@@ -157,6 +157,13 @@ authorize licence selection, publication, analytics or signup collection.
   build run `40224904977` and all generic checks in `40224904969`. The APK was
   nonempty; installation, device launch and Google consent remain unverified.
   Codex review was requested on that exact head. No PR has been merged.
+- The shared-session review finding now has a reproduced regression and repair.
+  A screen checks its review ID against the authoritative session while visible
+  and when resumed; missing, changed, expired or unverifiable reviews lose their
+  ready status. Generation checks discard late results, lookups do not overlap,
+  and hidden screens do not issue checks. Thirteen focused widget/integration
+  tests pass, including two screens backed by one real `LiveSession` with only
+  native IO replaced. Full candidate checks remain separate validation.
 
 ## Implemented
 

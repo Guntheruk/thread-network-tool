@@ -22,7 +22,8 @@ class NetworkMoveScreen extends StatefulWidget {
   State<NetworkMoveScreen> createState() => _NetworkMoveScreenState();
 }
 
-class _NetworkMoveScreenState extends State<NetworkMoveScreen> {
+class _NetworkMoveScreenState extends State<NetworkMoveScreen>
+    with WidgetsBindingObserver {
   late LiveState _state = widget.initialState;
   NetworkMovePlan? _plan;
   String? _targetRouterId;
@@ -31,30 +32,147 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen> {
   bool _attested = false;
   int _delaySeconds = 300;
   Timer? _reviewExpiryTimer;
+  Timer? _reviewCheckTimer;
   bool _reviewExpired = false;
+  String? _reviewIssue;
+  bool _reviewVerified = false;
+  bool _reviewLookupInFlight = false;
+  int _reviewGeneration = 0;
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _lifecycleState =
+        WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycleState = state;
+    if (state == AppLifecycleState.resumed) {
+      if (_plan != null && !_reviewExpired && _reviewIssue == null) {
+        setState(() {
+          _reviewGeneration++;
+          _reviewVerified = false;
+        });
+        _startReviewChecks();
+        _checkReview();
+      }
+    } else {
+      _reviewCheckTimer?.cancel();
+      _reviewCheckTimer = null;
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _reviewExpiryTimer?.cancel();
+    _reviewCheckTimer?.cancel();
     super.dispose();
   }
 
   void _clearReview() {
+    _reviewGeneration++;
     _reviewExpiryTimer?.cancel();
     _reviewExpiryTimer = null;
+    _reviewCheckTimer?.cancel();
+    _reviewCheckTimer = null;
     _plan = null;
     _reviewExpired = false;
+    _reviewIssue = null;
+    _reviewVerified = false;
+  }
+
+  void _invalidateDisplayedReview(String message) {
+    _reviewGeneration++;
+    _reviewExpiryTimer?.cancel();
+    _reviewExpiryTimer = null;
+    _reviewCheckTimer?.cancel();
+    _reviewCheckTimer = null;
+    _reviewVerified = false;
+    _reviewIssue = message;
   }
 
   void _showPlan(NetworkMovePlan plan) {
+    _reviewGeneration++;
     _reviewExpiryTimer?.cancel();
     _plan = plan;
     final remaining = plan.reviewValidUntil.difference(DateTime.now().toUtc());
     _reviewExpired = remaining <= Duration.zero;
+    _reviewVerified = !_reviewExpired;
     if (!_reviewExpired) {
       _reviewExpiryTimer = Timer(remaining, () {
-        if (mounted) setState(() => _reviewExpired = true);
+        if (mounted) {
+          setState(() {
+            _reviewExpired = true;
+            _reviewVerified = false;
+          });
+          _reviewCheckTimer?.cancel();
+          _reviewCheckTimer = null;
+        }
       });
+      _startReviewChecks();
+    }
+  }
+
+  void _startReviewChecks() {
+    if (_plan == null ||
+        _reviewExpired ||
+        _reviewIssue != null ||
+        _lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    _reviewCheckTimer ??=
+        Timer.periodic(const Duration(seconds: 5), (_) => _checkReview());
+  }
+
+  Future<void> _checkReview() async {
+    final plan = _plan;
+    if (!mounted ||
+        plan == null ||
+        _reviewExpired ||
+        _reviewIssue != null ||
+        _lifecycleState != AppLifecycleState.resumed ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        _reviewLookupInFlight) {
+      return;
+    }
+    final generation = _reviewGeneration;
+    _reviewLookupInFlight = true;
+    try {
+      final current = await widget.api
+          .currentNetworkMovePlan()
+          .timeout(const Duration(seconds: 5));
+      if (!mounted || generation != _reviewGeneration) return;
+      if (current == null ||
+          current.reviewId != plan.reviewId ||
+          !current.reviewValidUntil.isAfter(DateTime.now().toUtc())) {
+        setState(() {
+          _invalidateDisplayedReview(
+              'This review is no longer current. Recheck the evidence and prepare a new review.');
+        });
+      } else {
+        setState(() => _reviewVerified = true);
+      }
+    } catch (_) {
+      if (mounted && generation == _reviewGeneration) {
+        setState(() {
+          _invalidateDisplayedReview(
+              'This review could not be verified. Recheck the evidence and prepare a new review.');
+        });
+      }
+    } finally {
+      _reviewLookupInFlight = false;
+      if (mounted &&
+          generation != _reviewGeneration &&
+          _plan != null &&
+          !_reviewExpired &&
+          _reviewIssue == null) {
+        _checkReview();
+      }
     }
   }
 
@@ -411,9 +529,13 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen> {
             const SizedBox(height: 8),
             Text(_reviewExpired
                 ? 'This review has expired. Recheck the evidence and prepare a new review.'
-                : plan.readyForLabReview
-                    ? 'Evidence ready for separate lab review. No move can start here.'
-                    : 'More evidence is needed. No move can start here.'),
+                : _reviewIssue != null
+                    ? _reviewIssue!
+                    : !_reviewVerified
+                        ? 'Checking whether this review is still current. No move can start here.'
+                        : plan.readyForLabReview
+                            ? 'Evidence ready for separate lab review. No move can start here.'
+                            : 'More evidence is needed. No move can start here.'),
             const SizedBox(height: 8),
             const Text(
                 'Affected scope: the entire source Thread network and all devices on it.'),
