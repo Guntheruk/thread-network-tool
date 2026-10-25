@@ -41,7 +41,7 @@ int main() {
     CHECK(tnt_inspect_dataset(Hex(b).c_str(),out,sizeof out)==0);
     CHECK(std::strstr(out,"\"network_name\":\"\\\"est\""));
     b=Fixture();b[21]=0xc0;Invalid(Hex(b),"invalid_field");
-    b.push_back(200);b.push_back(1);b.push_back(7);
+    b=Fixture();b.push_back(200);b.push_back(1);b.push_back(7);
     CHECK(tnt_inspect_dataset(Hex(b).c_str(),out,sizeof out)==0);
     CHECK(std::strstr(out,"\"unknown_tlv_types\":[200]"));
     // Independent Thread wire fixtures: supported 11..26 is 001fffe0.
