@@ -3,8 +3,9 @@
 Reviewed 25 October 2026 against Google's Android and iOS documentation.
 Google Home device control remains planned: there is no Google account connection
 or verified Nest router support. A separate Android Thread Network SDK credential
-bridge is implemented in source, with consent and cancellation; it remains
-uncompiled and unverified on a device. See [ANDROID-BUILD.md](ANDROID-BUILD.md).
+bridge is implemented with consent and cancellation. Its hosted debug APK build
+passed at `c60c5b4`; consent and retrieval remain unverified on a device.
+See [ANDROID-BUILD.md](ANDROID-BUILD.md).
 
 ## Documented routes
 

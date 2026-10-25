@@ -94,7 +94,8 @@ Future<void> _tapVisible(WidgetTester tester, Key key) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _runReview(WidgetTester tester, _ReadFixture fixture) async {
+Future<NativeLiveApi> _runReview(
+    WidgetTester tester, _ReadFixture fixture) async {
   tester.view.physicalSize = const Size(900, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -148,6 +149,7 @@ Future<void> _runReview(WidgetTester tester, _ReadFixture fixture) async {
   expect(fixture.verbs,
       ['inspect', 'inspect', 'discover', 'probe', 'probe', 'probe']);
   expect(tester.takeException(), isNull);
+  return api;
 }
 
 void main() {
@@ -179,5 +181,29 @@ void main() {
             matching:
                 find.textContaining('A source router has a pending change')),
         findsOneWidget);
+  });
+
+  testWidgets('another screen invalidates a ready review in the shared session',
+      (tester) async {
+    final fixture = _ReadFixture();
+    final api = await _runReview(tester, fixture);
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsOneWidget);
+
+    final secondState = await api.state();
+    final navigator =
+        Navigator.of(tester.element(find.byType(NetworkMoveScreen)));
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => NetworkMoveScreen(api: api, initialState: secondState),
+    ));
+    await tester.pumpAndSettle();
+    await _tapVisible(tester, const Key('move-discover'));
+    expect(await api.currentNetworkMovePlan(), isNull);
+    navigator.pop();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsNothing);
   });
 }

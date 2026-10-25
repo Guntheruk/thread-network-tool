@@ -14,7 +14,10 @@ the separate native-window checks below record the current evidence.
   installed at `.tooling/flutter/bin/flutter`.
 - CMake, supplied by `TNT_CMAKE_BIN` or available on `PATH`.
 - A clean checkout of OpenThread Commissioner at the commit required by the
-  root CMake file. Set `TNT_COMMISSIONER_SOURCE` to that checkout. The build
+  manifest, or its verified generated source. Set `TNT_COMMISSIONER_SOURCE` to
+  either input. Python 3.10+ can verify generated source (`TNT_PYTHON_BIN` selects it); preparing
+  from Git additionally requires `tarfile.data_filter` (Python 3.12+ or a
+  security-patched interpreter providing that API). The build
   script requires the optional authenticated probe and confirms the resulting
   helper reports `authenticated_probe: true` and `network_writes: false`.
 
@@ -29,6 +32,21 @@ TNT_FLUTTER_BIN=/absolute/path/to/flutter \
 TNT_COMMISSIONER_SOURCE=/absolute/path/to/ot-commissioner \
 tools/build_macos_app.sh
 ```
+
+For an original clean Git input, the script prepares a separate generated copy
+at `$TNT_NATIVE_BUILD_DIR/commissioner-source` (the default native build directory
+is used when unset). It verifies the same manifest before configure, after build
+and before packaging. Reusing that generation checks both the original clean
+recursive pins and the generated tree. It never patches or checks out the input
+cache. A verified generated input is used directly. `PYTHONDONTWRITEBYTECODE=1`
+keeps dependency script imports from changing source identity.
+
+The output directory also retains `commissioner-source-provenance.json`,
+`commissioner-source-manifest.json` and `commissioner-source.patch`; existing
+sidecars are never overwritten. These describe the modified dependency with its
+original parent/recursive pins, patch hash and complete generated-tree hash.
+The script explicitly disables both move worker and journal helper, including
+when reusing a CMake cache that previously enabled them.
 
 The default result is a local ad hoc signed app in `build/macos-package/`.
 The script refuses to overwrite a prior package; set `TNT_OUTPUT_DIR` to a
@@ -113,3 +131,39 @@ Authenticated reads from the packaged sandbox, Intel execution, Developer ID
 signing and notarization remain unverified. Earlier direct Dart-adapter reads
 are separate evidence, not proof of the packaged app's DTLS path. Build logs and
 screenshots remain ignored local artifacts; do not publish household screenshots.
+
+## Current isolated Docker build inputs
+
+The checked-in Commissioner lab Dockerfiles now require a fresh
+`commissioner-prepared/` directory in each build context, generated on the host
+using that context's current `app-source/tools/prepare_commissioner_source.py`
+and matching `app-source/patches/commissioner/` manifest and patch. For example:
+
+```sh
+python3 /absolute/context/app-source/tools/prepare_commissioner_source.py \
+  --source /absolute/path/to/clean/ot-commissioner \
+  --output /absolute/context/commissioner-prepared
+```
+
+Include the preparer, manifest and patch in the current app-source checksum
+manifest. Both Dockerfiles verify the generated tree before and after compiling;
+the image keeps its provenance and original license files. Frozen images may
+have Python 3.10: they only run verification, which requires no archive extraction
+filter. No Python download or package installation is required. The original
+clean Git cache remains available for the Stage 1 independent pin audit, but is
+not the configured application dependency. Existing frozen Docker image IDs,
+source manifests and historical runtime reports describe their original inputs;
+these updated recipes require fresh contexts/manifests and do not retroactively
+change that evidence. No new network lab run is implied by recipe validation.
+
+Delivery-consumer smoke evidence, 25 October 2026: the read-only optional native
+Release helper built against generated tree
+`69f848c0395b356c7594aec2fd27539d03bce062d3dfb007c617d3266aaa66f7`.
+The real bundle helper staged it into a synthetic app with only the helper and
+core library, passed Mach-O dependency checks, and its installed capabilities
+reported `authenticated_probe: true`, `network_writes: false`. Generated-tree
+verification passed after building/staging. The notice collector completed with
+this source and the existing local Flutter/package notice inputs. These are
+native staging and collection checks, not a new Flutter app package, universal
+build, signature, router operation or Docker runtime test. The local Docker
+daemon was unavailable; the updated Docker recipes have not been rebuilt here.

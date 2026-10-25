@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thread_network_tool/live_api.dart';
@@ -48,6 +50,7 @@ Map<String, Object?> _stateJson({bool source = false, bool target = false}) => {
 
 NetworkMovePlan _plan({
   String decision = 'needs_evidence',
+  String reviewId = 'review-id',
   DateTime? validUntil,
 }) =>
     NetworkMovePlan.fromJson({
@@ -57,7 +60,7 @@ NetworkMovePlan _plan({
       'blockers': decision == 'needs_evidence'
           ? ['source_read_missing_or_stale']
           : <String>[],
-      'review_id': 'review-id',
+      'review_id': reviewId,
       'review_valid_until':
           (validUntil ?? DateTime.utc(2026, 10, 25, 10, 5)).toIso8601String(),
       'affected_scope': 'whole_source_network',
@@ -94,6 +97,8 @@ class MoveFake implements NetworkMoveApi {
   EmptySourceAttestationInput? attestation;
   int? delay;
   NetworkMovePlan? preparedPlan;
+  NetworkMovePlan? activePlan;
+  Future<NetworkMovePlan?> Function()? onCurrentPlan;
 
   @override
   Future<LiveState> state() async => current;
@@ -131,11 +136,13 @@ class MoveFake implements NetworkMoveApi {
     plannedTarget = targetRouterId;
     this.attestation = attestation;
     delay = delaySeconds;
-    return preparedPlan ?? _plan();
+    activePlan = preparedPlan ?? _plan();
+    return activePlan!;
   }
 
   @override
-  Future<NetworkMovePlan?> currentNetworkMovePlan() async => null;
+  Future<NetworkMovePlan?> currentNetworkMovePlan() async =>
+      onCurrentPlan == null ? activePlan : await onCurrentPlan!();
 }
 
 Future<void> _pump(WidgetTester tester, MoveFake api,
@@ -350,5 +357,123 @@ void main() {
                 find.byKey(const Key('move-dispatch-disabled')))
             .onPressed,
         isNull);
+  });
+
+  testWidgets(
+      'resume hides readiness until the authoritative review is checked',
+      (tester) async {
+    final pending = Completer<NetworkMovePlan?>();
+    final api = MoveFake()
+      ..preparedPlan = _plan(
+          decision: 'ready_for_lab_review',
+          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)))
+      ..onCurrentPlan = () => pending.future;
+    await _pump(tester, api);
+    await _tapVisible(tester, const Key('move-target-target-id'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsNothing);
+    expect(find.textContaining('Checking whether this review is still current'),
+        findsOneWidget);
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('review is no longer current'), findsOneWidget);
+  });
+
+  testWidgets('changed review ID and lookup error both remove a ready claim',
+      (tester) async {
+    final api = MoveFake()
+      ..preparedPlan = _plan(
+          decision: 'ready_for_lab_review',
+          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+    await _pump(tester, api);
+    await _tapVisible(tester, const Key('move-target-target-id'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    api.activePlan = _plan(
+        reviewId: 'other-review',
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsNothing);
+    expect(find.textContaining('review is no longer current'), findsOneWidget);
+
+    await _tapVisible(tester, const Key('move-prepare'));
+    api.onCurrentPlan = () async => throw StateError('lookup failed');
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsNothing);
+    expect(find.textContaining('review could not be verified'), findsOneWidget);
+  });
+
+  testWidgets('late old lookup cannot erase a newer prepared review',
+      (tester) async {
+    final pending = Completer<NetworkMovePlan?>();
+    var lookups = 0;
+    final api = MoveFake()
+      ..preparedPlan = _plan(
+          decision: 'ready_for_lab_review',
+          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+    api.onCurrentPlan = () {
+      lookups++;
+      return lookups == 1 ? pending.future : Future.value(api.activePlan);
+    };
+    await _pump(tester, api);
+    await _tapVisible(tester, const Key('move-target-target-id'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    await tester.pump(const Duration(seconds: 5));
+    api.preparedPlan = _plan(
+        reviewId: 'new-review',
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(api.activePlan!.reviewId, 'new-review');
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsOneWidget);
+    expect(find.textContaining('review is no longer current'), findsNothing);
+  });
+
+  testWidgets('resume ignores a lookup started before the app was hidden',
+      (tester) async {
+    final pending = Completer<NetworkMovePlan?>();
+    var lookups = 0;
+    final api = MoveFake()
+      ..preparedPlan = _plan(
+          decision: 'ready_for_lab_review',
+          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+    api.onCurrentPlan = () {
+      lookups++;
+      return lookups == 1 ? pending.future : Future.value(null);
+    };
+    await _pump(tester, api);
+    await _tapVisible(tester, const Key('move-target-target-id'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    await tester.pump(const Duration(seconds: 5));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsNothing);
+    pending.complete(api.activePlan);
+    await tester.pumpAndSettle();
+    expect(lookups, 2);
+    expect(find.textContaining('Evidence ready for separate lab review'),
+        findsNothing);
+    expect(find.textContaining('review is no longer current'), findsOneWidget);
   });
 }

@@ -47,7 +47,7 @@ const importedState = LiveState(
 
 Future<void> openSetup(WidgetTester tester, FakeAppleCredentials provider,
     Future<LiveState> Function(String) onImport,
-    {TextScaler? textScaler}) async {
+    {TextScaler? textScaler, bool? showAppleRoute = true}) async {
   await tester.pumpWidget(MaterialApp(
     builder: textScaler == null
         ? null
@@ -65,7 +65,7 @@ Future<void> openSetup(WidgetTester tester, FakeAppleCredentials provider,
             builder: (_) => CredentialSetupDialog(
               importDataset: onImport,
               appleCredentials: provider,
-              showAppleRoute: true,
+              showAppleRoute: showAppleRoute,
             ),
           ),
           child: const Text('Open'),
@@ -78,6 +78,16 @@ Future<void> openSetup(WidgetTester tester, FakeAppleCredentials provider,
 }
 
 void main() {
+  testWidgets('iOS shows saved Apple route by default without requesting access',
+      (tester) async {
+    final provider = FakeAppleCredentials();
+    await openSetup(tester, provider, (_) async => importedState,
+        showAppleRoute: null);
+    expect(find.byKey(const Key('live-apple-route')), findsOneWidget);
+    expect(provider.fetchCalls, 0);
+    expect(provider.availabilityCalls, 0);
+  }, variant: TargetPlatformVariant({TargetPlatform.iOS}));
+
   testWidgets('Apple fetch waits for explicit Allow access and imports once',
       (tester) async {
     final provider = FakeAppleCredentials();

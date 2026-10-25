@@ -149,6 +149,21 @@ authorize licence selection, publication, analytics or signup collection.
   `mktemp -d` before any session secret is written. The local access-boundary
   regression and direct macOS core-only compilation pass; fresh hosted CI is
   required to verify Linux and the final combined head.
+- Hosted Checks run `40225229885` passed at `fcc608d`, including the repaired
+  core-only builds and Linux private staging. Codex review reported no new major
+  issue on this head, but an earlier finding about review freshness across shared
+  browser tabs remains open and is being repaired separately.
+- Android PR #5 at `c60c5b4f0221fef9035700bcf947df8524605c62` passed debug APK
+  build run `40224904977` and all generic checks in `40224904969`. The APK was
+  nonempty; installation, device launch and Google consent remain unverified.
+  Codex review was requested on that exact head. No PR has been merged.
+- The shared-session review finding now has a reproduced regression and repair.
+  A screen checks its review ID against the authoritative session while visible
+  and when resumed; missing, changed, expired or unverifiable reviews lose their
+  ready status. Generation checks discard late results, lookups do not overlap,
+  and hidden screens do not issue checks. Thirteen focused widget/integration
+  tests pass, including two screens backed by one real `LiveSession` with only
+  native IO replaced. Full candidate checks remain separate validation.
 
 ## Implemented
 
@@ -219,3 +234,64 @@ Build instructions: README.md, docs/LIVE-READ-CONTRACT.md and docs/MACOS-BUILD.m
 6. Review dependency versions/licenses, complete release notices, choose project license, and arrange signing before publication.
 
 Known limits: the native Mac app is a locally signed development build, without Developer ID signing or notarization. Its authenticated router-read path is still unverified. Native parser validation is not complete Thread policy validation or permission to migrate. IPv6 zone identifiers remain unsupported by the initial CLI, and the session adapter currently permits only local/private endpoint ranges. Router restart persistence and universal vendor behavior have not been verified. A shared network may require no action; fresh preferred-keychain onboarding and repair of existing split networks are distinct product cases.
+
+## Integrated execution and Apple continuation — 25 October 2026
+
+- `c4d0d309d1d8ada09f962dae143b1b5b336e323d` combines the isolated native
+  Commissioner adapter, durable journal/controller, legacy TLV 74 support and
+  strict raw Pending GET. A fresh optional native build at that exact head
+  passed all seven CTests. This does not extend the earlier frozen Docker
+  runtime results to changed source or establish vendor support.
+- Confirmation replay now returns the original dispatch evidence rather than
+  incorrectly reporting that nothing was sent. Controller startup and adoption
+  of another process's operation reset inherited observation intervals.
+  Independent review found no further actionable defect in these repairs;
+  39 real-journal Dart checks and 11 native journal process tests passed.
+- The iOS provider slice `fd41149d78315c8ceb22d62c6883ee61299a972a` passed
+  22 focused provider/dialog tests, 11 native gate checks, a full unsigned iOS
+  build and a full unsigned build with the credential branch enabled. Independent
+  review found no concrete blocker. Device provisioning, consent/retrieval and
+  secure phone-to-Mac transfer remain unverified/unfinished respectively.
+  Apple's native macOS provisioning route is not established; see APPLE-ACCESS.
+- Hosted checks for the read-lab input repair `8a230693531776fdaa1534a6c7c6230762e2b0e3`
+  passed in run `40238414111`. Codex review was requested on that exact head.
+- The complete screen-to-session-to-native move flow is still being implemented.
+  Its isolated profile must bind the original simulator processes and complete
+  datasets, fence before dispatch and verify outcomes after worker termination.
+  Default consumer builds remain read-only. No household operation was performed.
+- Mac internal Thread radio research/implementation now belongs to the separate
+  chat and repository. This app's completion work does not depend on private
+  radio access. The older privacy/lighting and open-source strategy context
+  informs simple local operation; historical assistant proposals are not new
+  requirements or verified market claims.
+- Final combined source `04f3b852e8f4f3257bac1c64bbcddf81e6cfbf24` passed
+  clean Flutter analysis, all 105 Flutter tests, 39 execution checks and all
+  71 tooling/process tests with real source reproducibility enabled. Independent
+  delivery/raw-Pending review found no actionable blocker. Draft PR #8 records
+  this candidate; the full app execution flow remains a separate integration.
+- The universal Mac package at `build/macos-review-04f3b85/Thread Network Tool.app`
+  built and passed strict recursive signature checks. Its exact executable
+  launched; the guided setup and safe Apple-unavailable fallback were verified
+  in the native window. This check used no household credentials or discovery.
+  The package retains the exact dependency patch/tree provenance alongside it.
+- Hosted unsigned iOS run `40241323165` passed, including the enabled-provider
+  compile branch. In run `40241323050`, both native OS jobs and the complete
+  Flutter job passed; the tooling job failed because its journal tests lacked
+  the helper executable environment. CI now builds those fixtures and provides
+  their paths before the full tooling suite. Fresh hosted proof is pending.
+- The tooling fixture repair at `53a740875d77f9c196d6772479ea181ab6ce07af`
+  passed all hosted Checks in run `40241784835`; the unsigned iOS workflow
+  also passed in `40241784788`.
+- PR #8 review found three actionable issues despite earlier local reviews:
+  editable provenance could authorize unrelated dependency source; transient
+  journal contention poisoned cached recovery futures; and a sample spanning
+  the observation deadline could throw instead of remaining pending. Regressions
+  reproduced all three. Source verification now uses a committed independently
+  reconstructed tree digest. Recovery evicts failed cached attempts and requires
+  the sample itself to reach the deadline. The repaired slices passed 37 focused
+  source/resolver/notice checks and 43 real-journal execution checks respectively.
+- Verification of the exact generated source also passed in the frozen Linux
+  image's Python 3.10.12. CMake now permits that interpreter for verification;
+  preparing archives still requires the safe `tarfile.data_filter` API. Python
+  tar transport preserved the committed tree; Mac tar AppleDouble extras remain
+  invalid inputs.

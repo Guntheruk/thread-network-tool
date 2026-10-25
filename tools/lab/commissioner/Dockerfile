@@ -16,6 +16,11 @@ COPY app-source /opt/app-source
 COPY app-source.sha256 /lab/app-source.sha256
 RUN cd /opt/app-source && sha256sum -c /lab/app-source.sha256
 RUN python3 /lab/audit_source.py /opt/app-source/native/probe.cpp
-RUN cmake -G Ninja -S /opt/app-source -B /opt/app-build -DTNT_WITH_COMMISSIONER=ON -DTNT_COMMISSIONER_SOURCE=/opt/ot-commissioner -DTNT_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 && cmake --build /opt/app-build --target thread-network -j2
+# Prepare this directory on the host with the current app manifest/patch. Python
+# 3.11 in frozen images only verifies it; no extraction or dependency fetch occurs.
+COPY commissioner-prepared /opt/commissioner-prepared
+ENV PYTHONDONTWRITEBYTECODE=1
+RUN python3 /opt/app-source/tools/prepare_commissioner_source.py --verify-only --output /opt/commissioner-prepared
+RUN cmake -G Ninja -S /opt/app-source -B /opt/app-build -DTNT_WITH_COMMISSIONER=ON -DTNT_COMMISSIONER_SOURCE=/opt/commissioner-prepared -DTNT_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 && cmake --build /opt/app-build --target thread-network -j2 && python3 /opt/app-source/tools/prepare_commissioner_source.py --verify-only --output /opt/commissioner-prepared
 COPY driver.py /lab/driver.py
 ENTRYPOINT ["python3", "/lab/driver.py"]

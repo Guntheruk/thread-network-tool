@@ -34,7 +34,9 @@ class AppleCredentials {
   })  : _channel =
             channel ?? const MethodChannel('thread_network/apple_credentials'),
         _supportedPlatform = supportedPlatform ??
-            (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS);
+            (!kIsWeb &&
+                (defaultTargetPlatform == TargetPlatform.macOS ||
+                    defaultTargetPlatform == TargetPlatform.iOS));
 
   final MethodChannel _channel;
   final bool _supportedPlatform;

@@ -3,7 +3,7 @@
 
 The collector is intentionally conservative: it copies only a uniquely named
 license file for a resolved Dart package and known license files from the
-pinned Commissioner checkout. Flutter's generated notice bundle is copied
+verified generated Commissioner tree. Flutter's generated notice bundle is copied
 from the already-built macOS release app when available. Missing and ambiguous
 inputs are listed in the manifest instead of guessed.
 """
@@ -18,6 +18,12 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+# Importable both as tools.module and as a directly invoked script.
+try:
+    from .prepare_commissioner_source import verify_prepared, MANIFEST as COMMISSIONER_MANIFEST
+except ImportError:
+    from prepare_commissioner_source import verify_prepared, MANIFEST as COMMISSIONER_MANIFEST
 from urllib.parse import unquote, urlparse
 
 
@@ -142,19 +148,24 @@ def flutter_sdk_package_license(root: Path, flutter_root: Path) -> Path | None:
     return candidate if candidate.is_file() else None
 
 
-def commissioner_sources(source: Path) -> list[tuple[str, Path, str, str, str]]:
+def commissioner_sources(source: Path, provenance: dict | None = None) -> list[tuple[str, Path, str, str, str]]:
     # Only components present in the configured link command are collected.
     components = [
         ("OpenThread Commissioner", source, "LICENSE",
          "BSD-3-Clause (upstream source license)"),
         ("fmt", source / "third_party/fmtlib/repo", "LICENSE", "MIT"),
         ("libevent", source / "third_party/libevent/repo", "LICENSE", "BSD-3-Clause"),
-        ("Mbed TLS (includes linked Everest and p256-m sources)",
+        ("Mbed TLS (includes p256-m; Everest separately recorded)",
          source / "third_party/mbedtls/repo", "LICENSE",
          "Apache-2.0 OR GPL-2.0-or-later; selection unresolved"),
     ]
-    return [(name, root / license_path, *source_revision(root), license_name)
-            for name, root, license_path, license_name in components]
+    provenance = provenance if provenance is not None else verify_prepared(source)
+    rows = []
+    for name, root, license_path, license_name in components:
+        relative = root.relative_to(source).as_posix()
+        revision = provenance['revision'] if relative == '.' else provenance['submodules'][relative]
+        rows.append((name, root / license_path, revision, '', license_name))
+    return rows
 
 
 def configured_commissioner_root() -> Path:
@@ -177,6 +188,7 @@ def copy_text(src: Path, dst: Path) -> str:
 
 
 def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
+    commissioner_provenance = verify_prepared(args.commissioner_root)
     output = args.output_dir
     if output.exists():
         raise FileExistsError(f"refusing to overwrite existing output directory: {output}")
@@ -186,7 +198,7 @@ def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
 
     rows: list[dict[str, str]] = []
     errors = False
-    for name, src, revision, provenance, license_name in commissioner_sources(args.commissioner_root):
+    for name, src, revision, provenance, license_name in commissioner_sources(args.commissioner_root, commissioner_provenance):
         target = output / "commissioner" / (safe_name(name) + ".txt")
         if src.is_file():
             digest = copy_text(src, target)
@@ -198,9 +210,47 @@ def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
             errors = True
         rows.append({"component": name, "version_or_commit": revision,
                      "license": license_name,
-                     "source": "pinned Commissioner checkout: " + src.relative_to(args.commissioner_root).as_posix(),
+                     "source": "verified generated Commissioner source: " + src.relative_to(args.commissioner_root).as_posix(),
                      "status": status, "sha256": digest,
                      "output": target.relative_to(output).as_posix() if digest else ""})
+
+    # Everest has Apache-only notices, distinct from the Mbed TLS dual terms.
+    # Preserve every distinct leading source/header copyright block, without code.
+    everest = args.commissioner_root / 'third_party/mbedtls/repo/3rdparty/everest'
+    blocks = set()
+    for path in sorted(everest.rglob('*')):
+        if path.is_file() and path.suffix in ('.c', '.h'):
+            match = re.match(r'\s*(/\*.*?\*/)', path.read_text(encoding='utf-8'), re.S)
+            if match and ('Copyright' in match[1] or 'copyright' in match[1]):
+                blocks.add(match[1])
+    target = output / 'commissioner/Everest-NOTICES.txt'
+    if blocks:
+        data = ('\n\n'.join(sorted(blocks)) + '\n').encode()
+        target.write_bytes(data)
+    else:
+        data = b''
+        errors = True
+    rows.append({'component': 'Project Everest source and header notices',
+                 'version_or_commit': commissioner_provenance['submodules']['third_party/mbedtls/repo'],
+                 'license': 'Apache-2.0 (separate from Mbed TLS dual licensing)',
+                 'source': 'Mbed TLS 3rdparty/everest leading copyright and license comments',
+                 'status': 'collected' if blocks else 'missing Everest notices',
+                 'sha256': sha256(data) if blocks else '',
+                 'output': target.relative_to(output).as_posix() if blocks else ''})
+
+    # Keep exact original pins, patch and prepared-tree identity beside notices.
+    for src, name in [
+        (args.commissioner_root / 'tnt-source-provenance.json', 'source-provenance.json'),
+        (COMMISSIONER_MANIFEST, 'source-manifest.json'),
+        (COMMISSIONER_MANIFEST.parent / commissioner_provenance['patch'], 'source.patch'),
+    ]:
+        target = output / 'commissioner' / name
+        digest = copy_text(src, target)
+        rows.append({'component': 'Commissioner modification provenance ' + name,
+                     'version_or_commit': commissioner_provenance['revision'],
+                     'license': 'BSD-3-Clause; modification retains upstream terms',
+                     'source': 'local verified source profile', 'status': 'collected',
+                     'sha256': digest, 'output': target.relative_to(output).as_posix()})
 
     flutter_revision, flutter_provenance = source_revision(args.flutter_root)
     for name, src in [
@@ -300,6 +350,8 @@ def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
                      "status": "missing build artifact; Flutter notices not collected", "sha256": "", "output": ""})
         errors = True
 
+    if verify_prepared(args.commissioner_root) != commissioner_provenance:
+        raise ValueError('Commissioner source provenance changed during notice collection')
     rows.sort(key=lambda row: (row["component"].casefold(), row["source"].casefold()))
     manifest = [
         "# Collected third-party notice inputs",

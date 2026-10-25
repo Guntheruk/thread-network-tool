@@ -65,11 +65,13 @@ routes for the current platform, with manual dataset entry under **Advanced**.
    credentials were absent, permissions are missing, or the platform is not
    supported. Give a specific next step without resetting a router or device.
 
-Apple documents consent-based preferred-credential retrieval on macOS 13+ and
-iPhone. The local Xcode SDK also contains the ThreadNetwork framework. Those are
-implementation leads, not proof that our locally signed app has the required
-access. Test the Mac provider and entitlement path before requiring a phone
-handoff. [Apple credential API](https://developer.apple.com/documentation/threadnetwork/thclient/retrievepreferredcredentials(_:)),
+The iPhone bridge implements consent-based preferred-credential retrieval and
+requires configured development signing plus an actual device test. The native
+Mac framework compiles, but Apple's current entitlement availability and Xcode
+capability catalog omit native macOS. Do not promise that signing the Mac app
+alone enables saved credentials. A phone-to-Mac transfer remains separate work;
+guided eero and Advanced import remain available. See `APPLE-ACCESS.md`.
+[Apple credential API](https://developer.apple.com/documentation/threadnetwork/thclient/retrievepreferredcredentials(_:)),
 [Apple entitlement requirements](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.networking.manage-thread-network-credentials).
 
 Android's Thread Network SDK provides a consent flow for stored preferred or
