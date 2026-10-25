@@ -83,10 +83,29 @@ class SyntheticLabHarness {
     return reservation.operation;
   }
 
+  /// Stop the authoritative observation, including callbacks already queued.
+  /// This cannot undo a dispatched command or release an uncertain source.
+  JoinOperation stopObservation(JoinOperation operation) {
+    final reservation = _reservations[operation.operationId];
+    if (reservation == null) {
+      return operation.reduce(JoinEvent.stopObservation);
+    }
+    if (operation.sentAt == reservation.operation.sentAt) {
+      reservation.operation =
+          reservation.operation.reduce(JoinEvent.stopObservation);
+    }
+    return reservation.operation;
+  }
+
   JoinOperation observe(
       JoinOperation operation, JoinVerification evidence, DateTime now) {
     final reservation = _reservations[operation.operationId];
     if (reservation == null) return operation;
+    // Preserve a caller's reducer transition as well as the explicit harness
+    // API. Later callbacks holding an older immutable value cannot revive it.
+    if (operation.stage == JoinStage.observationStopped) {
+      stopObservation(operation);
+    }
     final current = reservation.operation;
     if (current.sentAt == null ||
         current.sentAt != evidence.sentAt ||

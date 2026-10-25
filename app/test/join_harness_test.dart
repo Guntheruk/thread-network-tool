@@ -244,6 +244,53 @@ void main() {
     await harness.send(result, candidate(), at);
     expect(actuator.calls, 1);
   });
+  test('stopped observation cannot be completed by queued or stale callbacks',
+      () async {
+    final actuator = SyntheticActuator(SyntheticCommandOutcome.accepted);
+    final harness = SyntheticLabHarness(actuator);
+    final reviewed = candidate();
+    final sent = await harness.send(confirmed(reviewed), reviewed, at);
+    final stopped = sent.reduce(JoinEvent.stopObservation);
+    final later = at.add(const Duration(seconds: 30));
+    NetworkRead read(String id) => NetworkRead(
+        routerId: id,
+        identity: 'target-id',
+        checkedAt: later,
+        authenticated: true,
+        activeRead: true,
+        pending: PendingState.empty);
+    final evidence = JoinVerification(
+        routerId: 'synthetic-router',
+        targetIdentity: 'target-id',
+        targetRouterId: 'target-router',
+        sentAt: at,
+        routerRead: read('synthetic-router'),
+        targetRead: read('target-router'),
+        accessories: AccessoryEvidence.noneAttested,
+        observationComplete: true);
+    expect(harness.observe(stopped, evidence, later).stage,
+        JoinStage.observationStopped);
+    expect(harness.observe(sent, evidence, later).stage,
+        JoinStage.observationStopped);
+    expect(
+        (await harness.send(confirmed(reviewed, 'retry'), reviewed, later))
+            .stage,
+        JoinStage.confirmed);
+    expect(actuator.calls, 1);
+  });
+
+  test('harness stop updates the authoritative reservation', () async {
+    final actuator = SyntheticActuator(SyntheticCommandOutcome.accepted);
+    final harness = SyntheticLabHarness(actuator);
+    final reviewed = candidate();
+    final original = confirmed(reviewed);
+    final sent = await harness.send(original, reviewed, at);
+    expect(harness.stopObservation(sent).stage, JoinStage.observationStopped);
+    expect((await harness.send(original, reviewed, at)).stage,
+        JoinStage.observationStopped);
+    expect(actuator.calls, 1);
+  });
+
   test('an interim observation can later complete', () async {
     final reviewed = candidate();
     final harness = SyntheticLabHarness(

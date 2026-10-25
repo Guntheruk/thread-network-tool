@@ -71,6 +71,11 @@ authorize licence selection, publication, analytics or signup collection.
   package remain incomplete. No household credentials or network change was used.
 - Draft PR #2 is stacked on #1 for source review. The protocol simulation runs
   separately from the application and has not yet yielded a recorded result.
+- GitHub Codex review of `7874ce0` found that the synthetic harness could ignore
+  a stop-observation transition. A regression reproduced `complete` after stop;
+  the fix updates the authoritative reservation and rejects stale callbacks.
+  Final continuation analysis is clean and all 86 Flutter tests pass. This
+  repairs simulated control flow, without enabling any network write.
 
 ## Implemented
 

@@ -16,6 +16,11 @@ The state path is `planned → confirmed → dispatching → observing → compl
 
 Completion requires fresh authenticated reads after dispatch from the **same selected router** and the target network, both matching the authorized target identity with no pending update. The current harness admits only the attested-empty source. The verification model also accepts an exact affected-accessory list with one fresh operational read per subject after dispatch, for a future separately authorized migration route; a status flag alone cannot prove this. Interim old identity, pending update, missing reads or unknown accessory evidence remain `observing` while the defined observation period is open; a changed router binding is rejected immediately. At the end of observation, unresolved or failed evidence yields `needsAttention`. No universal observation duration is inferred.
 
+The harness owns the authoritative operation after dispatch. Its
+`stopObservation` method records the stopped state before queued verification
+callbacks can run; a caller-supplied stopped reducer value is also preserved.
+Older callback snapshots cannot revive observation or release the source lease.
+
 ## Hardware gate for a future adapter
 
 Use an isolated router and a known target network with owner-authorized credentials, documented device command support and a model/firmware capability result. Establish the actual source inventory and a recovery method before any device command. The lab must observe command acceptance separately from router attachment, target reads and accessory operational reads. Test a missed response, lost connection, app restart and failed recovery. Rejoining the old network might be possible only if the device offers that command and old credentials remain usable; it is not a guaranteed rollback. No household router, vendor account or working accessory is an implicit test target.
