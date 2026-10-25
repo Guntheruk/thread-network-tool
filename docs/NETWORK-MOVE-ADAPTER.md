@@ -61,15 +61,19 @@ The exact stack defaults clamp key changes to at least 300000 ms; other changes
 have a 30000 ms minimum. This profile accepts 30000–600000 ms subject to those
 constraints. The lab does not lower the stack defaults or speed up time.
 
-The pinned Commissioner `448f807e3246c46e5b82e4cdc12a9b0fb2a646ae` provides
-`GetRawActiveDataset` but no raw Pending Dataset setter. Its typed encoder
-represents ten Active Dataset TLVs. This adapter therefore explicitly reports
-`unsupported_dataset_fields` for any source/target field it cannot reproduce,
-including Wakeup Channel TLV 74. It retains unknown raw TLVs for comparison and
-never silently drops them or lets source-only fields carry over. This is a
-**temporary pinned-adapter capability limit**, not a declaration that TLV 74 is
-invalid. A separately reviewed Commissioner extension is required before those
-real datasets can use this route.
+The integration uses verified generated source from Commissioner
+`448f807e3246c46e5b82e4cdc12a9b0fb2a646ae` plus the versioned patch in
+`patches/commissioner/manifest.json`. The typed Pending SET encoder now preserves
+the optional legacy Wake-up Channel TLV 74 within the documented page/channel
+subset. Unsupported fields still block rather than being dropped or carried
+over from the source. This is legacy compatibility, not finalized Thread 1.4 or
+Thread Direct compliance; see `LEGACY-WAKEUP-COMPAT.md`.
+
+The patch also adds a bounded raw Pending GET. The adapter validates the entire
+wire dataset before projecting known fields, so unknown-only, duplicate or
+malformed pending data cannot be mistaken for an empty or exact dataset. No raw
+SET API is added. The historical runtime evidence below predates this patch;
+current compile and codec checks do not extend that evidence to vendor hardware.
 
 ## Outcomes and observation
 
@@ -89,6 +93,10 @@ crash or generic launch/worker error must be treated as uncertain by a caller
 unless it receives and validates matching explicit native proof. A different
 operation ID is not permission to retry an unresolved move. Root's execution
 controller/journal work remains separate from this lab worker.
+
+Repeated Confirm calls return the original terminal result, including its
+Petition/SET counters. An accepted or uncertain dispatch cannot become
+`proven_not_sent` merely because the confirmation token was already consumed.
 
 The worker has an independent 1000-second process alarm; its lab driver has a
 1000-second deadline and Docker an outer 1100-second timeout plus 5-second kill
@@ -239,8 +247,10 @@ by its noexec mount; execution was moved to the offline build stage without
 changing runtime privileges or mount options.
 
 The source-only dataset operation is proven for this controlled simulator
-profile. Physical/vendor support, legacy TLV 74 support, application journal/UI
-dispatch integration and production packaging remain separate gates.
+profile at the frozen source recorded above. Current legacy TLV 74 encoding and
+strict raw Pending GET have separate codec/adapter checks. Physical/vendor
+support, current patched runtime, application journal/UI dispatch integration
+and production packaging remain separate gates.
 
 Exact-name inspection after the final runs returned no owned runtime containers.
 The cached images and task-owned Linux build context remain for reproduction.

@@ -258,17 +258,20 @@ class MoveRecord {
 
   static MoveRecord decode(String text) {
     try {
-      if (text.length > 8192 || !text.endsWith('\n'))
+      if (text.length > 8192 || !text.endsWith('\n')) {
         throw const FormatException();
+      }
       final fields = <String, String>{};
       for (final line in text.substring(0, text.length - 1).split('\n')) {
         final at = line.indexOf('=');
-        if (at < 1 || fields.containsKey(line.substring(0, at)))
+        if (at < 1 || fields.containsKey(line.substring(0, at))) {
           throw const FormatException();
+        }
         fields[line.substring(0, at)] = line.substring(at + 1);
       }
-      if (fields.length != 16 || fields['schema'] != '1')
+      if (fields.length != 16 || fields['schema'] != '1') {
         throw const FormatException();
+      }
       DateTime? stableTime(String field) => fields[field] == '0'
           ? null
           : DateTime.fromMillisecondsSinceEpoch(

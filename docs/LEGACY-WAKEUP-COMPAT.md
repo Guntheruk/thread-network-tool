@@ -1,10 +1,9 @@
 # Legacy Wake-up Channel compatibility
 
-The application currently blocks dataset TLV 74 in its write path. This patch is
-a bounded dependency extension for preserving that optional observed field
-through the existing public `SetPendingDataset` API. It adds no application
-command, raw setter, or household network operation. The root integration and
-adapter rejection checks must pass before enabling this compatibility profile.
+The optional native adapter preserves legacy dataset TLV 74 through the existing
+typed `SetPendingDataset` API. Its generated-source build and full-wire adapter
+checks are integrated. This adds no consumer application command, raw setter or
+household operation. Native runtime and vendor support remain separate gates.
 
 Do not describe this as finalized Thread 1.4 or Thread Direct compliance.
 [OpenThread PR 13614](https://github.com/openthread/openthread/pull/13614)
@@ -84,7 +83,7 @@ generated tree and verification correctly rejects the changed tree. Keep build
 outputs outside generated sources. Do not relax tree verification to hide new
 files.
 
-The root CMake, adapter and packaging integration are outside this slice.
+The root CMake and adapter now require and verify the generated source.
 Disable the unused upstream app, tests, Java bindings and commercial
 commissioning as specified by the manifest; enabling other features requires a
 fresh dependency inventory. Existing AppleClang/fmt build compatibility options
@@ -119,7 +118,7 @@ reproducibility and generated-tree tampering. The actual-source integration is
 explicitly skipped unless `TNT_COMMISSIONER_TEST_SOURCE` is supplied; skipped
 integration is not reproducibility evidence.
 
-Local evidence from this slice: the unmodified public header rejects both new
+Historical evidence from the original patch: the unmodified public header rejects both new
 member names at compile time. The prepared source builds in Release, and the
 actual codec executable passes 283 checks covering three complete round trips
 and 17 negative fixtures. The focused CTest passes 1/1. All 11 preparation tests
@@ -129,6 +128,15 @@ passes its full tree verification again after configure/build; its tree hash is
 These checks do not dispatch `SetPendingDataset`, establish eventual adoption,
 or test Apple/Eero hardware.
 
+The subsequent integrated patch also exposes bounded raw Pending GET. Strict
+adapter parsing rejects unknown, duplicate and malformed full-wire fields before
+they can be mistaken for empty/exact pending data. The integrated build passes
+seven CTests, including 284 codec checks and 73 adapter checks with three complete
+projections. Its generated tree hash is
+`69f848c0395b356c7594aec2fd27539d03bce062d3dfb007c617d3266aaa66f7`;
+the patch identity is recorded in the current manifest. This is build/codec
+evidence, not a new network-runtime result.
+
 ## Notices and provenance
 
 The patch retains upstream copyright headers and BSD-3-Clause terms. Source
@@ -136,7 +144,7 @@ archives preserve upstream and transitive licence files. The generated
 provenance identifies the modification instead of describing it as unmodified
 upstream. Binary notices must reproduce the upstream copyright, conditions and
 disclaimer, plus the required transitive notices. Update `docs/THIRD-PARTY.md`'s
-claim that no upstream source edits are required when root integrates this
-profile, and feed the generated tree/provenance into the notice collection.
+description of the modified dependency with its generated source provenance in
+notice collection.
 This work does not select an application licence, select among dependency
 licence alternatives, approve distribution, or claim a security review.

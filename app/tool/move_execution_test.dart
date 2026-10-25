@@ -3,10 +3,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../lib/move/move_execution.dart';
-import '../lib/move/move_execution_controller.dart';
-import '../lib/move/move_journal.dart';
-import '../lib/move/native_move_journal.dart';
+import 'package:thread_network_tool/move/move_execution.dart';
+import 'package:thread_network_tool/move/move_execution_controller.dart';
+import 'package:thread_network_tool/move/move_journal.dart';
+import 'package:thread_network_tool/move/native_move_journal.dart';
 
 String hex(String c) => c * 64;
 void expect(bool condition, String message) {

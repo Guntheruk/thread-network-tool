@@ -11,11 +11,11 @@ separate states. Joining remains disabled.
 | Area | Source state | Evidence and limit |
 | --- | --- | --- |
 | macOS local app | Implemented | A locally signed universal app opened on Apple Silicon. Packaged-window discovery and synthetic import passed. One read against a router and the direct native adapter passed separately; neither proves authenticated reads from the packaged sandbox. Intel execution, packaged DTLS reads, Developer ID distribution signing and notarization are unverified. |
-| Apple credential access (macOS) | Bridge implemented in source | The Swift/Flutter bridge has explicit consent, cancellation and typed failures. This local build lacks the credential-management entitlement and reports access unavailable; real retrieval remains unverified. Signing, entitlement and runtime access remain gates. The iOS bridge is not implemented. |
+| Apple credential access (macOS) | Unavailable in the local build | The framework/bridge compiles, but Apple's entitlement availability and Xcode capability catalog omit native macOS. A signing certificate alone does not establish a supported provisioning route. Guided import remains available; see `APPLE-ACCESS.md`. |
 | Android preferred credentials | Bridge and debug APK build verified | At `c60c5b4`, hosted run `40224904977` compiled the Kotlin/Flutter bridge and produced a nonempty debug APK with Thread SDK 16.3.0, desugaring 2.1.3 and minimum API 26. Installation, launch, consent and credential retrieval remain unverified on a device. |
 | Google Home / Nest device commands | Documented route only | Capability reads and temporary credential-sharing/join commands are described in `GOOGLE-HOME.md`; no Google account bridge, Home API implementation, Google device approval or verified Nest model exists. |
 | Windows | Desktop build verified; networking unavailable | At `6498a9e`, hosted run `40220629150` passed the native core checks and Flutter Windows desktop build. Discovery and authenticated router communication remain unavailable; no Windows device runtime check is recorded. |
-| iOS | Unavailable | A generated project and documented API routes do not provide an implemented app bridge. No iOS build or runtime check is recorded. |
+| iOS saved credentials | Bridge implemented; unsigned build verified | Explicit-consent provider and Flutter routing compile in the complete Runner, including the enabled physical-device branch. Default/simulator builds report access not configured. Development provisioning, device installation and real consent/retrieval remain unverified. Native phone discovery and secure phone-to-Mac transfer are separate unfinished work. |
 | Home Assistant / AI | Optional and unused by core | Neither is required by the local workflow; neither is an account or credential provider in this app. |
 | Mac internal Thread radio | Separate experimental probe; not integrated | An ordinary-user Skywalk/Spinel probe received version and capability replies on an M3 Pro Mac with macOS 27.0.1. This proves coprocessor access, not RF reception, app-sandbox support or a replacement for border-router networking. See `MAC-RADIO-RESEARCH.md`. |
 
@@ -25,10 +25,11 @@ The source contains a bounded dataset parser and read-only authenticated-probe
 path. A direct adapter read succeeded once against one router. The packaged Mac
 app has separate evidence for local discovery and synthetic dataset handling,
 not for that authenticated probe. No mutation command is enabled, and no
-controlled join/recovery result is recorded for the application. The separate
-CLI simulation in `PROTOCOL-LAB.md` verifies a synthetic Pending Dataset move;
-it does not yet establish the application's Commissioner write path or a
-supported vendor combination.
+controlled join/recovery result is recorded for the application. The original
+CLI simulation in `PROTOCOL-LAB.md` and subsequent real native Commissioner
+lab in `NETWORK-MOVE-ADAPTER.md` have distinct evidence. The latter completed
+three isolated software-network moves, including lost-result recovery. Neither
+establishes the full application screen workflow or a supported vendor combination.
 
 The product scopes differ by operation. Reading one vendor router is a
 single-router credential/authentication check; it does not inventory or assess

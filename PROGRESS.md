@@ -234,3 +234,33 @@ Build instructions: README.md, docs/LIVE-READ-CONTRACT.md and docs/MACOS-BUILD.m
 6. Review dependency versions/licenses, complete release notices, choose project license, and arrange signing before publication.
 
 Known limits: the native Mac app is a locally signed development build, without Developer ID signing or notarization. Its authenticated router-read path is still unverified. Native parser validation is not complete Thread policy validation or permission to migrate. IPv6 zone identifiers remain unsupported by the initial CLI, and the session adapter currently permits only local/private endpoint ranges. Router restart persistence and universal vendor behavior have not been verified. A shared network may require no action; fresh preferred-keychain onboarding and repair of existing split networks are distinct product cases.
+
+## Integrated execution and Apple continuation — 25 October 2026
+
+- `c4d0d309d1d8ada09f962dae143b1b5b336e323d` combines the isolated native
+  Commissioner adapter, durable journal/controller, legacy TLV 74 support and
+  strict raw Pending GET. A fresh optional native build at that exact head
+  passed all seven CTests. This does not extend the earlier frozen Docker
+  runtime results to changed source or establish vendor support.
+- Confirmation replay now returns the original dispatch evidence rather than
+  incorrectly reporting that nothing was sent. Controller startup and adoption
+  of another process's operation reset inherited observation intervals.
+  Independent review found no further actionable defect in these repairs;
+  39 real-journal Dart checks and 11 native journal process tests passed.
+- The iOS provider slice `fd41149d78315c8ceb22d62c6883ee61299a972a` passed
+  22 focused provider/dialog tests, 11 native gate checks, a full unsigned iOS
+  build and a full unsigned build with the credential branch enabled. Independent
+  review found no concrete blocker. Device provisioning, consent/retrieval and
+  secure phone-to-Mac transfer remain unverified/unfinished respectively.
+  Apple's native macOS provisioning route is not established; see APPLE-ACCESS.
+- Hosted checks for the read-lab input repair `8a230693531776fdaa1534a6c7c6230762e2b0e3`
+  passed in run `40238414111`. Codex review was requested on that exact head.
+- The complete screen-to-session-to-native move flow is still being implemented.
+  Its isolated profile must bind the original simulator processes and complete
+  datasets, fence before dispatch and verify outcomes after worker termination.
+  Default consumer builds remain read-only. No household operation was performed.
+- Mac internal Thread radio research/implementation now belongs to the separate
+  chat and repository. This app's completion work does not depend on private
+  radio access. The older privacy/lighting and open-source strategy context
+  informs simple local operation; historical assistant proposals are not new
+  requirements or verified market claims.

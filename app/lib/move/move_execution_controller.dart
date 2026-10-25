@@ -38,8 +38,9 @@ class MoveExecutionController {
   Future<MoveRecord> confirmAndStart(MoveExecutionPlan plan) {
     final existing = _starts[plan.operationId];
     if (existing != null) return existing;
-    if (_busy)
+    if (_busy) {
       return Future.error(const MoveExecutionFailure('operation_busy'));
+    }
     _busy = true;
     final result = _start(plan).whenComplete(() {
       _busy = false;
@@ -54,11 +55,13 @@ class MoveExecutionController {
     if (plan.profileId != isolatedMoveProfile) {
       throw const MoveExecutionFailure('unsupported_profile');
     }
-    if (!now().isBefore(plan.expiresAt))
+    if (!now().isBefore(plan.expiresAt)) {
       throw const MoveExecutionFailure('review_expired');
+    }
     final current = await this.current();
-    if (current != null && current.operationId == plan.operationId)
+    if (current != null && current.operationId == plan.operationId) {
       return current;
+    }
     if (current != null && !current.terminal) {
       throw const MoveExecutionFailure('unresolved_operation');
     }
@@ -185,8 +188,9 @@ class MoveExecutionController {
 
   Future<MoveRecord> stopObservation(String operationId) async {
     final record = await _record(operationId);
-    if (record.terminal || record.stage == MoveStage.observationStopped)
+    if (record.terminal || record.stage == MoveStage.observationStopped) {
       return record;
+    }
     return journal.update(
       record.next(
         MoveStage.observationStopped,
@@ -208,8 +212,9 @@ class MoveExecutionController {
   }) async {
     var record = await _record(operationId);
     if (record.terminal ||
-        (record.stage == MoveStage.observationStopped && !resume))
+        (record.stage == MoveStage.observationStopped && !resume)) {
       return record;
+    }
     if (record.stage == MoveStage.dispatchFenced) {
       record = await journal.update(
         record.next(

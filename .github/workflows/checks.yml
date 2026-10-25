@@ -37,11 +37,16 @@ jobs:
         with:
           persist-credentials: false
       - name: Configure read-only core and tests
-        run: cmake -S . -B build/ci-native -DCMAKE_BUILD_TYPE=Release -DTNT_WITH_COMMISSIONER=OFF -DTNT_BUILD_TESTS=ON
+        run: cmake -S . -B build/ci-native -DCMAKE_BUILD_TYPE=Release -DTNT_WITH_COMMISSIONER=OFF -DTNT_BUILD_TESTS=ON -DTNT_BUILD_MOVE_JOURNAL=ON
       - name: Build
         run: cmake --build build/ci-native --parallel 2
       - name: Test
         run: ctest --test-dir build/ci-native --output-on-failure --timeout 60
+      - name: Test durable journal with real processes
+        env:
+          TNT_JOURNAL_CLI: ${{ github.workspace }}/build/ci-native/thread-move-journal
+          TNT_JOURNAL_FAULT: ${{ github.workspace }}/build/ci-native/tnt-move-journal-fault
+        run: python3 -m unittest discover -s tests/tools -p test_move_journal.py -v
 
   flutter:
     name: Flutter analyze, test, and web build
@@ -69,5 +74,10 @@ jobs:
           dart run tool/network_move_plan_test.dart
           dart run tool/network_move_api_test.dart
           dart run tool/local_server_test.dart
+      - name: Test execution and restart recovery with real journal
+        run: |
+          cmake -S .. -B ../build/ci-journal -DCMAKE_BUILD_TYPE=Release -DTNT_WITH_COMMISSIONER=OFF -DTNT_BUILD_TESTS=OFF -DTNT_BUILD_MOVE_JOURNAL=ON
+          cmake --build ../build/ci-journal --target thread-move-journal --parallel 2
+          dart run tool/move_execution_test.dart ../build/ci-journal/thread-move-journal
       - name: Build release web app
         run: flutter build web --release --no-web-resources-cdn
