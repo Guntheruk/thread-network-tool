@@ -16,7 +16,12 @@ generated manifest. It reads the Commissioner source from the existing CMake
 cache when available, otherwise from `vendor/ot-commissioner`; use
 `--commissioner-root` when neither path applies. It records missing and
 ambiguous package-license files as gaps and exits nonzero when any required
-input is unavailable.
+input is unavailable. It also exits nonzero when a source checkout's exact Git
+revision cannot be established, tracked source changes are present, or a
+resolved Dart package lacks a lockfile version. The manifest records a dirty
+checkout as a provenance gap while still hashing the copied license bytes; a
+HEAD value beside that warning does not claim those bytes came from the clean
+commit. Local source paths are not included in the manifest.
 
 ## Native probe link inputs
 

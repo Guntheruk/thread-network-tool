@@ -33,6 +33,7 @@ class SyntheticLabHarness {
   SyntheticLabHarness(this.actuator);
   final SyntheticActuator actuator;
   final Map<String, _Reservation> _reservations = {};
+  final Map<String, _Reservation> _sourceLeases = {};
 
   Future<JoinOperation> send(
       JoinOperation operation, JoinCandidate candidate, DateTime at) async {
@@ -40,6 +41,23 @@ class SyntheticLabHarness {
     // original immutable confirmed value cannot dispatch the same ID twice.
     final prior = _reservations[operation.operationId];
     if (prior != null) return prior.operation;
+    final sourceLease = _sourceLeases[candidate.routerId];
+    if (sourceLease != null) {
+      // An uncertain or unfinished command must never be replayed under a
+      // fresh operation ID. A completed earlier join can be followed only by
+      // a separately reviewed move with post-dispatch source/target reads.
+      final priorSentAt = sourceLease.operation.sentAt;
+      final sourceRead = candidate.routerRead;
+      if (sourceLease.operation.stage != JoinStage.complete ||
+          priorSentAt == null ||
+          candidate.sourceState != SourceState.verifiedExisting ||
+          sourceRead == null ||
+          !sourceRead.checkedAt.isAfter(priorSentAt) ||
+          sourceRead.identity != sourceLease.targetIdentity ||
+          !candidate.targetRead.checkedAt.isAfter(priorSentAt)) {
+        return operation;
+      }
+    }
     if (assessJoin(candidate, at).decision != JoinDecision.readyForLabReview ||
         operation.stage != JoinStage.confirmed ||
         operation.confirmedPlan?.matches(candidate) != true ||
@@ -51,6 +69,7 @@ class SyntheticLabHarness {
     final reservation = _Reservation(next, candidate.routerId,
         candidate.targetRead.routerId, candidate.targetIdentity);
     _reservations[operation.operationId] = reservation;
+    _sourceLeases[candidate.routerId] = reservation;
     // A future hardware adapter must durably save this intent before dispatch.
     try {
       final outcome = await actuator.send();

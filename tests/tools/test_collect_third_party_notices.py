@@ -1,11 +1,13 @@
 import argparse
 import gzip
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from tools.collect_third_party_notices import collect, git_head
+from tools.collect_third_party_notices import collect, git_head, source_revision
 
 
 class NoticeCollectorTest(unittest.TestCase):
@@ -51,9 +53,49 @@ class NoticeCollectorTest(unittest.TestCase):
             flutter_root=self.flutter,
             flutter_notices=self.flutter_notices,
         )
+        self.revision_patcher = patch(
+            "tools.collect_third_party_notices.source_revision",
+            return_value=("a" * 40, ""),
+        )
+        self.revision_mock = self.revision_patcher.start()
 
     def tearDown(self):
+        self.revision_patcher.stop()
         self.tmp.cleanup()
+
+    def test_missing_revision_marks_collection_incomplete(self):
+        self.revision_mock.return_value = ("not established", "source revision unavailable")
+        _, errors = collect(self.args)
+        self.assertTrue(errors)
+        manifest = (self.output / "MANIFEST.md").read_text(encoding="utf-8")
+        self.assertIn("source revision unavailable", manifest)
+        self.assertIn("Version/commit: not established", manifest)
+
+    def test_dirty_revision_marks_collection_incomplete(self):
+        self.revision_mock.return_value = (
+            "a" * 40, "dirty source checkout; bytes may differ from commit")
+        _, errors = collect(self.args)
+        self.assertTrue(errors)
+        manifest = (self.output / "MANIFEST.md").read_text(encoding="utf-8")
+        self.assertIn("dirty source checkout; bytes may differ from commit", manifest)
+        self.assertNotIn(str(self.root), manifest)
+
+    def test_source_revision_rejects_missing_git_checkout(self):
+        self.assertEqual(source_revision(self.commissioner),
+                         ("not established", "source revision unavailable"))
+
+    def test_source_revision_detects_tracked_changes(self):
+        results = [
+            subprocess.CompletedProcess([], 0, str(self.commissioner) + "\n", ""),
+            subprocess.CompletedProcess([], 0, "b" * 40 + "\n", ""),
+            subprocess.CompletedProcess([], 0, " M LICENSE\n", ""),
+        ]
+        with patch("tools.collect_third_party_notices.subprocess.run",
+                   side_effect=results) as run:
+            self.assertEqual(source_revision(self.commissioner),
+                             ("b" * 40,
+                              "dirty source checkout; bytes may differ from commit"))
+        self.assertEqual(run.call_count, 3)
 
     def test_collects_license_sources_deterministically_and_sanitizes_paths(self):
         _, errors = collect(self.args)
@@ -97,6 +139,8 @@ class NoticeCollectorTest(unittest.TestCase):
             "rootUri": sdk_package.as_uri(),
         })
         (self.app / ".dart_tool/package_config.json").write_text(json.dumps(config))
+        with (self.app / "pubspec.lock").open("a", encoding="utf-8") as lock:
+            lock.write("  flutter_test:\n    dependency: direct dev\n    version: 0.0.0\n")
 
         _, errors = collect(self.args)
 
@@ -110,6 +154,13 @@ class NoticeCollectorTest(unittest.TestCase):
             (self.output / "dart/flutter_test.txt").read_text(encoding="utf-8"),
             "Flutter SDK BSD notice\n",
         )
+
+    def test_resolved_package_without_lock_version_is_a_gap(self):
+        (self.app / "pubspec.lock").write_text("packages:\n", encoding="utf-8")
+        _, errors = collect(self.args)
+        self.assertTrue(errors)
+        manifest = (self.output / "MANIFEST.md").read_text(encoding="utf-8")
+        self.assertIn("package version not in lockfile", manifest)
 
     def test_missing_non_sdk_package_does_not_inherit_flutter_license(self):
         sdk_license = self.flutter / "packages/flutter/LICENSE"

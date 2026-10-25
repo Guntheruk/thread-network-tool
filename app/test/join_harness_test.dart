@@ -59,6 +59,90 @@ void main() {
         JoinStage.observing);
     expect(actuator.calls, 1);
   });
+  test('distinct operation IDs cannot concurrently dispatch one source',
+      () async {
+    final gate = Completer<void>();
+    final actuator =
+        SyntheticActuator(SyntheticCommandOutcome.accepted, hold: gate.future);
+    final harness = SyntheticLabHarness(actuator);
+    final reviewed = candidate();
+    final first = harness.send(confirmed(reviewed, 'first'), reviewed, at);
+    final second =
+        await harness.send(confirmed(reviewed, 'second'), reviewed, at);
+    expect(second.stage, JoinStage.confirmed);
+    expect(actuator.calls, 1);
+    gate.complete();
+    expect((await first).stage, JoinStage.observing);
+  });
+  test('uncertain source lease blocks a separately confirmed retry', () async {
+    final actuator = SyntheticActuator(SyntheticCommandOutcome.uncertain);
+    final harness = SyntheticLabHarness(actuator);
+    final reviewed = candidate();
+    expect(
+        (await harness.send(confirmed(reviewed, 'first'), reviewed, at)).stage,
+        JoinStage.needsAttention);
+    expect(
+        (await harness.send(confirmed(reviewed, 'second'), reviewed,
+                at.add(const Duration(seconds: 30))))
+            .stage,
+        JoinStage.confirmed);
+    expect(actuator.calls, 1);
+  });
+  test(
+      'completed source needs fresh authenticated source evidence for a new target',
+      () async {
+    final actuator = SyntheticActuator(SyntheticCommandOutcome.accepted);
+    final harness = SyntheticLabHarness(actuator);
+    final firstCandidate = candidate();
+    final first = await harness.send(
+        confirmed(firstCandidate, 'first'), firstCandidate, at);
+    final observedAt = at.add(const Duration(seconds: 30));
+    NetworkRead read(String router, String identity, DateTime when) =>
+        NetworkRead(
+            routerId: router,
+            identity: identity,
+            checkedAt: when,
+            authenticated: true,
+            activeRead: true,
+            pending: PendingState.empty);
+    final complete = harness.observe(
+        first,
+        JoinVerification(
+            routerId: 'synthetic-router',
+            targetIdentity: 'target-id',
+            targetRouterId: 'target-router',
+            sentAt: at,
+            routerRead: read('synthetic-router', 'target-id', observedAt),
+            targetRead: read('target-router', 'target-id', observedAt),
+            accessories: AccessoryEvidence.noneAttested,
+            observationComplete: true),
+        observedAt);
+    expect(complete.stage, JoinStage.complete);
+    JoinCandidate next(DateTime sourceAt) => JoinCandidate(
+        routerId: 'synthetic-router',
+        targetIdentity: 'next-target',
+        model: 'Synthetic',
+        firmware: '1',
+        capability: DeviceCapability.supported,
+        threadReadiness: ThreadReadiness.ready,
+        authorizedTargetCredentials: true,
+        authorizedDeviceCommand: true,
+        sourceState: SourceState.verifiedExisting,
+        emptySourceAttested: true,
+        routerRead: read('synthetic-router', 'target-id', sourceAt),
+        targetRead: read('next-target-router', 'next-target', observedAt));
+    final stale = next(at);
+    expect(
+        (await harness.send(confirmed(stale, 'stale'), stale, observedAt))
+            .stage,
+        JoinStage.confirmed);
+    final fresh = next(observedAt);
+    expect(
+        (await harness.send(confirmed(fresh, 'fresh'), fresh, observedAt))
+            .stage,
+        JoinStage.observing);
+    expect(actuator.calls, 2);
+  });
   test('confirmation for one candidate cannot dispatch a substituted one',
       () async {
     final actuator = SyntheticActuator(SyntheticCommandOutcome.accepted);
@@ -183,6 +267,29 @@ void main() {
         accessories: AccessoryEvidence.noneAttested,
         observationComplete: done);
     expect(harness.observe(sent, evidence(false), later).stage,
+        JoinStage.observing);
+    final oldRead = NetworkRead(
+        routerId: 'synthetic-router',
+        identity: 'old-target',
+        checkedAt: later,
+        authenticated: true,
+        activeRead: true,
+        pending: PendingState.present);
+    expect(
+        harness
+            .observe(
+                sent,
+                JoinVerification(
+                    routerId: 'synthetic-router',
+                    targetIdentity: 'target-id',
+                    targetRouterId: 'target-router',
+                    sentAt: at,
+                    routerRead: oldRead,
+                    targetRead: read('target-router'),
+                    accessories: AccessoryEvidence.unknown,
+                    observationComplete: false),
+                later)
+            .stage,
         JoinStage.observing);
     expect(
         harness.observe(sent, evidence(true), later).stage, JoinStage.complete);

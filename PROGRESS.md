@@ -45,7 +45,7 @@ authorize licence selection, publication, analytics or signup collection.
   separate operations. The earlier Eero approach was network-wide. Work on an
   isolated OpenThread simulation must not be represented as vendor compatibility.
 - The local notice collector resolves source revisions and SDK package licence
-  provenance, copies deterministic inputs and refuses overwrite. Eight focused
+  provenance, copies deterministic inputs and refuses overwrite. Thirteen focused
   tests pass and local collection completed without missing inputs. This does
   not choose a project or dependency licence or certify distribution notices.
 - `docs/COMPATIBILITY.md` and `docs/PILOT.md` distinguish source, package,
@@ -55,6 +55,22 @@ authorize licence selection, publication, analytics or signup collection.
   tests pass. These include mocked provider outcomes, cancellation, join-state
   evidence and consumer layouts. They do not prove Apple/Android device access
   or a real join. The dependency collector's eight tests pass separately.
+- Independent review of committed head `7874ce0` found no new credential/setup
+  defect and three join/notice issues. The repairs keep incomplete observations
+  pending until the observation period ends, reserve a source router across
+  distinct operation IDs, and reject missing/dirty dependency revision evidence.
+  The repaired working tree has clean analysis, 84 passing Flutter tests and 13
+  passing collector tests. Fresh collection against the new package completed.
+- Source `7874ce0` built a new universal Mac app at
+  `build/macos-guided-7874ce0/Thread Network Tool.app`. App/helper signatures pass
+  strict recursive checks, and both architectures load ThreadNetwork with
+  `LC_LOAD_WEAK_DYLIB`. The native window shows all guided choices, reports the
+  missing Apple entitlement, and rejects a malformed synthetic input with a
+  cleared field. The valid TestMesh fixture was entered and visibly masked;
+  the Mac locked before its submit/restart check, so those checks for this
+  package remain incomplete. No household credentials or network change was used.
+- Draft PR #2 is stacked on #1 for source review. The protocol simulation runs
+  separately from the application and has not yet yielded a recorded result.
 
 ## Implemented
 

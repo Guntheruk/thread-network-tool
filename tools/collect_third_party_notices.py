@@ -15,6 +15,7 @@ import gzip
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -105,6 +106,30 @@ def git_head(path: Path) -> str:
         return "unknown"
 
 
+def source_revision(path: Path) -> tuple[str, str]:
+    """Return a clean exact commit or an explicit provenance gap."""
+    try:
+        def run(*args: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(["git", "-C", str(path), *args],
+                                  capture_output=True, text=True, check=False)
+
+        root = run("rev-parse", "--show-toplevel")
+        head = run("rev-parse", "--verify", "HEAD^{commit}")
+        if (root.returncode or head.returncode or
+                Path(root.stdout.strip()).resolve() != path.resolve() or
+                not re.fullmatch(r"[0-9a-fA-F]{40,64}", head.stdout.strip())):
+            return "not established", "source revision unavailable"
+        revision = head.stdout.strip().lower()
+        dirty = run("status", "--porcelain=v1", "--untracked-files=no")
+        if dirty.returncode:
+            return revision, "source cleanliness unavailable"
+        if dirty.stdout.strip():
+            return revision, "dirty source checkout; bytes may differ from commit"
+        return revision, ""
+    except OSError:
+        return "not established", "source revision unavailable"
+
+
 def flutter_sdk_package_license(root: Path, flutter_root: Path) -> Path | None:
     """Use Flutter's own BSD notice only for package roots in its source tree."""
     package_root = (flutter_root / "packages").resolve()
@@ -117,20 +142,19 @@ def flutter_sdk_package_license(root: Path, flutter_root: Path) -> Path | None:
     return candidate if candidate.is_file() else None
 
 
-def commissioner_sources(source: Path) -> list[tuple[str, Path, str, str]]:
+def commissioner_sources(source: Path) -> list[tuple[str, Path, str, str, str]]:
     # Only components present in the configured link command are collected.
-    return [
-        ("OpenThread Commissioner", source / "LICENSE", git_head(source),
+    components = [
+        ("OpenThread Commissioner", source, "LICENSE",
          "BSD-3-Clause (upstream source license)"),
-        ("fmt", source / "third_party/fmtlib/repo/LICENSE",
-         git_head(source / "third_party/fmtlib/repo"), "MIT"),
-        ("libevent", source / "third_party/libevent/repo/LICENSE",
-         git_head(source / "third_party/libevent/repo"), "BSD-3-Clause"),
+        ("fmt", source / "third_party/fmtlib/repo", "LICENSE", "MIT"),
+        ("libevent", source / "third_party/libevent/repo", "LICENSE", "BSD-3-Clause"),
         ("Mbed TLS (includes linked Everest and p256-m sources)",
-         source / "third_party/mbedtls/repo/LICENSE",
-         git_head(source / "third_party/mbedtls/repo"),
+         source / "third_party/mbedtls/repo", "LICENSE",
          "Apache-2.0 OR GPL-2.0-or-later; selection unresolved"),
     ]
+    return [(name, root / license_path, *source_revision(root), license_name)
+            for name, root, license_path, license_name in components]
 
 
 def configured_commissioner_root() -> Path:
@@ -162,11 +186,12 @@ def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
 
     rows: list[dict[str, str]] = []
     errors = False
-    for name, src, revision, license_name in commissioner_sources(args.commissioner_root):
+    for name, src, revision, provenance, license_name in commissioner_sources(args.commissioner_root):
         target = output / "commissioner" / (safe_name(name) + ".txt")
         if src.is_file():
             digest = copy_text(src, target)
-            status = "collected"
+            status = "collected" if not provenance else f"collected; {provenance}"
+            errors |= bool(provenance)
         else:
             digest = ""
             status = "missing license text"
@@ -177,7 +202,7 @@ def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
                      "status": status, "sha256": digest,
                      "output": target.relative_to(output).as_posix() if digest else ""})
 
-    flutter_revision = git_head(args.flutter_root)
+    flutter_revision, flutter_provenance = source_revision(args.flutter_root)
     for name, src in [
         ("Flutter framework", args.flutter_root / "packages/flutter/LICENSE"),
         ("Dart SDK", args.flutter_root / "bin/cache/dart-sdk/LICENSE"),
@@ -185,7 +210,8 @@ def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
         target = output / "flutter" / (safe_name(name) + "-LICENSE.txt")
         if src.is_file():
             digest = copy_text(src, target)
-            status = "collected"
+            status = "collected" if not flutter_provenance else f"collected; {flutter_provenance}"
+            errors |= bool(flutter_provenance)
         else:
             digest = ""
             status = "missing license text"
@@ -240,8 +266,12 @@ def collect(args: argparse.Namespace) -> tuple[list[str], bool]:
                 status = why
                 rel_source = f"resolved Dart package {name}"
                 errors = True
+            version = lock_versions.get(name)
+            if version is None:
+                status += "; package version not in lockfile"
+                errors = True
             rows.append({"component": f"Dart package {name} ({role})",
-                         "version_or_commit": lock_versions.get(name, "not in lockfile"),
+                         "version_or_commit": version or "not in lockfile",
                          "license": "See included package license text; not independently classified",
                          "source": rel_source, "status": status,
                          "sha256": digest,

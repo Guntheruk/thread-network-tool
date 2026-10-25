@@ -63,6 +63,29 @@ VerificationOutcome verifyJoin(JoinVerification v, DateTime now,
       read.pending == PendingState.empty;
   final subjects = v.affectedAccessoryIds.toSet();
   final reads = v.accessories.reads;
+  // A changed device binding is a different operation, even during the
+  // observation window. Old state and incomplete reads may still converge.
+  if (v.routerId.isEmpty ||
+      v.targetIdentity.isEmpty ||
+      v.targetRouterId.isEmpty ||
+      v.targetRouterId == v.routerId ||
+      v.routerRead.routerId != v.routerId ||
+      v.targetRead.routerId != v.targetRouterId) {
+    return VerificationOutcome.needsAttention;
+  }
+  if (subjects.length != v.affectedAccessoryIds.length ||
+      (v.accessories.kind == AccessoryEvidenceKind.noneAttested &&
+          subjects.isNotEmpty) ||
+      (v.accessories.kind == AccessoryEvidenceKind.operationalReads &&
+          (subjects.isEmpty ||
+              reads.any((read) =>
+                  read.subjectId.isEmpty ||
+                  !subjects.contains(read.subjectId)) ||
+              reads.map((read) => read.subjectId).toSet().length !=
+                  reads.length))) {
+    return VerificationOutcome.needsAttention;
+  }
+  if (!v.observationComplete) return VerificationOutcome.pending;
   final accessoryValid = v.accessories.kind ==
           AccessoryEvidenceKind.noneAttested
       ? subjects.isEmpty
@@ -78,15 +101,10 @@ VerificationOutcome verifyJoin(JoinVerification v, DateTime now,
               read.checkedAt.isAfter(v.sentAt) &&
               !read.checkedAt.isAfter(now) &&
               now.difference(read.checkedAt) <= maxReadAge);
-  if (v.routerId.isEmpty ||
-      v.targetIdentity.isEmpty ||
-      v.targetRouterId.isEmpty ||
-      v.targetRouterId == v.routerId ||
-      !valid(v.routerRead, v.routerId) ||
+  if (!valid(v.routerRead, v.routerId) ||
       !valid(v.targetRead, v.targetRouterId) ||
       !accessoryValid) {
     return VerificationOutcome.needsAttention;
   }
-  if (!v.observationComplete) return VerificationOutcome.pending;
   return VerificationOutcome.complete;
 }

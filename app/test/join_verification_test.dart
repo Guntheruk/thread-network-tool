@@ -66,6 +66,45 @@ void main() {
     expect(verifyJoin(evidence(observed: false), now),
         VerificationOutcome.pending);
   });
+  test('interim old identity, pending update, and unknown accessories wait',
+      () {
+    expect(
+        verifyJoin(
+            evidence(router: read('router-A', 'old-id'), observed: false), now),
+        VerificationOutcome.pending);
+    expect(
+        verifyJoin(
+            evidence(
+                router: read('router-A', 'target-id',
+                    pending: PendingState.present),
+                observed: false),
+            now),
+        VerificationOutcome.pending);
+    expect(
+        verifyJoin(
+            evidence(accessories: AccessoryEvidence.unknown, observed: false),
+            now),
+        VerificationOutcome.pending);
+    expect(
+        verifyJoin(
+            evidence(
+                router: read('wrong-router', 'target-id'), observed: false),
+            now),
+        VerificationOutcome.needsAttention);
+    final wrongAccessory = JoinVerification(
+        routerId: 'router-A',
+        targetIdentity: 'target-id',
+        targetRouterId: 'target-router',
+        sentAt: sent,
+        routerRead: read('router-A', 'target-id'),
+        targetRead: read('target-router', 'target-id'),
+        affectedAccessoryIds: const ['accessory-A'],
+        accessories: AccessoryEvidence.operationalReads([
+          AccessoryOperationalRead('accessory-B', now),
+        ]),
+        observationComplete: false);
+    expect(verifyJoin(wrongAccessory, now), VerificationOutcome.needsAttention);
+  });
   test('operational accessory reads must identify every subject after dispatch',
       () {
     final stale = JoinVerification(
