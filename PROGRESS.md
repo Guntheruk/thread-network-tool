@@ -295,3 +295,7 @@ Known limits: the native Mac app is a locally signed development build, without 
   preparing archives still requires the safe `tarfile.data_filter` API. Python
   tar transport preserved the committed tree; Mac tar AppleDouble extras remain
   invalid inputs.
+- The owner questioned hosted-check costs. Further pushes and cloud review
+  requests are on hold; implementation and verification continue on the Mac and
+  the existing Linux machine. The completed hosted checks remain historical
+  evidence, not permission to trigger more jobs.

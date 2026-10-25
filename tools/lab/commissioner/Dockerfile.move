@@ -4,7 +4,7 @@ COPY app-source /opt/move-source
 COPY move-source.sha256 /lab/move-source.sha256
 RUN cd /opt/move-source && sha256sum -c /lab/move-source.sha256
 # Prepare this directory on the host with the current app manifest/patch. Python
-# 3.11 in frozen images only verifies it; no extraction or dependency fetch occurs.
+# 3.10 in the frozen image only verifies it; no extraction or dependency fetch occurs.
 COPY commissioner-prepared /opt/commissioner-prepared
 ENV PYTHONDONTWRITEBYTECODE=1
 RUN python3 /opt/move-source/tools/prepare_commissioner_source.py --verify-only --output /opt/commissioner-prepared
