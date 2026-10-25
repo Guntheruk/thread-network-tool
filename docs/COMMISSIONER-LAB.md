@@ -26,9 +26,29 @@ Create a fresh task-owned Linux build context with these entries:
 including Git metadata and the initialized nested build dependencies); `app-source/`
 (containing the app's `CMakeLists.txt` and `native/`); and all files from
 `tools/lab/commissioner/` at the context root. Do not copy app build output,
-settings, credentials or household logs. Existing pinned caches can be copied;
+settings, credentials or household logs. Existing clean pinned source caches can be copied;
 fetch dependencies before the offline build. When transferring from macOS,
 use `COPYFILE_DISABLE=1 tar --no-xattrs` to avoid AppleDouble metadata.
+
+Before either build starts, the image verifies each dependency root at the
+listed commit, each listed build-reachable recursive submodule as both the
+parent's exact gitlink and the initialized checkout at that revision, and a
+clean root/submodule worktree. Tracked modifications and every untracked file,
+including ignored build caches, are rejected. The lab intentionally has no
+cache allowlist: configure/build discovery could otherwise consume content not
+named by a pinned commit. The trusted timestamp-run source context already meets
+this rule with zero untracked files, so a fresh clean copy is reproducible.
+
+These are the exact Commissioner gitlinks permitted to remain uninitialized:
+COSE-C `third_party/COSE-C/repo` at `9401d5859e049585dd45dd1f689b6caf5bb8cd7f`,
+cn-cbor `third_party/cn-cbor/repo` at `0385f09964c5f2b1fee85189e931c607da225d37`,
+GoogleTest `third_party/googletest/repo` at `93748a946684defd1494d5585dbc912e451e83f8`,
+JSON `third_party/json/repo` at `bde57124187c5732c026ffb9357c0491344c45e7`,
+and mDNS `third_party/mdns/repo` at `a6eb0c5d5ad91f6f834a1c90798e651e0a5c3602`.
+`OT_COMM_APP=OFF`, `OT_COMM_CCM=OFF`, `OT_COMM_TEST=OFF` and
+`OT_COMM_JAVA_BINDING=OFF` keep them outside this build graph; mDNS is also
+disabled by the application build. Any option change requires revisiting this
+allowlist rather than silently accepting another source tree.
 
 The Dockerfile builds a simulated RCP and POSIX CLI. The POSIX CLI uses real
 platform UDP but no platform TUN interface. `-I lo` selects the runtime's
@@ -80,10 +100,12 @@ An external kill or host failure may prevent a JSON report.
    the source audit and executable capability permit GET operations only.
 4. The runtime uses the complete isolation/deadline/resource command above;
    reports omit datasets, keys, PSKc, endpoints, labels and raw subprocess output.
-5. `python3 tests/tools/test_commissioner_lab.py -v` passes eight tests covering
+5. `python3 tests/tools/test_commissioner_lab.py -v` passes fourteen tests covering
    strict success classification, exact baseline Active Timestamp comparison,
    malformed/duplicate timestamp TLVs, wrong-key construction, malformed/oversized
-   output, bounded probe timeout, typed timeout outcome and report redaction.
+   output, bounded probe timeout, typed timeout outcome, report redaction, exact
+   clean dependency trees, tracked/untracked mutations, wrong or uninitialized
+   recursive submodules, and both pre-build audit gates.
 
 The lab's JSON contains only fixed pins, enumerated stages/errors and boolean
 checks. Its random synthetic credentials live only in runtime memory/tmpfs.
