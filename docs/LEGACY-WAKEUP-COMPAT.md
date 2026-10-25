@@ -66,17 +66,28 @@ python3 tools/prepare_commissioner_source.py \
 
 Preparation checks the parent and recursive Git pins, dirty/untracked source,
 and patch hash. It archives only tracked files at the explicit revisions,
-applies the reviewed patch into a new source copy and writes
-`tnt-source-provenance.json`. It performs no fetch, checkout or source-cache
+applies the reviewed patch into a new source copy, checks the result against the
+independent `prepared_tree_sha256` committed in the manifest, and writes
+`tnt-source-provenance.json`. The current digest was independently reproduced
+from the clean pinned Git sources; it is not learned from a supplied generated
+tree. Verification requires both exact manifest provenance and this committed
+tree identity. Replacing source and recomputing the adjacent provenance hash
+cannot authorize a different tree. It performs no fetch, checkout or source-cache
 mutation. It refuses an existing output or a nested input/output relationship.
 The generated source has no `.git`; build integration must use provenance
 verification instead of asking it for a Git HEAD. Verify again before each
 configure/build and retain the source/provenance alongside build evidence.
 
 The manifest records the source SHA, recursive revisions, patch SHA-256,
-compatibility profile and required build options. The prepared-tree hash covers
-all copied files, their executable modes and symlink targets, excluding only
-the provenance file itself. Preparation twice must produce identical identity.
+compatibility profile, required build options and expected prepared-tree hash.
+The hash covers all copied files, their canonical modes and symlink targets,
+excluding only the provenance file itself. Preparation maps Git's executable
+files to mode 0755 and other regular files to 0644, independently of host umask;
+directory permissions are not part of identity. Preparation twice must produce
+identical identity. Transport generated trees without adding metadata files:
+Mac BSD tar can include AppleDouble `._*` entries that Linux Docker extraction
+materializes. Python `tarfile` transport was verified to retain the same tree
+and modes across Mac/Linux; extra files must continue to fail verification.
 Set `PYTHONDONTWRITEBYTECODE=1` for configure/build, as the focused CMake test
 project does; otherwise Mbed TLS's script imports add Python cache files to the
 generated tree and verification correctly rejects the changed tree. Keep build
@@ -114,7 +125,8 @@ checked separately. No test opens a network session or sends a packet.
 Source preparation tests cover patch tampering, dirty/wrong parent pins,
 uninitialized repositories, recursive submodule mismatch/dirty state, refusing
 overwrite, directory alias containment, hash changes, actual clean-source
-reproducibility and generated-tree tampering. The actual-source integration is
+reproducibility, canonical modes across umasks, resolver reuse, a fabricated tree
+with rewritten provenance and generated-source tampering followed by a rehash. The actual-source integration is
 explicitly skipped unless `TNT_COMMISSIONER_TEST_SOURCE` is supplied; skipped
 integration is not reproducibility evidence.
 

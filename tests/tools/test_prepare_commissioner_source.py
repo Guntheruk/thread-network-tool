@@ -43,6 +43,22 @@ class PreparationTests(unittest.TestCase):
             module.prepare(self.source,self.output,manifest)
         self.assertFalse(self.output.exists())
 
+    def test_rejects_fabricated_tree_with_self_declared_hash(self):
+        self.output.mkdir()
+        (self.output/'CMakeLists.txt').write_text('unrelated fabricated source')
+        actual = dict(self.manifest)
+        actual['prepared_tree_sha256'] = module.tree_hash(self.output)
+        (self.output/'tnt-source-provenance.json').write_text(json.dumps(actual))
+        with self.assertRaisesRegex(ValueError, 'provenance differs'):
+            module.verify_prepared(self.output)
+
+    def test_committed_identity_rejects_fabricated_tree_even_with_matching_provenance(self):
+        self.output.mkdir()
+        (self.output/'CMakeLists.txt').write_text('unrelated fabricated source')
+        (self.output/'tnt-source-provenance.json').write_text(json.dumps(self.manifest))
+        with self.assertRaisesRegex(ValueError, 'tree changed'):
+            module.verify_prepared(self.output)
+
     def test_refuses_existing_output(self):
         self.output.mkdir()
         marker=self.output/'keep'; marker.write_text('owner content')
@@ -105,6 +121,24 @@ class PreparationTests(unittest.TestCase):
                 archive.addfile(item,io.BytesIO(b'x') if item.isfile() else None)
         return output.getvalue()
 
+    def test_archive_file_modes_are_canonical_across_umasks(self):
+        ordinary = tarfile.TarInfo('ordinary'); ordinary.size = 1; ordinary.mode = 0o600
+        executable = tarfile.TarInfo('executable'); executable.size = 1; executable.mode = 0o700
+        payload = self.archive([ordinary, executable])
+        hashes = []
+        for mask in (0o022, 0o077):
+            destination = self.root/str(mask)
+            previous = os.umask(mask)
+            try:
+                with patch.object(module, 'git', return_value=payload):
+                    module.extract_archive(self.source, destination, module.PIN)
+            finally:
+                os.umask(previous)
+            self.assertEqual((destination/'ordinary').stat().st_mode & 0o777, 0o644)
+            self.assertEqual((destination/'executable').stat().st_mode & 0o777, 0o755)
+            hashes.append(module.tree_hash(destination))
+        self.assertEqual(hashes[0], hashes[1])
+
     def test_requires_safe_extraction_filter_capability(self):
         with patch.object(module.tarfile,'data_filter',None), self.assertRaisesRegex(ValueError,'data_filter'):
             module.extract_archive(self.source,self.output,module.PIN)
@@ -137,7 +171,21 @@ class PreparationTests(unittest.TestCase):
         other=self.root/'other'
         second=module.prepare(source,other)
         self.assertEqual(first,second)
+        self.assertEqual(first['prepared_tree_sha256'], self.manifest['prepared_tree_sha256'])
         self.assertEqual(module.verify_prepared(self.output),first)
+        from tools.resolve_commissioner_source import resolve
+        self.assertEqual(resolve(source, self.output), self.output.resolve())
+        self.assertEqual(resolve(self.output, self.root/'unused'), self.output.resolve())
+        self.assertFalse((self.root/'unused').exists())
+        # Preparation itself must also check the independent identity before
+        # publishing any generated output, even if the manifest has a bad pin.
+        bad_manifest = self.local_manifest()
+        bad = json.loads(bad_manifest.read_text())
+        bad['prepared_tree_sha256'] = '0' * 64
+        bad_manifest.write_text(json.dumps(bad))
+        with self.assertRaisesRegex(ValueError, 'committed identity'):
+            module.prepare(source, self.root/'unpublished', bad_manifest)
+        self.assertFalse((self.root/'unpublished').exists())
         # Frozen Python 3.11 images only verify; extraction filters are irrelevant.
         with patch.object(module.tarfile,'data_filter',None):
             self.assertEqual(module.verify_prepared(self.output),first)
@@ -147,5 +195,9 @@ class PreparationTests(unittest.TestCase):
         self.assertIn('mLegacyWakeupChannel',(self.output/'include/commissioner/network_data.hpp').read_text())
         (self.output/'include/commissioner/network_data.hpp').write_text('tampered')
         with self.assertRaisesRegex(ValueError,'tree changed'): module.verify_prepared(self.output)
+        first['prepared_tree_sha256'] = module.tree_hash(self.output)
+        (self.output/'tnt-source-provenance.json').write_text(json.dumps(first))
+        with self.assertRaisesRegex(ValueError,'provenance differs'):
+            module.verify_prepared(self.output)
 
 if __name__ == '__main__': unittest.main()

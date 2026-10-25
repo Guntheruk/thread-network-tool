@@ -83,7 +83,14 @@ def extract_archive(repo: Path, destination: Path, revision: str) -> None:
                 if target.is_absolute() or '..' in target.parts:
                     raise ValueError('Unsafe source archive symlink')
         destination.mkdir(parents=True, exist_ok=True)
-        archive.extractall(destination, filter='data')
+        def canonical_filter(member: tarfile.TarInfo, target: str) -> tarfile.TarInfo:
+            filtered = tarfile.data_filter(member, target)
+            # Git tracks only the executable distinction. Ignore archive/host
+            # umask permission differences while retaining it in the tree hash.
+            if filtered.isfile():
+                filtered.mode = 0o755 if member.mode & 0o111 else 0o644
+            return filtered
+        archive.extractall(destination, filter=canonical_filter)
 
 
 def tree_hash(root: Path) -> str:
@@ -135,8 +142,9 @@ def prepare(source: Path, destination: Path, manifest_path: Path = MANIFEST) -> 
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if source_repositories(source, manifest) != repositories:
             raise ValueError('Input changed during preparation')
+        if tree_hash(stage) != manifest['prepared_tree_sha256']:
+            raise ValueError('Prepared source tree differs from committed identity')
         provenance = dict(manifest)
-        provenance['prepared_tree_sha256'] = tree_hash(stage)
         (stage / 'tnt-source-provenance.json').write_text(json.dumps(provenance, sort_keys=True, indent=2) + '\n')
         # Reserve the destination without replacing any pre-existing path.
         destination.mkdir()
@@ -157,9 +165,11 @@ def verify_prepared(destination: Path, manifest_path: Path = MANIFEST) -> dict:
     if hashlib.sha256(patch.read_bytes()).hexdigest() != expected['patch_sha256']:
         raise ValueError('Compatibility patch hash mismatch')
     actual = json.loads((destination / 'tnt-source-provenance.json').read_text())
-    if {k: v for k, v in actual.items() if k != 'prepared_tree_sha256'} != expected:
+    if actual != expected:
         raise ValueError('Prepared source provenance differs from manifest')
-    if actual['prepared_tree_sha256'] != tree_hash(destination):
+    # The committed manifest is the trust anchor; the adjacent, editable
+    # provenance cannot authorize different source by declaring its own hash.
+    if expected['prepared_tree_sha256'] != tree_hash(destination):
         raise ValueError('Prepared source tree changed')
     return actual
 
