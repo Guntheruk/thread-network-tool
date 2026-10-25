@@ -55,7 +55,7 @@ fields block execution instead of being dropped by a typed setter.
 | Method | Effect |
 | --- | --- |
 | `confirmAndStart(plan)` | Revalidate the trusted plan, obtain durable fence, invoke worker once. |
-| `current()` | Read authoritative private status. |
+| `current()` | Initialize recovery if needed, then read authoritative private status. |
 | `restore()` | Convert an unresolved fence to uncertain recovery; clear prior observation continuity. Never invokes worker. |
 | `checkOutcome(id, resume: false)` | Fresh read-only observation; explicit `resume: true` restarts stopped observation. |
 | `stopObservation(id)` | Stop observation, retain the global fence, invalidate late callbacks. |
@@ -118,6 +118,16 @@ loss or prove storage hardware flush behavior.
 
 ## Observation and recovery
 
+Every controller entry point performs shared one-time recovery initialization
+before consuming journal state. An unfamiliar operation first appearing after
+initialization receives the same recovery treatment. An inherited unresolved record loses persisted
+observation continuity even when the caller starts with `current()` or
+`checkOutcome()` and never calls `restore()`. Initialization uses the journal's
+revision check and fails closed on a conflict or persistence failure. Operations
+started by that controller and repeated status polls retain their current
+observation interval. Explicit `restore()` still breaks continuity; constructing
+a new controller conservatively starts a new recovery interval.
+
 After restart, credentials must be reacquired and matched to the saved private
 commitments. The profile must re-establish the original router bindings; a new
 discovery handle or matching name is insufficient. If this cannot be established,
@@ -168,7 +178,11 @@ sync. The fault hooks exist only in a separate test executable.
 duplicate confirmation, capability/freshness/binding failures, fence failures,
 uncertain worker outcomes, rejected recovery, complete source/target evidence,
 observation continuity, stop/late-callback races, and separate Dart process exits
-before/after an injected worker call. These prove controller/storage behavior;
+before/after an injected worker call. Separate seed/recovery Dart processes
+also verify that accepted, uncertain, and definitely rejected operations cannot
+reuse a pre-exit stable interval through either `current()` or direct
+`checkOutcome()`: each requires a full fresh interval without worker replay.
+These prove controller/storage behavior;
 they are not native Commissioner or vendor runtime evidence.
 
 | Original acceptance gate | Evidence in this slice / remaining work |

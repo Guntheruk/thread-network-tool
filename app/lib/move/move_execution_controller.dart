@@ -23,6 +23,15 @@ class MoveExecutionController {
   final DateTime Function() now;
   final Map<String, Future<MoveRecord>> _starts = {};
   bool _busy = false;
+  Future<void>? _initialization;
+  final Set<String> _knownOperations = {};
+  final Map<String, Future<MoveRecord?>> _recoveries = {};
+
+  // A controller must invalidate continuity inherited from a previous owner
+  // before exposing or observing it. Share the in-flight initialization so
+  // concurrent entry points cannot race recovery against their own reads.
+  Future<void> _initialize() =>
+      _initialization ??= _recover().then<void>((_) {});
 
   /// Duplicate calls receive the same future. This reservation precedes any
   /// await; the durable global journal also fences other app processes.
@@ -41,12 +50,13 @@ class MoveExecutionController {
   }
 
   Future<MoveRecord> _start(MoveExecutionPlan plan) async {
+    await _initialize();
     if (plan.profileId != isolatedMoveProfile) {
       throw const MoveExecutionFailure('unsupported_profile');
     }
     if (!now().isBefore(plan.expiresAt))
       throw const MoveExecutionFailure('review_expired');
-    final current = await journal.read();
+    final current = await this.current();
     if (current != null && current.operationId == plan.operationId)
       return current;
     if (current != null && !current.terminal) {
@@ -92,6 +102,7 @@ class MoveExecutionController {
     );
     // A failed/uncertain journal acknowledgement never permits worker launch.
     record = await journal.begin(record);
+    _knownOperations.add(record.operationId);
     MoveDisposition disposition;
     var reason = 'worker_uncertain';
     try {
@@ -126,17 +137,38 @@ class MoveExecutionController {
     }
   }
 
-  Future<MoveRecord?> current() => journal.read();
+  Future<MoveRecord?> current() async {
+    await _initialize();
+    final record = await journal.read();
+    if (record == null || _knownOperations.contains(record.operationId)) {
+      return record;
+    }
+    // Initialization may have happened before another process began this
+    // operation. Adopt each unfamiliar operation with the same recovery rule.
+    await _recoveries.putIfAbsent(record.operationId, () => _recover(record));
+    return current();
+  }
 
   /// Restores display/recovery state only. No plan or dispatch capability is
   /// reconstructed from disk, and this path cannot call the worker.
   Future<MoveRecord?> restore() async {
-    final record = await journal.read();
+    if (_initialization == null) {
+      await _initialize();
+      return current();
+    }
+    await _initialize();
+    return _recover();
+  }
+
+  Future<MoveRecord?> _recover([MoveRecord? inherited]) async {
+    final record = inherited ?? await journal.read();
     if (record == null ||
         record.terminal ||
-        record.stage == MoveStage.observationStopped)
+        record.stage == MoveStage.observationStopped) {
+      if (record != null) _knownOperations.add(record.operationId);
       return record;
-    return journal.update(
+    }
+    final recovered = await journal.update(
       record.next(
         MoveStage.needsAttention,
         'restart_requires_reads',
@@ -147,6 +179,8 @@ class MoveExecutionController {
       ),
       record.revision,
     );
+    _knownOperations.add(record.operationId);
+    return recovered;
   }
 
   Future<MoveRecord> stopObservation(String operationId) async {
@@ -284,7 +318,7 @@ class MoveExecutionController {
   }
 
   Future<MoveRecord> _record(String operationId) async {
-    final record = await journal.read();
+    final record = await current();
     if (record == null || record.operationId != operationId) {
       throw const MoveExecutionFailure('unknown_operation');
     }

@@ -152,7 +152,72 @@ Future<void> child(String helper, String directory, String boundary) async {
   throw StateError('Child did not exit at fault boundary');
 }
 
+// Each phase runs in a separate Dart process against the same native journal.
+Future<void> restartObservationChild(
+  String helper,
+  String directory,
+  String disposition,
+  String phase,
+  String entry,
+) async {
+  final rig = Rig(NativeMoveJournal(executable: helper, directory: directory));
+  rig.disposition = MoveDisposition.values.byName(disposition);
+  rig.sourceUnchanged = rig.disposition == MoveDisposition.rejected;
+  if (phase == 'seed') {
+    await rig.controller.confirmAndStart(rig.plan());
+    rig.clock = rig.clock.add(const Duration(seconds: 310));
+    expect(
+      !(await rig.controller.checkOutcome(hex('a'))).terminal,
+      'Seed sample must remain fenced',
+    );
+    return;
+  }
+  rig.clock = rig.clock.add(const Duration(seconds: 320));
+  if (entry == 'current') {
+    final recovered = await rig.controller.current();
+    expect(
+      recovered!.stableSince == null && recovered.stableLast == null,
+      'current must initialize recovery without caller restore',
+    );
+  }
+  final first = await rig.controller.checkOutcome(hex('a'));
+  expect(
+    !first.terminal && rig.observationCalls == 1,
+    'Restart cannot reuse the previous process observation interval',
+  );
+  await failure(
+    rig.controller.confirmAndStart(rig.plan(id: '2')),
+    'unresolved_operation',
+  );
+  final revision = first.revision;
+  expect(
+    (await rig.controller.current())!.revision == revision,
+    'Polling current must not reset active observation continuity',
+  );
+  expect(
+    (await rig.controller.current())!.stableSince == rig.clock,
+    'Polling current preserves the new interval',
+  );
+  rig.clock = rig.clock.add(const Duration(seconds: 10));
+  final complete = await rig.controller.checkOutcome(hex('a'));
+  expect(
+    complete.stage ==
+        (rig.sourceUnchanged
+            ? MoveStage.verifiedUnchanged
+            : MoveStage.verifiedComplete),
+    'Fresh full post-restart interval must complete',
+  );
+  expect(
+    rig.calls == 0 && rig.observationCalls == 2,
+    'Recovery only performs fresh read observations',
+  );
+}
+
 Future<void> main(List<String> args) async {
+  if (args.length == 6 && args[0] == '--restart-observation') {
+    await restartObservationChild(args[1], args[2], args[3], args[4], args[5]);
+    return;
+  }
   if (args.length == 4 && args[0] == '--child') {
     await child(args[1], args[2], args[3]);
     return;
@@ -487,6 +552,57 @@ Future<void> main(List<String> args) async {
           );
         },
       );
+    }
+    await test('controller initialized empty adopts later external operation', (
+      r,
+    ) async {
+      expect(await r.controller.current() == null, 'Starts empty');
+      final journal = r.journal as NativeMoveJournal;
+      final seeded = await Process.run(Platform.resolvedExecutable, [
+        Platform.script.toFilePath(),
+        '--restart-observation',
+        helper,
+        journal.directory,
+        'accepted',
+        'seed',
+        'checkOutcome',
+      ]);
+      expect(seeded.exitCode == 0, 'External seed failed: ${seeded.stderr}');
+      r.clock = r.clock.add(const Duration(seconds: 320));
+      expect(
+        !(await r.controller.checkOutcome(hex('a'))).terminal,
+        'Unfamiliar operation cannot inherit external continuity',
+      );
+      r.clock = r.clock.add(const Duration(seconds: 10));
+      expect(
+        (await r.controller.checkOutcome(hex('a'))).terminal,
+        'Adopted operation retains its fresh interval',
+      );
+    });
+    for (final disposition in ['accepted', 'uncertain', 'rejected']) {
+      for (final entry in ['current', 'checkOutcome']) {
+        await test(
+          'real restart $disposition via $entry needs a fresh interval',
+          (r) async {
+            final journal = r.journal as NativeMoveJournal;
+            for (final phase in ['seed', 'recover']) {
+              final result = await Process.run(Platform.resolvedExecutable, [
+                Platform.script.toFilePath(),
+                '--restart-observation',
+                helper,
+                journal.directory,
+                disposition,
+                phase,
+                entry,
+              ]);
+              expect(
+                result.exitCode == 0,
+                '$phase process failed: ${result.stdout} ${result.stderr}',
+              );
+            }
+          },
+        );
+      }
     }
     await test('journal has commitments and no private request material', (
       r,
