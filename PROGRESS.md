@@ -149,6 +149,14 @@ authorize licence selection, publication, analytics or signup collection.
   `mktemp -d` before any session secret is written. The local access-boundary
   regression and direct macOS core-only compilation pass; fresh hosted CI is
   required to verify Linux and the final combined head.
+- Hosted Checks run `40225229885` passed at `fcc608d`, including the repaired
+  core-only builds and Linux private staging. Codex review reported no new major
+  issue on this head, but an earlier finding about review freshness across shared
+  browser tabs remains open and is being repaired separately.
+- Android PR #5 at `c60c5b4f0221fef9035700bcf947df8524605c62` passed debug APK
+  build run `40224904977` and all generic checks in `40224904969`. The APK was
+  nonempty; installation, device launch and Google consent remain unverified.
+  Codex review was requested on that exact head. No PR has been merged.
 
 ## Implemented
 
