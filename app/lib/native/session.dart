@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:math';
 
 import '../move/network_move_plan.dart';
+import '../move/move_execution.dart';
+import 'native_move_adapter.dart';
 
 typedef NativeCall = Future<NativeReply> Function(List<String>, String?);
 
@@ -118,10 +120,15 @@ bool localEndpoint(String value) {
 }
 
 class LiveSession {
-  LiveSession(this.native, {DateTime Function()? now})
+  LiveSession(this.native, {DateTime Function()? now, this.execution})
       : now = now ?? DateTime.now;
   final NativeCall native;
   final DateTime Function() now;
+  final NativeMoveAdapter? execution;
+  bool get executionAvailable => execution?.available ?? false;
+  final String _sessionId = randomToken();
+  String _discoveryRevision = randomToken();
+  final Map<String, String> _fixtureNodes = {};
   String? _credential;
   String? _credentialName;
   final Map<String, _RoleCredential> _roleCredentials = {};
@@ -176,6 +183,34 @@ class LiveSession {
           await _probe(body['router_id'], body['role']);
         case 'network-move/plan':
           return _plan(body);
+        case 'network-move/execution/prepare':
+          return await _prepareExecution(body);
+        case 'network-move/execution/confirm':
+          final adapter = _execution();
+          final reviewId = safeText(body['review_id'], 64);
+          if (reviewId == null) throw const ApiFailure('invalid_review', 400);
+          final plan = adapter.resolveReview(reviewId);
+          final result = await adapter.controller.confirmAndStart(plan);
+          return _executionStatus(result);
+        case 'network-move/execution/current':
+          final adapter = _execution();
+          await adapter.initialize();
+          final result = await adapter.controller.current();
+          return {'status': result == null ? null : _executionStatus(result)};
+        case 'network-move/execution/check':
+          final adapter = _execution();
+          final id = safeText(body['operation_id'], 64);
+          if (id == null ||
+              (body['resume'] != null && body['resume'] is! bool)) {
+            throw const ApiFailure('invalid_operation', 400);
+          }
+          return _executionStatus(await adapter.controller
+              .checkOutcome(id, resume: body['resume'] == true));
+        case 'network-move/execution/stop':
+          final adapter = _execution();
+          final id = safeText(body['operation_id'], 64);
+          if (id == null) throw const ApiFailure('invalid_operation', 400);
+          return _executionStatus(await adapter.controller.stopObservation(id));
         default:
           throw const ApiFailure('not_found', 404);
       }
@@ -238,6 +273,8 @@ class LiveSession {
     _endpoints.clear();
     _advertisedXpans.clear();
     _knownSourceCandidates.clear();
+    _fixtureNodes.clear();
+    _discoveryRevision = randomToken();
     _observed = null;
     _discoveryStatus = 'error';
     final result = await native(['discover'], null);
@@ -270,7 +307,7 @@ class LiveSession {
       // Several interface/address observations are one router, not duplicates.
       final identity = '$name|$port';
       final previous = candidates[identity];
-      int score(String address) => !localEndpoint(address)
+      int score(String address) => !_usableEndpoint(address)
           ? 0
           : address.contains(':')
               ? 1
@@ -285,7 +322,7 @@ class LiveSession {
       final address = item['address'] as String;
       final port = item['port'] as int;
       final id = randomToken();
-      final usable = localEndpoint(address);
+      final usable = _usableEndpoint(address);
       _routers[id] = {
         'id': id,
         'service_name': name,
@@ -301,7 +338,14 @@ class LiveSession {
           ? advertisedXpan
           : null;
       if (usable) _endpoints[id] = (address, port);
+      final fixtureNode = item['fixture_node_id'];
+      if (executionAvailable &&
+          fixtureNode is String &&
+          moveCommitmentValid(fixtureNode)) {
+        _fixtureNodes[id] = fixtureNode;
+      }
     }
+    _refreshRecoveryCredentials();
   }
 
   Future<void> _probe(Object? id, Object? role) async {
@@ -420,7 +464,110 @@ class LiveSession {
   void _invalidateReview() {
     _review = null;
     _reviewExpires = null;
+    execution?.invalidateReviews();
+    _refreshRecoveryCredentials();
   }
+
+  bool _usableEndpoint(String address) =>
+      localEndpoint(address) ||
+      (executionAvailable && (address == '::1' || address == '127.0.0.1'));
+
+  NativeMoveAdapter _execution() {
+    if (!executionAvailable) throw const ApiFailure('not_found', 404);
+    return execution!;
+  }
+
+  void _refreshRecoveryCredentials() {
+    final source = _roleCredentials['source'];
+    final target = _roleCredentials['target'];
+    execution?.credentialsChanged(
+      source: source?.dataset,
+      target: target?.dataset,
+      sourceGeneration: source == null
+          ? 0
+          : int.parse(source.generation.substring(0, 12), radix: 16),
+      targetGeneration: target == null
+          ? 0
+          : int.parse(target.generation.substring(0, 12), radix: 16),
+      sessionId: _sessionId,
+      discoveryRevision: _discoveryRevision,
+    );
+  }
+
+  Future<Map<String, dynamic>> _prepareExecution(
+      Map<String, dynamic> body) async {
+    final adapter = _execution();
+    final review = currentReview;
+    if (review == null ||
+        body.length != 1 ||
+        body['review_id'] != review['review_id'] ||
+        review['decision'] != 'ready_for_lab_review' ||
+        review['delay_seconds'] != 300) {
+      throw const ApiFailure('review_invalidated', 409);
+    }
+    final source = _roleCredentials['source'];
+    final target = _roleCredentials['target'];
+    final rows = review['source_routers'] as List;
+    final targetId = review['target_router_id'] as String;
+    final sourceIds = rows
+        .map((row) => (row as Map)['router_id'] as String)
+        .toList(growable: false);
+    if (source == null ||
+        target == null ||
+        sourceIds.isEmpty ||
+        sourceIds.any((id) => !_fixtureNodes.containsKey(id)) ||
+        !_fixtureNodes.containsKey(targetId)) {
+      throw const ApiFailure('execution_unavailable', 409);
+    }
+    final bootstrap = await adapter.fixture.call('bootstrap');
+    final fixtureId = bootstrap['fixture_id'];
+    if (fixtureId is! String || !moveCommitmentValid(fixtureId)) {
+      throw const ApiFailure('execution_unavailable', 409);
+    }
+    final plan = await adapter.prepare(NativeMoveRequest(
+      operationId: randomToken(),
+      reviewId: review['review_id'] as String,
+      sourceDataset: source.dataset,
+      targetDataset: target.dataset,
+      sourceGeneration:
+          int.parse(source.generation.substring(0, 12), radix: 16),
+      targetGeneration:
+          int.parse(target.generation.substring(0, 12), radix: 16),
+      sessionId: _sessionId,
+      discoveryRevision: _discoveryRevision,
+      connectivityRevision: fixtureId,
+      sourceNodes: List.unmodifiable(sourceIds.map((id) => _fixtureNodes[id]!)),
+      targetNode: _fixtureNodes[targetId]!,
+      inventoryAttestation: review['review_id'] as String,
+    ));
+    // No native request can outlive a superseding session review.
+    if (currentReview?['review_id'] != plan.reviewId) {
+      adapter.invalidateReviews();
+      throw const ApiFailure('review_invalidated', 409);
+    }
+    return {
+      'schema_version': 1,
+      'mode': 'network_move_execution_review',
+      'review_id': plan.reviewId,
+      'operation_id': plan.operationId,
+      'profile_id': plan.profileId,
+      'expires_at': plan.expiresAt.toIso8601String(),
+      'source_router_ids': sourceIds,
+      'target_router_id': targetId,
+      'delay_seconds': plan.delaySeconds,
+      'observation_seconds': plan.observationSeconds,
+    };
+  }
+
+  Map<String, dynamic> _executionStatus(MoveRecord record) => {
+        'schema_version': 1,
+        'mode': 'network_move_execution_status',
+        'operation_id': record.operationId,
+        'profile_id': record.profileId,
+        'stage': record.stage.wire,
+        'disposition': record.disposition.wire,
+        'reason': record.reason,
+      };
 
   Map<String, dynamic>? get currentReview {
     if (_reviewExpires == null || now().isAfter(_reviewExpires!)) {
@@ -432,6 +579,7 @@ class LiveSession {
   }
 
   Map<String, dynamic> _plan(Map<String, dynamic> body) {
+    _invalidateReview();
     final targetId = body['target_router_id'];
     final delay = body['delay_seconds'];
     if (targetId is! String ||

@@ -29,6 +29,7 @@ bool Prepare(Operation& op,Fake& fake,std::string& reason){return op.Prepare(Req
 }
 int main(){
     unsigned cases=0;
+    {Fake fake;Operation op(fake);std::string reason;auto request=RequestFor(fake.source,fake.target);request.operation_id=std::string(64,'a');CHECK(op.Prepare(std::move(request),reason));Marker marker;auto result=op.Confirm(marker);CHECK(result.disposition==Disposition::accepted&&marker.id==std::string(64,'a'));++cases;}
     // Actual pinned timestamp rule matrix: key change permits older/equal target; unchanged key requires newer.
     for(bool different:{false,true})for(uint64_t target_stamp:{10u,20u,30u}){
         Fake fake;fake.target=Fixture(true,target_stamp,different?0x22:0x11);Operation op(fake);std::string reason;

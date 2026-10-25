@@ -134,7 +134,8 @@ class LiveRouter {
       throw const FormatException('Invalid live state');
     }
     return Map.unmodifiable(
-        value.map((key, item) => MapEntry(key, LiveProbe.fromJson(item))));
+      value.map((key, item) => MapEntry(key, LiveProbe.fromJson(item))),
+    );
   }
 }
 
@@ -170,8 +171,9 @@ class LiveState {
       throw const FormatException('Invalid live state');
     }
     final timestamp = value['observed_at'];
-    final observedAt =
-        timestamp == null ? null : DateTime.tryParse(_safeText(timestamp));
+    final observedAt = timestamp == null
+        ? null
+        : DateTime.tryParse(_safeText(timestamp));
     if (timestamp != null && observedAt == null) {
       throw const FormatException('Invalid live state');
     }
@@ -193,14 +195,20 @@ class LiveState {
       }),
       observedAt: observedAt,
       routers: routers,
-      sourceCredentialAvailable:
-          _optionalBool(value['source_credential_available']),
-      sourceCredentialNetworkName:
-          _optionalText(value['source_credential_network_name'], maxBytes: 16),
-      targetCredentialAvailable:
-          _optionalBool(value['target_credential_available']),
-      targetCredentialNetworkName:
-          _optionalText(value['target_credential_network_name'], maxBytes: 16),
+      sourceCredentialAvailable: _optionalBool(
+        value['source_credential_available'],
+      ),
+      sourceCredentialNetworkName: _optionalText(
+        value['source_credential_network_name'],
+        maxBytes: 16,
+      ),
+      targetCredentialAvailable: _optionalBool(
+        value['target_credential_available'],
+      ),
+      targetCredentialNetworkName: _optionalText(
+        value['target_credential_network_name'],
+        maxBytes: 16,
+      ),
     );
   }
 
@@ -216,15 +224,19 @@ class EmptySourceAttestationInput {
   final DateTime attestedAt;
 
   Map<String, Object> toJson() => {
-        'method': 'operator_controlled_inventory',
-        'scope': 'whole_source_network',
-        'attested_at': attestedAt.toUtc().toIso8601String(),
-      };
+    'method': 'operator_controlled_inventory',
+    'scope': 'whole_source_network',
+    'attested_at': attestedAt.toUtc().toIso8601String(),
+  };
 }
 
 class NetworkMoveSourceRouter {
   const NetworkMoveSourceRouter(
-      this.routerId, this.serviceName, this.readCheckedAt, this.readStatus);
+    this.routerId,
+    this.serviceName,
+    this.readCheckedAt,
+    this.readStatus,
+  );
   final String routerId;
   final String serviceName;
   final DateTime? readCheckedAt;
@@ -249,24 +261,25 @@ class NetworkMoveSourceRouter {
         'partial',
         'error',
         'timeout',
-        'unsupported'
+        'unsupported',
       }),
     );
   }
 }
 
 class NetworkMovePlan {
-  const NetworkMovePlan(
-      {required this.decision,
-      required this.blockers,
-      required this.reviewId,
-      required this.reviewValidUntil,
-      required this.sourceRouters,
-      required this.targetRouterId,
-      required this.targetReadCheckedAt,
-      required this.delaySeconds,
-      required this.verification,
-      required this.recovery});
+  const NetworkMovePlan({
+    required this.decision,
+    required this.blockers,
+    required this.reviewId,
+    required this.reviewValidUntil,
+    required this.sourceRouters,
+    required this.targetRouterId,
+    required this.targetReadCheckedAt,
+    required this.delaySeconds,
+    required this.verification,
+    required this.recovery,
+  });
   final String decision;
   final List<String> blockers;
   final String reviewId;
@@ -313,8 +326,10 @@ class NetworkMovePlan {
       throw const FormatException('Invalid plan');
     }
     return NetworkMovePlan(
-      decision: _choice(
-          value['decision'], const {'ready_for_lab_review', 'needs_evidence'}),
+      decision: _choice(value['decision'], const {
+        'ready_for_lab_review',
+        'needs_evidence',
+      }),
       blockers: blockers,
       reviewId: _safeText(value['review_id']),
       reviewValidUntil: expires,
@@ -338,20 +353,157 @@ abstract class LiveApi {
 abstract class NetworkMoveApi implements LiveApi {
   Future<LiveState> credentialsForRole(String role, String dataset);
   Future<LiveState> probeForRole(String role, String routerId);
-  Future<NetworkMovePlan> networkMovePlan(
-      {required String targetRouterId,
-      required EmptySourceAttestationInput attestation,
-      required int delaySeconds});
+  Future<NetworkMovePlan> networkMovePlan({
+    required String targetRouterId,
+    required EmptySourceAttestationInput attestation,
+    required int delaySeconds,
+  });
   Future<NetworkMovePlan?> currentNetworkMovePlan();
 }
 
+/// Public, allowlisted execution data. Private datasets, endpoint handles and
+/// binding commitments never cross this interface.
+class NetworkMoveExecutionReview {
+  const NetworkMoveExecutionReview({
+    required this.reviewId,
+    required this.operationId,
+    required this.profileId,
+    required this.expiresAt,
+    required this.sourceRouterIds,
+    required this.targetRouterId,
+    required this.delaySeconds,
+    required this.observationSeconds,
+  });
+  final String reviewId, operationId, profileId, targetRouterId;
+  final DateTime expiresAt;
+  final List<String> sourceRouterIds;
+  final int delaySeconds, observationSeconds;
+
+  factory NetworkMoveExecutionReview.fromJson(Object? value) {
+    if (value is! Map<String, dynamic> ||
+        value['schema_version'] != 1 ||
+        value['mode'] != 'network_move_execution_review' ||
+        value['source_router_ids'] is! List ||
+        value['delay_seconds'] is! int ||
+        value['observation_seconds'] is! int) {
+      throw const FormatException('Invalid execution review');
+    }
+    final sources = (value['source_router_ids'] as List)
+        .map((id) => _safeText(id))
+        .toList(growable: false);
+    final expiry = DateTime.tryParse(_safeText(value['expires_at']));
+    final delay = value['delay_seconds'] as int;
+    final observation = value['observation_seconds'] as int;
+    if (expiry == null ||
+        sources.isEmpty ||
+        sources.length > 32 ||
+        sources.toSet().length != sources.length ||
+        delay < 300 ||
+        delay > 86400 ||
+        observation < 1 ||
+        observation > 3600) {
+      throw const FormatException('Invalid execution review');
+    }
+    return NetworkMoveExecutionReview(
+      reviewId: _safeText(value['review_id']),
+      operationId: _safeText(value['operation_id']),
+      profileId: _choice(value['profile_id'], const {
+        'openthread-posix-lab-v1',
+      }),
+      expiresAt: expiry,
+      sourceRouterIds: List.unmodifiable(sources),
+      targetRouterId: _safeText(value['target_router_id']),
+      delaySeconds: delay,
+      observationSeconds: observation,
+    );
+  }
+}
+
+class NetworkMoveExecutionStatus {
+  const NetworkMoveExecutionStatus({
+    required this.operationId,
+    required this.profileId,
+    required this.stage,
+    required this.disposition,
+    required this.reason,
+  });
+  final String operationId, profileId, stage, disposition, reason;
+
+  bool get terminal => const {
+    'verified_complete',
+    'verified_unchanged',
+    'proven_not_sent',
+  }.contains(stage);
+
+  factory NetworkMoveExecutionStatus.fromJson(Object? value) {
+    if (value is! Map<String, dynamic> ||
+        value['schema_version'] != 1 ||
+        value['mode'] != 'network_move_execution_status') {
+      throw const FormatException('Invalid execution status');
+    }
+    return NetworkMoveExecutionStatus(
+      operationId: _safeText(value['operation_id']),
+      profileId: _choice(value['profile_id'], const {
+        'openthread-posix-lab-v1',
+      }),
+      stage: _choice(value['stage'], const {
+        'dispatch_fenced',
+        'observing',
+        'needs_attention',
+        'observation_stopped',
+        'verified_complete',
+        'verified_unchanged',
+        'proven_not_sent',
+      }),
+      disposition: _choice(value['disposition'], const {
+        'unknown',
+        'accepted',
+        'rejected',
+        'uncertain',
+        'proven_not_sent',
+      }),
+      reason: _choice(value['reason'], const {
+        'none',
+        'worker_accepted',
+        'worker_rejected',
+        'worker_not_sent',
+        'worker_uncertain',
+        'worker_failure',
+        'journal_failure',
+        'restart_requires_reads',
+        'credentials_required',
+        'recovery_binding_mismatch',
+        'verification_pending',
+        'verification_failed',
+        'verification_complete',
+        'verification_unchanged',
+        'observation_stopped',
+      }),
+    );
+  }
+}
+
+abstract class NetworkMoveExecutionApi implements NetworkMoveApi {
+  bool get executionAvailable;
+  Future<NetworkMoveExecutionReview> prepareExecution(String reviewId);
+  Future<NetworkMoveExecutionStatus> confirmExecution(String reviewId);
+  Future<NetworkMoveExecutionStatus?> currentExecution();
+  Future<NetworkMoveExecutionStatus> checkExecution(
+    String operationId, {
+    bool resume = false,
+  });
+  Future<NetworkMoveExecutionStatus> stopExecution(String operationId);
+}
+
 class HttpLiveApi implements NetworkMoveApi {
-  HttpLiveApi(
-      {required String session, required Uri baseUri, http.Client? client})
-      : assert(RegExp(r'^[0-9a-f]{64}$').hasMatch(session)),
-        _session = session,
-        _baseUri = baseUri,
-        _client = client ?? http.Client();
+  HttpLiveApi({
+    required String session,
+    required Uri baseUri,
+    http.Client? client,
+  }) : assert(RegExp(r'^[0-9a-f]{64}$').hasMatch(session)),
+       _session = session,
+       _baseUri = baseUri,
+       _client = client ?? http.Client();
 
   final String _session;
   final Uri _baseUri;
@@ -378,8 +530,11 @@ class HttpLiveApi implements NetworkMoveApi {
     }
   }
 
-  Future<Object?> _planRequest(String method, String path,
-      [Object? body]) async {
+  Future<Object?> _planRequest(
+    String method,
+    String path, [
+    Object? body,
+  ]) async {
     final uri = _baseUri.resolve(path);
     if (uri.origin != _baseUri.origin) throw const LiveApiException();
     final request = http.Request(method, uri)
@@ -424,16 +579,17 @@ class HttpLiveApi implements NetworkMoveApi {
       _request('POST', '/api/probe', {'role': role, 'router_id': routerId});
 
   @override
-  Future<NetworkMovePlan> networkMovePlan(
-          {required String targetRouterId,
-          required EmptySourceAttestationInput attestation,
-          required int delaySeconds}) async =>
-      NetworkMovePlan.fromJson(
-          await _planRequest('POST', '/api/network-move/plan', {
-        'target_router_id': targetRouterId,
-        'empty_source_attestation': attestation.toJson(),
-        'delay_seconds': delaySeconds,
-      }));
+  Future<NetworkMovePlan> networkMovePlan({
+    required String targetRouterId,
+    required EmptySourceAttestationInput attestation,
+    required int delaySeconds,
+  }) async => NetworkMovePlan.fromJson(
+    await _planRequest('POST', '/api/network-move/plan', {
+      'target_router_id': targetRouterId,
+      'empty_source_attestation': attestation.toJson(),
+      'delay_seconds': delaySeconds,
+    }),
+  );
 
   @override
   Future<NetworkMovePlan?> currentNetworkMovePlan() async {

@@ -89,7 +89,7 @@ bool Operation::Prepare(Request request,std::string& reason) {
     std::lock_guard<std::mutex> lock(mutex_);
     if(prepare_attempted_||consumed_){reason="operation_consumed";return false;}
     prepare_attempted_=true;
-    if(request.sources.empty()||request.sources.size()>8||request.operation_id.size()!=32||
+    if(request.sources.empty()||request.sources.size()>8||(request.operation_id.size()!=32&&request.operation_id.size()!=64)||
        !std::all_of(request.operation_id.begin(),request.operation_id.end(),[](char c){return(c>='0'&&c<='9')||(c>='a'&&c<='f');})||
        !request.controlled_empty||!request.manual_recovery){reason="authorization_incomplete";return false;}
     if(!DecodeDataset(request.source_dataset,source_,reason)||!DecodeDataset(request.target_dataset,target_,reason))return false;

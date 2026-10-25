@@ -113,10 +113,12 @@ class MoveFake implements NetworkMoveApi {
   @override
   Future<LiveState> credentialsForRole(String role, String dataset) async {
     credentialRoles.add(role);
-    current = LiveState.fromJson(_stateJson(
-      source: role == 'source' || current.sourceCredentialAvailable,
-      target: role == 'target' || current.targetCredentialAvailable,
-    ));
+    current = LiveState.fromJson(
+      _stateJson(
+        source: role == 'source' || current.sourceCredentialAvailable,
+        target: role == 'target' || current.targetCredentialAvailable,
+      ),
+    );
     return current;
   }
 
@@ -128,10 +130,11 @@ class MoveFake implements NetworkMoveApi {
   }
 
   @override
-  Future<NetworkMovePlan> networkMovePlan(
-      {required String targetRouterId,
-      required EmptySourceAttestationInput attestation,
-      required int delaySeconds}) async {
+  Future<NetworkMovePlan> networkMovePlan({
+    required String targetRouterId,
+    required EmptySourceAttestationInput attestation,
+    required int delaySeconds,
+  }) async {
     planCalls++;
     plannedTarget = targetRouterId;
     this.attestation = attestation;
@@ -145,18 +148,95 @@ class MoveFake implements NetworkMoveApi {
       onCurrentPlan == null ? activePlan : await onCurrentPlan!();
 }
 
-Future<void> _pump(WidgetTester tester, MoveFake api,
-    {Size size = const Size(900, 900), double textScale = 1}) async {
+class ExecutionMoveFake extends MoveFake implements NetworkMoveExecutionApi {
+  @override
+  bool get executionAvailable => true;
+  NetworkMoveExecutionStatus? status;
+  final actions = <String>[];
+  bool failConfirm = false;
+  bool failCurrent = false;
+
+  @override
+  Future<NetworkMoveExecutionReview> prepareExecution(String reviewId) async {
+    actions.add('prepare:$reviewId');
+    return NetworkMoveExecutionReview.fromJson({
+      'schema_version': 1,
+      'mode': 'network_move_execution_review',
+      'review_id': reviewId,
+      'operation_id': 'operation-1',
+      'profile_id': 'openthread-posix-lab-v1',
+      'expires_at': DateTime.now()
+          .toUtc()
+          .add(const Duration(minutes: 2))
+          .toIso8601String(),
+      'source_router_ids': ['source-a', 'source-b'],
+      'target_router_id': 'target-id',
+      'delay_seconds': 300,
+      'observation_seconds': 30,
+    });
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus> confirmExecution(String reviewId) async {
+    actions.add('confirm:$reviewId');
+    if (failConfirm) throw const LiveApiException();
+    return status = _status('observing');
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus?> currentExecution() async {
+    actions.add('current');
+    if (failCurrent) throw const LiveApiException();
+    return status;
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus> checkExecution(
+    String operationId, {
+    bool resume = false,
+  }) async {
+    actions.add('check:$operationId:$resume');
+    return status = _status('needs_attention');
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus> stopExecution(String operationId) async {
+    actions.add('stop:$operationId');
+    return status = _status('observation_stopped');
+  }
+
+  NetworkMoveExecutionStatus _status(String stage) =>
+      NetworkMoveExecutionStatus.fromJson({
+        'schema_version': 1,
+        'mode': 'network_move_execution_status',
+        'operation_id': 'operation-1',
+        'profile_id': 'openthread-posix-lab-v1',
+        'stage': stage,
+        'disposition': 'uncertain',
+        'reason': stage == 'observation_stopped'
+            ? 'observation_stopped'
+            : 'worker_uncertain',
+      });
+}
+
+Future<void> _pump(
+  WidgetTester tester,
+  MoveFake api, {
+  Size size = const Size(900, 900),
+  double textScale = 1,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(MaterialApp(
-    home: MediaQuery(
-      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-      child: NetworkMoveScreen(api: api, initialState: api.current),
+  await tester.pumpWidget(
+    MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+        child: NetworkMoveScreen(api: api, initialState: api.current),
+      ),
     ),
-  ));
+  );
   await tester.pumpAndSettle();
 }
 
@@ -184,16 +264,21 @@ Future<void> _tapVisible(WidgetTester tester, Key key) async {
 
 Future<void> _ensureEndKeyVisible(WidgetTester tester, Key key) async {
   final finder = find.byKey(key);
-  final scrollable =
-      tester.state<ScrollableState>(find.byType(Scrollable).first);
+  final scrollable = tester.state<ScrollableState>(
+    find.byType(Scrollable).first,
+  );
   scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
   await tester.pumpAndSettle();
   for (var attempt = 0; attempt < 30 && finder.evaluate().isEmpty; attempt++) {
     final position = scrollable.position;
     if (position.pixels <= position.minScrollExtent) break;
     final step = position.viewportDimension / 2;
-    position.jumpTo((position.pixels - step)
-        .clamp(position.minScrollExtent, position.maxScrollExtent));
+    position.jumpTo(
+      (position.pixels - step).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      ),
+    );
     await tester.pumpAndSettle();
   }
   expect(finder, findsOneWidget);
@@ -202,41 +287,161 @@ Future<void> _ensureEndKeyVisible(WidgetTester tester, Key key) async {
 }
 
 void main() {
-  testWidgets('attestation is off and plan never runs from selection alone',
-      (tester) async {
+  testWidgets(
+    'isolated execution requires separate preparation and confirmation',
+    (tester) async {
+      final api = ExecutionMoveFake()
+        ..preparedPlan = _plan(
+          decision: 'ready_for_lab_review',
+          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+        );
+      await _pump(tester, api);
+      expect(api.actions, ['current']);
+      await _ensureVisible(tester, const Key('move-execution-prepare'));
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('move-execution-prepare')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await _tapVisible(tester, const Key('move-target-target-id'));
+      await _tapVisible(tester, const Key('move-empty-source-attestation'));
+      await _tapVisible(tester, const Key('move-prepare'));
+      await _tapVisible(tester, const Key('move-execution-prepare'));
+      expect(api.actions, ['current', 'prepare:review-id']);
+      expect(
+        find.textContaining(
+            'The isolated source must have no attached devices'),
+        findsOneWidget,
+      );
+      await _tapVisible(tester, const Key('move-execution-confirm'));
+      expect(api.actions, [
+        'current',
+        'prepare:review-id',
+        'confirm:review-id',
+      ]);
+      await _tapVisible(tester, const Key('move-execution-check'));
+      expect(api.actions.last, 'check:operation-1:false');
+    },
+  );
+
+  testWidgets('uncertain confirmation never offers a resend', (tester) async {
+    final api = ExecutionMoveFake()
+      ..failConfirm = true
+      ..preparedPlan = _plan(
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+      );
+    await _pump(tester, api);
+    await _tapVisible(tester, const Key('move-target-target-id'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    await _tapVisible(tester, const Key('move-execution-prepare'));
+    await _tapVisible(tester, const Key('move-execution-confirm'));
+    await _ensureVisible(tester, const Key('move-execution-confirm'));
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('move-execution-confirm')))
+          .onPressed,
+      isNull,
+    );
+    expect(find.textContaining('Do not submit again'), findsOneWidget);
+    await _tapVisible(tester, const Key('move-execution-current'));
+    expect(
+      api.actions.where((action) => action.startsWith('confirm:')).length,
+      1,
+    );
+  });
+
+  testWidgets(
+    'opening restores a fenced operation without preparing a review',
+    (tester) async {
+      final api = ExecutionMoveFake()
+        ..status = NetworkMoveExecutionStatus.fromJson({
+          'schema_version': 1,
+          'mode': 'network_move_execution_status',
+          'operation_id': 'operation-1',
+          'profile_id': 'openthread-posix-lab-v1',
+          'stage': 'needs_attention',
+          'disposition': 'uncertain',
+          'reason': 'restart_requires_reads',
+        });
+      await _pump(tester, api);
+      await _ensureVisible(tester, const Key('move-execution-stage'));
+      expect(find.textContaining('needs attention'), findsOneWidget);
+      expect(find.byKey(const Key('move-execution-confirm')), findsNothing);
+      expect(api.actions, ['current']);
+    },
+  );
+  testWidgets('failed current-status lookup blocks execution preparation', (
+    tester,
+  ) async {
+    final api = ExecutionMoveFake()
+      ..failCurrent = true
+      ..preparedPlan = _plan(
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+      );
+    await _pump(tester, api);
+    await _tapVisible(tester, const Key('move-target-target-id'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    await _ensureVisible(tester, const Key('move-execution-prepare'));
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('move-execution-prepare')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+        api.actions.where((action) => action.startsWith('prepare:')), isEmpty);
+  });
+
+  testWidgets('attestation is off and plan never runs from selection alone', (
+    tester,
+  ) async {
     final api = MoveFake();
     await _pump(tester, api);
     await _ensureVisible(tester, const Key('move-empty-source-attestation'));
     expect(
-        tester
-            .widget<CheckboxListTile>(
-                find.byKey(const Key('move-empty-source-attestation')))
-            .value,
-        false);
+      tester
+          .widget<CheckboxListTile>(
+            find.byKey(const Key('move-empty-source-attestation')),
+          )
+          .value,
+      false,
+    );
     expect(
-        tester
-            .widget<FilledButton>(find.byKey(const Key('move-prepare')))
-            .onPressed,
-        isNull);
+      tester
+          .widget<FilledButton>(find.byKey(const Key('move-prepare')))
+          .onPressed,
+      isNull,
+    );
     await _tapVisible(tester, const Key('move-target-target-id'));
     await _ensureVisible(tester, const Key('move-prepare'));
     expect(
-        tester
-            .widget<FilledButton>(find.byKey(const Key('move-prepare')))
-            .onPressed,
-        isNull);
+      tester
+          .widget<FilledButton>(find.byKey(const Key('move-prepare')))
+          .onPressed,
+      isNull,
+    );
     expect(api.planCalls, 0);
     await _ensureEndKeyVisible(tester, const Key('move-dispatch-disabled'));
     expect(
-        tester
-            .widget<OutlinedButton>(
-                find.byKey(const Key('move-dispatch-disabled')))
-            .onPressed,
-        isNull);
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('move-dispatch-disabled')),
+          )
+          .onPressed,
+      isNull,
+    );
   });
 
-  testWidgets('access dialog cancel does not import either role',
-      (tester) async {
+  testWidgets('access dialog cancel does not import either role', (
+    tester,
+  ) async {
     final api = MoveFake();
     await _pump(tester, api);
     await _tapVisible(tester, const Key('move-target-access'));
@@ -251,8 +456,9 @@ void main() {
     expect(api.planCalls, 0);
   });
 
-  testWidgets('target and source setup and checks keep explicit roles',
-      (tester) async {
+  testWidgets('target and source setup and checks keep explicit roles', (
+    tester,
+  ) async {
     final api = MoveFake();
     await _pump(tester, api);
     await _tapVisible(tester, const Key('move-target-access'));
@@ -273,35 +479,43 @@ void main() {
     expect(api.planCalls, 0);
   });
 
-  testWidgets('explicit attestation prepares a read-only whole-network review',
-      (tester) async {
-    final api = MoveFake();
-    await _pump(tester, api, size: const Size(320, 640), textScale: 2);
-    await _tapVisible(tester, const Key('move-target-target-id'));
-    await _tapVisible(tester, const Key('move-empty-source-attestation'));
-    await _tapVisible(tester, const Key('move-prepare'));
-    expect(api.planCalls, 1);
-    expect(api.plannedTarget, 'target-id');
-    expect(api.attestation!.toJson()['scope'], 'whole_source_network');
-    expect(api.delay, 300);
-    await _ensureVisible(tester, const Key('move-review'));
-    expect(find.text('Source router one'), findsWidgets);
-    expect(find.text('Source router two'), findsWidgets);
-    expect(find.textContaining('entire source Thread network'), findsWidgets);
-    expect(find.textContaining('Offline or unobserved devices'), findsWidgets);
-    expect(find.textContaining('Manual recovery'), findsWidgets);
-    await _ensureEndKeyVisible(tester, const Key('move-dispatch-disabled'));
-    expect(
+  testWidgets(
+    'explicit attestation prepares a read-only whole-network review',
+    (tester) async {
+      final api = MoveFake();
+      await _pump(tester, api, size: const Size(320, 640), textScale: 2);
+      await _tapVisible(tester, const Key('move-target-target-id'));
+      await _tapVisible(tester, const Key('move-empty-source-attestation'));
+      await _tapVisible(tester, const Key('move-prepare'));
+      expect(api.planCalls, 1);
+      expect(api.plannedTarget, 'target-id');
+      expect(api.attestation!.toJson()['scope'], 'whole_source_network');
+      expect(api.delay, 300);
+      await _ensureVisible(tester, const Key('move-review'));
+      expect(find.text('Source router one'), findsWidgets);
+      expect(find.text('Source router two'), findsWidgets);
+      expect(find.textContaining('entire source Thread network'), findsWidgets);
+      expect(
+        find.textContaining('Offline or unobserved devices'),
+        findsWidgets,
+      );
+      expect(find.textContaining('Manual recovery'), findsWidgets);
+      await _ensureEndKeyVisible(tester, const Key('move-dispatch-disabled'));
+      expect(
         tester
             .widget<OutlinedButton>(
-                find.byKey(const Key('move-dispatch-disabled')))
+              find.byKey(const Key('move-dispatch-disabled')),
+            )
             .onPressed,
-        isNull);
-    expect(tester.takeException(), isNull);
-  });
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('every offered delay passes the real planner delay rule',
-      (tester) async {
+  testWidgets('every offered delay passes the real planner delay rule', (
+    tester,
+  ) async {
     final api = MoveFake();
     await _pump(tester, api);
     await _tapVisible(tester, const Key('move-target-target-id'));
@@ -334,95 +548,123 @@ void main() {
     expect(api.planCalls, 3);
   });
 
-  testWidgets('ready review stops claiming readiness after expiry',
-      (tester) async {
+  testWidgets('ready review stops claiming readiness after expiry', (
+    tester,
+  ) async {
     final api = MoveFake()
       ..preparedPlan = _plan(
-          decision: 'ready_for_lab_review',
-          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 1)));
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 1)),
+      );
     await _pump(tester, api);
     await _tapVisible(tester, const Key('move-target-target-id'));
     await _tapVisible(tester, const Key('move-empty-source-attestation'));
     await _tapVisible(tester, const Key('move-prepare'));
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsOneWidget);
+    expect(
+      find.textContaining('Evidence ready for separate lab review'),
+      findsOneWidget,
+    );
     await tester.pump(const Duration(minutes: 2));
     expect(find.textContaining('review has expired'), findsOneWidget);
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsNothing);
+    expect(
+      find.textContaining('Evidence ready for separate lab review'),
+      findsNothing,
+    );
     await _ensureVisible(tester, const Key('move-dispatch-disabled'));
     expect(
-        tester
-            .widget<OutlinedButton>(
-                find.byKey(const Key('move-dispatch-disabled')))
-            .onPressed,
-        isNull);
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('move-dispatch-disabled')),
+          )
+          .onPressed,
+      isNull,
+    );
   });
 
   testWidgets(
-      'resume hides readiness until the authoritative review is checked',
-      (tester) async {
-    final pending = Completer<NetworkMovePlan?>();
-    final api = MoveFake()
-      ..preparedPlan = _plan(
+    'resume hides readiness until the authoritative review is checked',
+    (tester) async {
+      final pending = Completer<NetworkMovePlan?>();
+      final api = MoveFake()
+        ..preparedPlan = _plan(
           decision: 'ready_for_lab_review',
-          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)))
-      ..onCurrentPlan = () => pending.future;
-    await _pump(tester, api);
-    await _tapVisible(tester, const Key('move-target-target-id'));
-    await _tapVisible(tester, const Key('move-empty-source-attestation'));
-    await _tapVisible(tester, const Key('move-prepare'));
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsOneWidget);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsNothing);
-    expect(find.textContaining('Checking whether this review is still current'),
-        findsOneWidget);
-    pending.complete(null);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('review is no longer current'), findsOneWidget);
-  });
+          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+        )
+        ..onCurrentPlan = () => pending.future;
+      await _pump(tester, api);
+      await _tapVisible(tester, const Key('move-target-target-id'));
+      await _tapVisible(tester, const Key('move-empty-source-attestation'));
+      await _tapVisible(tester, const Key('move-prepare'));
+      expect(
+        find.textContaining('Evidence ready for separate lab review'),
+        findsOneWidget,
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(
+        find.textContaining('Evidence ready for separate lab review'),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Checking whether this review is still current'),
+        findsOneWidget,
+      );
+      pending.complete(null);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('review is no longer current'),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('changed review ID and lookup error both remove a ready claim',
-      (tester) async {
+  testWidgets('changed review ID and lookup error both remove a ready claim', (
+    tester,
+  ) async {
     final api = MoveFake()
       ..preparedPlan = _plan(
-          decision: 'ready_for_lab_review',
-          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+      );
     await _pump(tester, api);
     await _tapVisible(tester, const Key('move-target-target-id'));
     await _tapVisible(tester, const Key('move-empty-source-attestation'));
     await _tapVisible(tester, const Key('move-prepare'));
     api.activePlan = _plan(
-        reviewId: 'other-review',
-        decision: 'ready_for_lab_review',
-        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+      reviewId: 'other-review',
+      decision: 'ready_for_lab_review',
+      validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+    );
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsNothing);
+    expect(
+      find.textContaining('Evidence ready for separate lab review'),
+      findsNothing,
+    );
     expect(find.textContaining('review is no longer current'), findsOneWidget);
 
     await _tapVisible(tester, const Key('move-prepare'));
     api.onCurrentPlan = () async => throw StateError('lookup failed');
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsNothing);
+    expect(
+      find.textContaining('Evidence ready for separate lab review'),
+      findsNothing,
+    );
     expect(find.textContaining('review could not be verified'), findsOneWidget);
   });
 
-  testWidgets('late old lookup cannot erase a newer prepared review',
-      (tester) async {
+  testWidgets('late old lookup cannot erase a newer prepared review', (
+    tester,
+  ) async {
     final pending = Completer<NetworkMovePlan?>();
     var lookups = 0;
     final api = MoveFake()
       ..preparedPlan = _plan(
-          decision: 'ready_for_lab_review',
-          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+      );
     api.onCurrentPlan = () {
       lookups++;
       return lookups == 1 ? pending.future : Future.value(api.activePlan);
@@ -433,28 +675,33 @@ void main() {
     await _tapVisible(tester, const Key('move-prepare'));
     await tester.pump(const Duration(seconds: 5));
     api.preparedPlan = _plan(
-        reviewId: 'new-review',
-        decision: 'ready_for_lab_review',
-        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+      reviewId: 'new-review',
+      decision: 'ready_for_lab_review',
+      validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+    );
     await _tapVisible(tester, const Key('move-empty-source-attestation'));
     await _tapVisible(tester, const Key('move-empty-source-attestation'));
     await _tapVisible(tester, const Key('move-prepare'));
     pending.complete(null);
     await tester.pumpAndSettle();
     expect(api.activePlan!.reviewId, 'new-review');
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsOneWidget);
+    expect(
+      find.textContaining('Evidence ready for separate lab review'),
+      findsOneWidget,
+    );
     expect(find.textContaining('review is no longer current'), findsNothing);
   });
 
-  testWidgets('resume ignores a lookup started before the app was hidden',
-      (tester) async {
+  testWidgets('resume ignores a lookup started before the app was hidden', (
+    tester,
+  ) async {
     final pending = Completer<NetworkMovePlan?>();
     var lookups = 0;
     final api = MoveFake()
       ..preparedPlan = _plan(
-          decision: 'ready_for_lab_review',
-          validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)));
+        decision: 'ready_for_lab_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+      );
     api.onCurrentPlan = () {
       lookups++;
       return lookups == 1 ? pending.future : Future.value(null);
@@ -467,13 +714,17 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsNothing);
+    expect(
+      find.textContaining('Evidence ready for separate lab review'),
+      findsNothing,
+    );
     pending.complete(api.activePlan);
     await tester.pumpAndSettle();
     expect(lookups, 2);
-    expect(find.textContaining('Evidence ready for separate lab review'),
-        findsNothing);
+    expect(
+      find.textContaining('Evidence ready for separate lab review'),
+      findsNothing,
+    );
     expect(find.textContaining('review is no longer current'), findsOneWidget);
   });
 }

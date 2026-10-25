@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(TNT_WITH_COMMISSIONER "Build optional OpenThread read-only probe" OFF)
 option(TNT_BUILD_MOVE_LAB "Build isolated loopback-only native move lab worker" OFF)
+option(TNT_BUILD_APP_MOVE_LAB "Build isolated app move lab worker" OFF)
 option(TNT_BUILD_TESTS "Build native tests" ON)
 option(TNT_BUILD_MOVE_JOURNAL "Build private POSIX move journal helper (no network access)" OFF)
 if(TNT_BUILD_TESTS)
@@ -96,16 +97,43 @@ if(TNT_BUILD_TESTS)
 endif()
 
 # No mutation entry point is added to the application CLI or installed payload.
-if(TNT_BUILD_MOVE_LAB)
+if(TNT_BUILD_MOVE_LAB OR TNT_BUILD_APP_MOVE_LAB)
   if(NOT TNT_WITH_COMMISSIONER OR WIN32)
-    message(FATAL_ERROR "The isolated move lab requires the pinned Commissioner on POSIX")
+    message(FATAL_ERROR "Isolated move workers require the pinned Commissioner on POSIX")
   endif()
   add_library(tnt-network-move STATIC native/network_move.cpp)
   target_include_directories(tnt-network-move PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/native)
   target_link_libraries(tnt-network-move PUBLIC thread_network_core)
-  add_executable(thread-network-move-lab native/network_move_lab_main.cpp native/network_move_commissioner.cpp)
-  target_include_directories(thread-network-move-lab PRIVATE "${TNT_COMMISSIONER_SOURCE}/include")
-  target_link_libraries(thread-network-move-lab PRIVATE tnt-network-move commissioner)
+  if(TNT_BUILD_MOVE_LAB)
+    add_executable(thread-network-move-lab native/network_move_lab_main.cpp native/network_move_commissioner.cpp)
+    target_include_directories(thread-network-move-lab PRIVATE "${TNT_COMMISSIONER_SOURCE}/include")
+    target_link_libraries(thread-network-move-lab PRIVATE tnt-network-move commissioner)
+  endif()
+  if(TNT_BUILD_APP_MOVE_LAB)
+    add_executable(thread-network-move-app
+      native/network_move_worker_main.cpp
+      native/network_move_worker_protocol.cpp
+      native/network_move_worker_fixture.cpp
+      native/network_move_worker_lifecycle.cpp
+      native/network_move_commissioner.cpp)
+    target_include_directories(thread-network-move-app PRIVATE "${TNT_COMMISSIONER_SOURCE}/include" "${TNT_COMMISSIONER_SOURCE}/third_party/mbedtls/repo/include")
+    target_link_libraries(thread-network-move-app PRIVATE tnt-network-move commissioner)
+    if(TNT_BUILD_TESTS)
+      add_executable(tnt-move-app-protocol-tests
+        tests/native/test_network_move_worker_protocol.cpp
+        native/network_move_worker_protocol.cpp)
+      target_include_directories(tnt-move-app-protocol-tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/native"
+        "${TNT_COMMISSIONER_SOURCE}/third_party/mbedtls/repo/include")
+      target_link_libraries(tnt-move-app-protocol-tests PRIVATE tnt-network-move commissioner)
+      add_test(NAME native-move-app-protocol COMMAND tnt-move-app-protocol-tests)
+      add_executable(tnt-move-app-lifecycle-tests
+        tests/native/test_network_move_worker_lifecycle.cpp
+        native/network_move_worker_lifecycle.cpp)
+      target_include_directories(tnt-move-app-lifecycle-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/native")
+      add_test(NAME native-move-app-lifecycle COMMAND tnt-move-app-lifecycle-tests)
+    endif()
+  endif()
 endif()
 
 if(TNT_BUILD_TESTS)

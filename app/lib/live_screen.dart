@@ -63,8 +63,10 @@ class _LiveScreenState extends State<LiveScreen> {
     _run(_api.state);
   }
 
-  Future<void> _run(Future<LiveState> Function() operation,
-      {String? routerId}) async {
+  Future<void> _run(
+    Future<LiveState> Function() operation, {
+    String? routerId,
+  }) async {
     if (!mounted) return;
     setState(() {
       _busy = true;
@@ -76,8 +78,10 @@ class _LiveScreenState extends State<LiveScreen> {
       if (mounted) setState(() => _state = next);
     } catch (_) {
       if (mounted) {
-        setState(() => _notice =
-            'The local helper could not complete this request. Refresh discovery if the router list expired.');
+        setState(
+          () => _notice =
+              'The local helper could not complete this request. Refresh discovery if the router list expired.',
+        );
       }
     } finally {
       if (mounted) {
@@ -102,9 +106,11 @@ class _LiveScreenState extends State<LiveScreen> {
     final api = _api;
     final state = _state;
     if (api is! NetworkMoveApi || state == null) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => NetworkMoveScreen(api: api, initialState: state),
-    ));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NetworkMoveScreen(api: api, initialState: state),
+      ),
+    );
     if (mounted) await _run(_api.state);
   }
 
@@ -183,18 +189,22 @@ class _LiveScreenState extends State<LiveScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               children: [
-                Row(children: [
-                  Expanded(
-                    child: Text('Thread Network Tool',
-                        style: Theme.of(context).textTheme.headlineSmall),
-                  ),
-                  IconButton(
-                    key: const Key('live-report'),
-                    tooltip: 'Redacted report',
-                    onPressed: state == null ? null : _showReport,
-                    icon: const Icon(Icons.description_outlined),
-                  ),
-                ]),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Thread Network Tool',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('live-report'),
+                      tooltip: 'Redacted report',
+                      onPressed: state == null ? null : _showReport,
+                      icon: const Icon(Icons.description_outlined),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 5),
                 Wrap(
                   key: const Key('live-banner'),
@@ -202,23 +212,36 @@ class _LiveScreenState extends State<LiveScreen> {
                   spacing: 6,
                   runSpacing: 2,
                   children: [
-                    Icon(Icons.visibility_outlined,
-                        size: 18, color: colors.primary),
-                    const Text('Live · Read only'),
-                    const Text('No network changes'),
+                    Icon(
+                      Icons.visibility_outlined,
+                      size: 18,
+                      color: colors.primary,
+                    ),
+                    Text(
+                      _api is NetworkMoveExecutionApi && _api.executionAvailable
+                          ? 'Live · Isolated lab execution available'
+                          : 'Live · Read only',
+                    ),
+                    if (_api is! NetworkMoveExecutionApi ||
+                        !_api.executionAvailable)
+                      const Text('No network changes'),
                   ],
                 ),
                 const SizedBox(height: 16),
                 if (_busy) const LinearProgressIndicator(key: Key('live-busy')),
                 if (_notice != null) ...[
                   const SizedBox(height: 10),
-                  Text(_notice!,
-                      key: const Key('live-error'),
-                      style: TextStyle(color: colors.error)),
+                  Text(
+                    _notice!,
+                    key: const Key('live-error'),
+                    style: TextStyle(color: colors.error),
+                  ),
                 ],
-                Text(_nextAction(state),
-                    key: const Key('live-next-action'),
-                    style: Theme.of(context).textTheme.bodyLarge),
+                Text(
+                  _nextAction(state),
+                  key: const Key('live-next-action'),
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 9,
@@ -256,11 +279,15 @@ class _LiveScreenState extends State<LiveScreen> {
                         key: Key('live-unsupported'),
                       ),
                     ),
-                  Text('Routers (${state.routers.length})',
-                      style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Routers (${state.routers.length})',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 3),
-                  Text(_discoverySummary(state),
-                      key: const Key('live-discovery-status')),
+                  Text(
+                    _discoverySummary(state),
+                    key: const Key('live-discovery-status'),
+                  ),
                   Text(
                     state.credentialAvailable
                         ? 'Credentials ready for ${state.credentialNetworkName ?? 'your network'}'
@@ -284,12 +311,15 @@ class _LiveScreenState extends State<LiveScreen> {
                     title: const Text('How this works'),
                     children: [
                       const Text(
-                          'Router advertisements only suggest a network name. A router is verified only after an authenticated read completes and its identity matches imported credentials. This screen cannot change your network.'),
+                        'Router advertisements only suggest a network name. A router is verified only after an authenticated read completes and its identity matches imported credentials. This screen cannot change your network.',
+                      ),
                       Text(
-                          'Discovery observed: ${_localTime(state.observedAt)}',
-                          key: const Key('live-observed-at')),
+                        'Discovery observed: ${_localTime(state.observedAt)}',
+                        key: const Key('live-observed-at'),
+                      ),
                       Text(
-                          'Discovery time (UTC): ${state.observedAt?.toUtc().toIso8601String() ?? 'not yet'}'),
+                        'Discovery time (UTC): ${state.observedAt?.toUtc().toIso8601String() ?? 'not yet'}',
+                      ),
                       Text('Discovery code: ${state.discoveryStatus}'),
                     ],
                   ),
@@ -377,56 +407,70 @@ class _LiveScreenState extends State<LiveScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(router.serviceName,
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        router.serviceName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    Text('Advertised: ${router.networkName ?? 'unknown'}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ],
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        'Advertised: ${router.networkName ?? 'unknown'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                key: Key('live-details-$index'),
-                tooltip: expanded ? 'Hide router details' : 'Router details',
-                onPressed: () => setState(() {
-                  if (expanded) {
-                    _expandedRouters.remove(router.id);
-                  } else {
-                    _expandedRouters.add(router.id);
-                  }
-                }),
-                icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
-              ),
-            ]),
+                IconButton(
+                  key: Key('live-details-$index'),
+                  tooltip: expanded ? 'Hide router details' : 'Router details',
+                  onPressed: () => setState(() {
+                    if (expanded) {
+                      _expandedRouters.remove(router.id);
+                    } else {
+                      _expandedRouters.add(router.id);
+                    }
+                  }),
+                  icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
+                ),
+              ],
+            ),
             const SizedBox(height: 3),
-            Row(children: [
-              Icon(statusIcon, size: 18, color: colors.primary),
-              const SizedBox(width: 6),
-              Expanded(
-                  child: Text(_probeSummary(probe),
-                      key: Key('live-probe-status-$index'))),
-              const SizedBox(width: 6),
-              OutlinedButton(
-                key: Key('live-read-$index'),
-                onPressed: _busy ||
-                        !credentialAvailable ||
-                        !router.endpointUsable
-                    ? null
-                    : () =>
-                        _run(() => _api.probe(router.id), routerId: router.id),
-                child: _busyRouter == router.id
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Check'),
-              ),
-            ]),
+            Row(
+              children: [
+                Icon(statusIcon, size: 18, color: colors.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _probeSummary(probe),
+                    key: Key('live-probe-status-$index'),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                OutlinedButton(
+                  key: Key('live-read-$index'),
+                  onPressed:
+                      _busy || !credentialAvailable || !router.endpointUsable
+                          ? null
+                          : () => _run(
+                                () => _api.probe(router.id),
+                                routerId: router.id,
+                              ),
+                  child: _busyRouter == router.id
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Check'),
+                ),
+              ],
+            ),
             if (!router.endpointUsable)
               const Text('No usable address was advertised for this router.'),
             if (expanded) ...[
@@ -435,15 +479,19 @@ class _LiveScreenState extends State<LiveScreen> {
               Text(_probeDetail(probe)),
               Text('Thread version: ${router.threadVersion ?? 'unknown'}'),
               Text(
-                  'Endpoint: ${router.endpointUsable ? 'available' : 'unavailable'}'),
+                'Endpoint: ${router.endpointUsable ? 'available' : 'unavailable'}',
+              ),
               if (probe != null) ...[
                 Text('Read code: ${probe.probeStatus}'),
                 Text('Active read: ${probe.activeStatus}'),
                 Text('Pending read: ${probe.pendingStatus}'),
-                Text('Read checked: ${_localTime(probe.checkedAt)}',
-                    key: Key('live-checked-at-$index')),
                 Text(
-                    'Read time (UTC): ${probe.checkedAt.toUtc().toIso8601String()}'),
+                  'Read checked: ${_localTime(probe.checkedAt)}',
+                  key: Key('live-checked-at-$index'),
+                ),
+                Text(
+                  'Read time (UTC): ${probe.checkedAt.toUtc().toIso8601String()}',
+                ),
               ],
             ],
           ],
