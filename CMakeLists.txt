@@ -10,7 +10,18 @@ target_include_directories(thread_network_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR
 add_executable(thread-network native/cli.cpp native/discovery.cpp)
 target_link_libraries(thread-network PRIVATE thread_network_core)
 if(APPLE)
+  # An installed helper lives in Contents/Helpers and finds its core in
+  # Contents/Frameworks. Build-tree targets keep CMake's separate build RPATH.
+  set_target_properties(thread_network_core PROPERTIES
+    MACOSX_RPATH ON
+    INSTALL_NAME_DIR "@rpath")
+  set_target_properties(thread-network PROPERTIES
+    INSTALL_RPATH "@executable_path/../Frameworks")
   target_link_libraries(thread-network PRIVATE "-framework CoreServices")
+endif()
+if(APPLE)
+  install(TARGETS thread_network_core LIBRARY DESTINATION Frameworks)
+  install(TARGETS thread-network RUNTIME DESTINATION Helpers)
 endif()
 if(TNT_WITH_COMMISSIONER)
   if(WIN32)
@@ -28,6 +39,8 @@ if(TNT_WITH_COMMISSIONER)
   set(OT_COMM_CCM OFF CACHE BOOL "" FORCE)
   set(OT_COMM_TEST OFF CACHE BOOL "" FORCE)
   set(OT_COMM_JAVA_BINDING OFF CACHE BOOL "" FORCE)
+  # Dependencies stay local to this build; do not update a user-wide registry.
+  set(CMAKE_EXPORT_NO_PACKAGE_REGISTRY ON)
   # Pinned Commissioner hardcodes libfmt.a even in Debug configurations.
   set(FMT_DEBUG_POSTFIX "" CACHE STRING "" FORCE)
   add_subdirectory("${TNT_COMMISSIONER_SOURCE}" "${CMAKE_CURRENT_BINARY_DIR}/ot-commissioner" EXCLUDE_FROM_ALL)
@@ -51,4 +64,7 @@ if(TNT_BUILD_TESTS)
     target_link_libraries(tnt-discovery-tests PRIVATE "-framework CoreServices")
   endif()
   add_test(NAME native-discovery COMMAND tnt-discovery-tests)
+  add_test(NAME native-capabilities COMMAND thread-network capabilities)
+  set_tests_properties(native-capabilities PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"network_writes\":false")
 endif()

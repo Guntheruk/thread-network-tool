@@ -57,6 +57,24 @@ bool NumericIp(const char* s) {
 }
 int main(int argc,char** argv) {
     if(argc<2) {std::cout<<tnt::ErrorJson("invalid_command")<<'\n';return 2;}
+    // Packaging can inspect build capabilities without credentials, stdin or
+    // network access. These flags describe this executable, not router support.
+    if(std::string(argv[1])=="capabilities" && argc==2) {
+        std::cout<<"{\"schema_version\":1,\"dataset_inspection\":true,\"discovery\":";
+#if defined(__APPLE__)
+        std::cout<<"true";
+#else
+        std::cout<<"false";
+#endif
+        std::cout<<",\"authenticated_probe\":";
+#if defined(TNT_WITH_COMMISSIONER)
+        std::cout<<"true";
+#else
+        std::cout<<"false";
+#endif
+        std::cout<<",\"network_writes\":false}"<<'\n';
+        return 0;
+    }
     if(std::string(argv[1])=="discover" && argc==2) {
 #if defined(__APPLE__)
         struct sigaction action{};action.sa_handler=DiscoveryTimeout;sigemptyset(&action.sa_mask);

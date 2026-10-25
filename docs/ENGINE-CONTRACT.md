@@ -13,6 +13,10 @@ CLI `thread-network inspect` reads exactly one dataset hex line from stdin and e
 
 Build: CMake with core/tests independent of OpenThread; `TNT_WITH_COMMISSIONER=ON` and `TNT_COMMISSIONER_SOURCE` opt into the pinned upstream source. Use isolated build directories, never change upstream checkout.
 
+CLI `thread-network capabilities` requires no stdin, credentials, or network activity. It emits `schema_version: 1` and boolean `dataset_inspection`, `discovery`, `authenticated_probe`, and `network_writes` fields. These describe compiled functionality, not connected-router compatibility. The packaging workflow requires authenticated-probe support and rejects an executable reporting network writes.
+
+On macOS, CMake installs the executable in `Helpers/` and the core library in `Frameworks/` beneath a supplied app `Contents` directory. Installed binaries use relative Mach-O load paths, not the build directory. The app's helper has only sandbox and inheritance entitlements; the parent supplies both network entitlements because UDP needs send and receive access. Full native Flutter launch remains a separate runtime check. See MACOS-BUILD.md.
+
 Flutter uses a platform-independent model. The parser FFI adapter and smoke test remain available. Live discovery and authenticated reads use the bounded native executable through a shared Dart session, exposed directly to native Flutter or through an authenticated localhost development helper. The web preview only claims live results when that helper supplies them; otherwise it remains explicitly synthetic. See LIVE-READ-CONTRACT.md for transport, state and privacy boundaries.
 
 CLI `thread-network discover` requires no stdin. The macOS implementation browses `_meshcop._udp.local`, resolves safe numeric endpoints and emits only allowlisted advertisement metadata. It uses a seven-second collection window, an eight-second process alarm, a 32-service cap and a 64-row cap. Other platforms return explicit unsupported status. Its results are discovery observations, never authenticated identity or endpoint health.

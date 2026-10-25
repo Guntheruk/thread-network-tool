@@ -65,7 +65,7 @@
 		331C80D7294CF71000263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		333000ED22D3DE5D00554162 /* Warnings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Warnings.xcconfig; sourceTree = "<group>"; };
 		335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GeneratedPluginRegistrant.swift; sourceTree = "<group>"; };
-		33CC10ED2044A3C60003C045 /* thread_network_tool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "thread_network_tool.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		33CC10ED2044A3C60003C045 /* Thread Network Tool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Thread Network Tool.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		33CC10F02044A3C60003C045 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		33CC10F22044A3C60003C045 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Runner/Assets.xcassets; sourceTree = "<group>"; };
 		33CC10F52044A3C60003C045 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
@@ -75,6 +75,7 @@
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
 		33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Flutter-Generated.xcconfig"; path = "ephemeral/Flutter-Generated.xcconfig"; sourceTree = "<group>"; };
 		33E51913231747F40026EE4D /* DebugProfile.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DebugProfile.entitlements; sourceTree = "<group>"; };
+		A01B2C3D4E5F678901234567 /* Helper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Helper.entitlements; sourceTree = "<group>"; };
 		33E51914231749380026EE4D /* Release.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = Release.entitlements; sourceTree = "<group>"; };
 		33E5194F232828860026EE4D /* AppInfo.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppInfo.xcconfig; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
@@ -134,7 +135,7 @@
 		33CC10EE2044A3C60003C045 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				33CC10ED2044A3C60003C045 /* thread_network_tool.app */,
+				33CC10ED2044A3C60003C045 /* Thread Network Tool.app */,
 				331C80D5294CF71000263BE5 /* RunnerTests.xctest */,
 			);
 			name = Products;
@@ -169,6 +170,7 @@
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
+				A01B2C3D4E5F678901234567 /* Helper.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
 				33BA886A226E78AF003329D5 /* Configs */,
@@ -224,7 +226,7 @@
 				78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */,
 			);
 			productName = Runner;
-			productReference = 33CC10ED2044A3C60003C045 /* thread_network_tool.app */;
+			productReference = 33CC10ED2044A3C60003C045 /* Thread Network Tool.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -398,7 +400,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.threadNetworkTool.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/thread_network_tool.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/thread_network_tool";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Thread Network Tool.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Thread Network Tool";
 			};
 			name = Debug;
 		};
@@ -412,7 +414,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.threadNetworkTool.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/thread_network_tool.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/thread_network_tool";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Thread Network Tool.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Thread Network Tool";
 			};
 			name = Release;
 		};
@@ -426,7 +428,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.threadNetworkTool.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/thread_network_tool.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/thread_network_tool";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Thread Network Tool.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Thread Network Tool";
 			};
 			name = Profile;
 		};

@@ -46,7 +46,9 @@ flutter run -d macos \
   --dart-define=TNT_ENGINE_PATH="$PWD/../build/probe/thread-network"
 ```
 
-The final bundle lookup is `Contents/Resources/thread-network`. Bundling that helper and its dependent libraries, native window verification, code signing and distribution remain unfinished. A missing helper is shown as unavailable; it does not silently become demo data. Full Xcode is required for the Flutter macOS runner. The current development Mac has Command Line Tools only, so no packaged native window has been tested. Windows and phone launch paths explicitly report unsupported until their native integrations are implemented.
+The bundle lookup is `Contents/Helpers/thread-network`, with its core library in `Contents/Frameworks`. The [macOS packaging workflow](docs/MACOS-BUILD.md) builds a universal native helper, bundles it with Flutter, and applies a local ad hoc signature or an explicitly selected Developer ID identity. Helper relocation and local signature checks are tested; the complete Flutter package and native window remain unverified because the current development Mac has Command Line Tools rather than full Xcode.
+
+A missing helper is shown as unavailable; it does not silently become demo data. Windows and phone launch paths explicitly report unsupported until their native integrations are implemented. Developer ID signing and notarization are separate distribution gates.
 
 ## Build the native parser
 
@@ -59,6 +61,8 @@ ctest --test-dir build/native --output-on-failure
 ```
 
 `thread-network inspect` reads exactly one dataset hex line from piped standard input. It prints validated metadata, never Network Key, PSKc, or raw dataset bytes. The initial parser supports page 0, channels 11–26; an accepted dataset is not proof of router access or migration compatibility.
+
+`thread-network capabilities` reports this executable's compiled inspection, discovery and authenticated-probe support without reading stdin or using the network. It also explicitly reports `network_writes: false`.
 
 Test Dart calling the actual native library on macOS:
 

@@ -8,7 +8,7 @@ No home-network writes, resets, accessory removal, credential regeneration, publ
 
 ## Implemented
 
-Previous source milestone: `a08b2c0b8b649c0ac34d6f5c3d282ebac5b4c9bd`. This continuation adds live discovery and both direct-native and development HTTP adapters.
+Previous source milestone: `4768a7215fc381983f218b6f5f3f6b183881dacd`. This continuation prepares macOS helper bundling and local application packaging on top of the live discovery and read adapters.
 
 - Bounded C++ dataset parser and C ABI; rejects malformed/duplicate/missing/oversized TLVs, invalid UTF-8 and unsupported page/channel combinations. Page-0 channel mask follows raw MeshCoP MSB-first encoding.
 - CLI inspect and optional pinned OpenThread Commissioner read-only probe. Credentials enter via stdin; reports omit Network Key, PSKc and raw datasets.
@@ -21,6 +21,9 @@ Previous source milestone: `a08b2c0b8b649c0ac34d6f5c3d282ebac5b4c9bd`. This cont
 - Live Flutter screen with credential import, individual authenticated reads, timestamps, explicit mismatch/partial/timeout outcomes, disabled join and a report omitting household identifiers.
 - Direct native macOS adapter invokes the engine without HTTP. Missing helpers and unsupported Windows/phone networking are shown as unavailable. Native window packaging remains unverified.
 - Optional loopback development helper with exact Host/Origin checks, temporary bearer access, bounded bodies and native subprocesses, private session-file publication and no credential persistence. Browser refresh retains live mode without browser storage.
+- macOS runner now resolves `Contents/Helpers/thread-network`. CMake installs the helper and its core library with relative load paths. The parent retains App Sandbox with client/server network access for UDP; the helper has only sandbox/inherit entitlements. Local-network purpose and Bonjour service are declared.
+- Native `capabilities` command reports compiled read support without credentials or network activity. Packaging requires a read-only authenticated-probe build, defaults to Intel/Apple Silicon universal output, checks app/helper architecture compatibility and refuses to overwrite an existing package.
+- Packaging signs nested code before the app, supports local ad hoc signatures and an explicitly selected Developer ID identity, and verifies nested signatures. Developer ID signing requests secure timestamps. It does not install Xcode, change the selected toolchain, notarize or publish.
 
 ## Verification
 
@@ -38,17 +41,24 @@ Previous source milestone: `a08b2c0b8b649c0ac34d6f5c3d282ebac5b4c9bd`. This cont
 - Direct native Flutter adapter also completed discovery/import/one real Eero read without the browser or HTTP server. This verifies its Dart-to-native read path, not a packaged Flutter desktop window.
 - Full Flutter analysis clean; 20 tests passed including native adapter and unavailable behavior. Web release rebuilt successfully; known unused Cupertino font-family warning remains.
 - Local-helper regression script passed: unauthorized/foreign-origin/rebinding requests rejected, endpoint handles bound to discovery and expired, errors/results redacted, private session files not overwritten, and a slow-drip request closes at the total five-second deadline. Independent review findings on atomic session-file privacy and total request time were fixed and re-reviewed.
+- In the current workspace, the pinned Commissioner build produced an `arm64`/`x86_64` helper targeting macOS 12.0. Native CTests passed 3/3, including capabilities; installed payload reports authenticated-probe support and `network_writes: false`. Dynamic dependencies are the bundled core plus system libraries/frameworks. Intel execution has not been tested.
+- The universal relocation smoke test passed after moving a synthetic app and deleting its native build tree. A separate locally signed sandbox parent successfully launched its sandbox-inheriting helper; valid synthetic inspection returned success and invalid inspection returned a redacted failure. The test passes outside Codex's enclosing process sandbox; inside it the signed parent aborts before `main`. This is not proof of a packaged Flutter window or sandboxed networking.
+- Full universal authenticated-probe payload staging passed after correcting the dependency scanner to ignore each architecture's `otool` filename heading. Installed capabilities ran successfully without credentials or network calls.
+- Full Flutter analysis is clean and all 24 tests pass, including bundled-helper lookup, missing-helper handling and explicit override behavior. Plists/project file and scheme pass static syntax checks. Independent packaging review findings on timestamps and recursive verification were fixed and verified; the UDP receive entitlement was corrected against current Apple documentation.
+- The full macOS build command stops at its Xcode preflight: only Command Line Tools are installed. No complete Flutter app package, native window or Developer ID distribution signature has been produced.
 
 ## Running preview and reproducibility
 
 Synthetic preview remains available at http://127.0.0.1:5187/. The live development helper uses http://127.0.0.1:5188/ with its private session fragment; opening the bare URL intentionally selects the synthetic preview. The browser tab holds the live session. Both modes keep network changes disabled.
 
-Build instructions: README.md and docs/LIVE-READ-CONTRACT.md. Root build output is build/native; optional-probe evidence was built in a temporary directory and must be rebuilt for later use. Live checks used the earlier firewall-approved probe executable plus the new separate discovery executable; no broad firewall rule or home configuration was changed. The SDK is ignored at .tooling/flutter. No remote Git repository exists.
+Current source workspace is `/Users/richard/thread`, cloned locally from the clean committed source in `/Users/richard/thread-network-tool`. The earlier folder and its running preview remain intact; prior UI screenshots and preview build artifacts remain there. Git origin is that local source path, not a hosted repository. The ignored Flutter SDK link currently resolves to the earlier workspace's SDK; portable builds can set `TNT_FLUTTER_BIN` explicitly.
+
+Build instructions: README.md, docs/LIVE-READ-CONTRACT.md and docs/MACOS-BUILD.md. Current optional-probe output is `build/native-probe`; `build/native-payload/Contents` is an installed helper/library payload, not a complete application. Earlier live checks used the firewall-approved probe executable plus a separate discovery executable. This packaging continuation made no home-network calls or configuration changes. No remote Git repository or release exists.
 
 ## Next work and gates
 
 1. Real discovery, live UI reads and the direct native adapter are implemented and verified as described above. Preserve the observation/authentication distinction; broader device/platform compatibility still requires separate checks.
-2. Package the native Mac application with its helper and dependent libraries, then verify the native window. Full Xcode is missing: xcodebuild explicitly reports that Command Line Tools are insufficient. No valid signing identity was listed by the local keychain check; distribution signing remains unconfigured.
+2. Run the prepared macOS packaging workflow and verify the native window, bundled helper and sandboxed discovery/read path after full Xcode is installed. Command Line Tools are insufficient. No valid signing identity was listed by the local keychain check; distribution signing remains unconfigured.
 3. Windows and phone native networking, builds/runtime tests and credential-provider integration remain unverified. Their current native entry points explicitly report unavailable.
 4. Add supported credential providers; Apple entitlement and actual Google/Nest command support remain unresolved. HA stays optional.
 5. Validate joining on a controlled empty/new source network before adding mutating application commands. Existing accessory transfer can remain unsupported with an explicit explanation; never reset devices automatically.

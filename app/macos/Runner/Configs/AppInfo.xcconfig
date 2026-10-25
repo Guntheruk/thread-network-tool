@@ -5,9 +5,9 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = thread_network_tool
+PRODUCT_NAME = Thread Network Tool
 
-// The application's bundle identifier
+// Development placeholder; choose an owned identifier before distribution.
 PRODUCT_BUNDLE_IDENTIFIER = com.example.threadNetworkTool
 
 // The copyright displayed in application information

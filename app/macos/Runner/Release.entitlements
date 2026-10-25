@@ -4,5 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- UDP status reads require receive access as well as outgoing access. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 </dict>
 </plist>

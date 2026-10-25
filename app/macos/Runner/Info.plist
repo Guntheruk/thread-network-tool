@@ -26,6 +26,12 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Discover Thread border routers on your local network and read their status after you provide authorized network credentials.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_meshcop._udp</string>
+	</array>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>
