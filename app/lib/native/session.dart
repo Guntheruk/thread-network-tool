@@ -317,6 +317,12 @@ class LiveSession {
     }
     final endpoint = _endpoints[id];
     if (endpoint == null) throw const ApiFailure('unsupported_endpoint', 400);
+    // Any new observation attempt supersedes older role-bound evidence for
+    // this router, including when the native read times out or throws.
+    _invalidateReview();
+    _roleReads['source']?.remove(id);
+    _roleReads['target']?.remove(id);
+    (_routers[id]!['role_probes'] as Map<String, dynamic>).clear();
     final response =
         await native(['probe', endpoint.$1, '${endpoint.$2}'], credential);
     final value = response.value;
@@ -385,7 +391,6 @@ class LiveSession {
         publicProbe;
     _roleReads.putIfAbsent(role, () => {})[id] = _RoleRead(publicProbe,
         planningMatch, validTimestamp ? readTimestamp : null, slot.generation);
-    _invalidateReview();
   }
 
   void clear() {

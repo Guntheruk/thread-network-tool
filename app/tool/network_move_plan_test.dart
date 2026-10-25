@@ -105,6 +105,7 @@ Future<void> main() async {
 
   await session.perform('credentials', {'role': 'source', 'dataset': 'aa'});
   await session.perform('credentials', {'role': 'target', 'dataset': 'bb'});
+  await session.perform('credentials', {'dataset': 'aa'});
   plan = await session.perform('network-move/plan', request(ids[2]));
   check(
       (plan['source_routers'] as List).length == 2 &&
@@ -136,6 +137,36 @@ Future<void> main() async {
     // Tiny credential fixture strings could appear inside ordinary words.
     if (secret.length > 2) check(!encoded.contains(secret), 'secret leaked');
   }
+
+  replies['aa:192.168.5.11'] = {
+    ...reply('SourceNet', sourceXpan, sourceStamp),
+    'pending_status': 'present',
+  };
+  await session.perform('probe', {'router_id': ids[0]});
+  check(session.currentReview == null,
+      'inspection-only probe retained contradictory ready review');
+  plan = await session.perform('network-move/plan', request(ids[2]));
+  check((plan['blockers'] as List).contains('source_read_missing_or_stale'),
+      'generic probe reused stale source-role evidence');
+  replies['aa:192.168.5.11'] = reply('SourceNet', sourceXpan, sourceStamp);
+  await session.perform('probe', {'role': 'source', 'router_id': ids[0]});
+  plan = await session.perform('network-move/plan', request(ids[2]));
+  check(plan['decision'] == 'ready_for_lab_review',
+      'fresh source-role check did not restore review readiness');
+  replies.remove('aa:192.168.5.11');
+  try {
+    await session.perform('probe', {'role': 'source', 'router_id': ids[0]});
+    throw StateError('expected synthetic native failure');
+  } on StateError catch (error) {
+    check(error.message != 'expected synthetic native failure',
+        'synthetic native failure was not raised');
+  }
+  check(session.currentReview == null, 'throwing probe retained ready review');
+  plan = await session.perform('network-move/plan', request(ids[2]));
+  check((plan['blockers'] as List).contains('source_read_missing_or_stale'),
+      'throwing probe reused stale source-role evidence');
+  replies['aa:192.168.5.11'] = reply('SourceNet', sourceXpan, sourceStamp);
+  await session.perform('probe', {'role': 'source', 'router_id': ids[0]});
 
   replies['aa:192.168.5.12'] = {
     ...reply('SourceNet', sourceXpan, sourceStamp),
