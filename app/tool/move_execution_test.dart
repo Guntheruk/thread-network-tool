@@ -1,6 +1,7 @@
 // Standalone Dart: real native journal processes, injected network worker.
 // Run: dart app/tool/move_execution_test.dart /path/to/thread-network-journal
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:thread_network_tool/move/move_execution.dart';
@@ -45,6 +46,7 @@ class Rig {
   bool staleReads = false;
   bool targetPending = false;
   bool throwingObservation = false;
+  Duration observationClockAdvance = Duration.zero;
   MoveDisposition disposition = MoveDisposition.accepted;
   Completer<void>? workerHold;
   Completer<void>? observeHold;
@@ -88,7 +90,7 @@ class Rig {
                 : !targetPending,
             connectivityVerified: true,
           );
-      return MoveObservation(
+      final evidence = MoveObservation(
         operationId: record.operationId,
         recoveryBindingVerified: bindingVerified,
         workerTerminated: workerTerminated,
@@ -101,6 +103,8 @@ class Rig {
           changed: targetChanged,
         ),
       );
+      clock = clock.add(observationClockAdvance);
+      return evidence;
     },
   );
   MoveExecutionPlan plan({
@@ -132,6 +136,51 @@ class FailBegin implements MoveJournal {
   @override
   Future<MoveRecord> update(MoveRecord record, int revision) =>
       actual.update(record, revision);
+}
+
+// Hold the actual native helper's flock from an independent process.
+Future<Process> lockJournal(String directory) async {
+  final process = await Process.start('python3', [
+    '-u',
+    '-c',
+    'import fcntl,sys; f=open(sys.argv[1], "rb"); '
+        'fcntl.flock(f, fcntl.LOCK_EX); print("locked", flush=True); sys.stdin.read()',
+    '$directory/writer.lock',
+  ]);
+  expect(
+    await process.stdout
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .first ==
+        'locked',
+    'Lock process must confirm ownership',
+  );
+  return process;
+}
+
+Future<void> releaseJournal(Process process) async {
+  await process.stdin.close();
+  expect(await process.exitCode == 0, 'Lock holder must exit cleanly');
+}
+
+class ReadHookJournal implements MoveJournal {
+  ReadHookJournal(this.actual);
+  final MoveJournal actual;
+  Future<void> Function()? afterRead;
+  @override
+  Future<MoveRecord?> read() async {
+    final result = await actual.read();
+    final hook = afterRead;
+    afterRead = null;
+    await hook?.call();
+    return result;
+  }
+
+  @override
+  Future<MoveRecord> begin(MoveRecord record) => actual.begin(record);
+  @override
+  Future<MoveRecord> update(MoveRecord record, int expectedRevision) =>
+      actual.update(record, expectedRevision);
 }
 
 Future<void> child(String helper, String directory, String boundary) async {
@@ -237,6 +286,109 @@ Future<void> main(List<String> args) async {
   }
 
   try {
+    await test('initialization retries after real journal lock is released', (
+      r,
+    ) async {
+      final journal = r.journal as NativeMoveJournal;
+      final seeder = Rig(journal);
+      await seeder.controller.confirmAndStart(seeder.plan());
+      final lock = await lockJournal(journal.directory);
+      try {
+        await Future.wait([
+          failure(r.controller.current(), 'journal_busy'),
+          failure(r.controller.current(), 'journal_busy'),
+        ]);
+      } finally {
+        await releaseJournal(lock);
+      }
+      final recovered = await r.controller.current();
+      expect(
+        recovered!.reason == 'restart_requires_reads',
+        'Recovery retries after release',
+      );
+      final revision = recovered.revision;
+      expect(
+        (await r.controller.current())!.revision == revision,
+        'Successful initialization stays cached',
+      );
+      expect(r.calls == 0, 'Recovery must not invoke worker');
+    });
+    await test(
+      'unfamiliar recovery retries after real journal update contention',
+      (r) async {
+        final journal = r.journal as NativeMoveJournal;
+        final hookJournal = ReadHookJournal(journal);
+        final reader = Rig(hookJournal);
+        expect(
+          await reader.controller.current() == null,
+          'Initialize before external operation',
+        );
+        await r.controller.confirmAndStart(r.plan());
+        Process? lock;
+        hookJournal.afterRead = () async {
+          lock = await lockJournal(journal.directory);
+        };
+        try {
+          await failure(reader.controller.current(), 'journal_busy');
+        } finally {
+          if (lock != null) await releaseJournal(lock!);
+        }
+        final recovered = await reader.controller.current();
+        expect(
+          recovered!.reason == 'restart_requires_reads',
+          'Failed unfamiliar recovery must retry',
+        );
+        reader.clock = reader.clock.add(const Duration(seconds: 310));
+        final first = await reader.controller.checkOutcome(
+          recovered.operationId,
+        );
+        expect(!first.terminal, 'Fresh interval required');
+        final revision = first.revision;
+        expect(
+          (await reader.controller.current())!.revision == revision,
+          'Polling retains successful recovery',
+        );
+        reader.clock = reader.clock.add(const Duration(seconds: 10));
+        expect(
+          (await reader.controller.checkOutcome(
+            recovered.operationId,
+          )).terminal,
+          'Fresh interval survives retry',
+        );
+        expect(reader.calls == 0, 'Recovery cannot invoke worker');
+      },
+    );
+    for (final rejected in [false, true]) {
+      await test('read spanning deadline stays pending rejected=$rejected', (
+        r,
+      ) async {
+        r.disposition = rejected
+            ? MoveDisposition.rejected
+            : MoveDisposition.accepted;
+        r.sourceUnchanged = rejected;
+        final operation = await r.controller.confirmAndStart(r.plan());
+        r.clock = r.clock.add(const Duration(seconds: 298));
+        await r.controller.checkOutcome(operation.operationId);
+        r.clock = r.clock.add(const Duration(seconds: 11));
+        r.observationClockAdvance = const Duration(seconds: 2);
+        final pending = await r.controller.checkOutcome(operation.operationId);
+        expect(
+          !pending.terminal &&
+              pending.stableLast!.isBefore(operation.observeUntil),
+          'A sample before deadline must remain pending even when callback finishes after',
+        );
+        r.observationClockAdvance = Duration.zero;
+        final complete = await r.controller.checkOutcome(operation.operationId);
+        expect(
+          complete.stage ==
+              (rejected
+                  ? MoveStage.verifiedUnchanged
+                  : MoveStage.verifiedComplete),
+          'Next fresh sample after deadline completes normally',
+        );
+        expect(r.calls == 1, 'Observation must not replay worker');
+      });
+    }
     await test('duplicate clicks reserve before await and launch once', (
       r,
     ) async {

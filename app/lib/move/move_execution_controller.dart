@@ -30,8 +30,19 @@ class MoveExecutionController {
   // A controller must invalidate continuity inherited from a previous owner
   // before exposing or observing it. Share the in-flight initialization so
   // concurrent entry points cannot race recovery against their own reads.
-  Future<void> _initialize() =>
-      _initialization ??= _recover().then<void>((_) {});
+  Future<void> _initialize() {
+    final existing = _initialization;
+    if (existing != null) return existing;
+    late final Future<void> attempt;
+    attempt = _recover().then<void>((_) {}).catchError((
+      Object error,
+      StackTrace stack,
+    ) {
+      if (identical(_initialization, attempt)) _initialization = null;
+      Error.throwWithStackTrace(error, stack);
+    });
+    return _initialization = attempt;
+  }
 
   /// Duplicate calls receive the same future. This reservation precedes any
   /// await; the durable global journal also fences other app processes.
@@ -148,7 +159,16 @@ class MoveExecutionController {
     }
     // Initialization may have happened before another process began this
     // operation. Adopt each unfamiliar operation with the same recovery rule.
-    await _recoveries.putIfAbsent(record.operationId, () => _recover(record));
+    await _recoveries.putIfAbsent(record.operationId, () {
+      late final Future<MoveRecord?> attempt;
+      attempt = _recover(record).catchError((Object error, StackTrace stack) {
+        if (identical(_recoveries[record.operationId], attempt)) {
+          _recoveries.remove(record.operationId);
+        }
+        Error.throwWithStackTrace(error, stack);
+      });
+      return attempt;
+    });
     return current();
   }
 
@@ -294,6 +314,7 @@ class MoveExecutionController {
         matching &&
         evidence.workerTerminated &&
         !at.isBefore(record.observeUntil) &&
+        !sampleAt.isBefore(record.observeUntil) &&
         since != null &&
         sampleAt.difference(since) >=
             Duration(seconds: record.observationSeconds);

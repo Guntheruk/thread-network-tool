@@ -123,7 +123,12 @@ before consuming journal state. An unfamiliar operation first appearing after
 initialization receives the same recovery treatment. An inherited unresolved record loses persisted
 observation continuity even when the caller starts with `current()` or
 `checkOutcome()` and never calls `restore()`. Initialization uses the journal's
-revision check and fails closed on a conflict or persistence failure. Operations
+revision check and fails closed on a conflict or persistence failure. Concurrent
+callers share an in-flight initialization or unfamiliar-operation recovery.
+Failed attempts are evicted so a later call can retry after transient journal
+contention; successful recovery remains cached and polling retains continuity.
+A retry performs recovery reads and journal updates only, never worker dispatch.
+Operations
 started by that controller and repeated status polls retain their current
 observation interval. Explicit `restore()` still breaks continuity; constructing
 a new controller conservatively starts a new recovery interval.
@@ -142,7 +147,10 @@ own deadline when the parent exits, and the adapter must establish termination
 before releasing the fence.
 
 The controller requires matching samples spanning the profile's observation
-interval and at least the reviewed propagation/observation time. Samples older
+interval and at least the reviewed propagation/observation time. The earliest
+source/target sample must itself reach the reviewed deadline: a read sampled
+before the deadline and returned afterward remains pending until fresh samples
+reach it. Samples older
 than 30 seconds, a gap exceeding 30 seconds, a mismatch, an app restart, or an
 explicit observation stop break continuity. A single read after a long sleep
 cannot establish a successful observation period. Status updates use revisions,
