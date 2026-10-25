@@ -2,16 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'engine_service.dart';
+import 'live_screen.dart';
+import 'live_api.dart';
+import 'platform_api_stub.dart' if (dart.library.io) 'platform_api_io.dart'
+    as platform;
 
-void main() => runApp(const ThreadNetworkApp());
+String? liveSessionFromFragment(String fragment) =>
+    RegExp(r'(?:^|[?&])session=([0-9a-f]{64})(?:&|$)')
+        .firstMatch(fragment)
+        ?.group(1);
+
+void main() {
+  platform.configureRouting();
+  runApp(ThreadNetworkApp(
+    liveSession: liveSessionFromFragment(Uri.base.fragment),
+    liveApi: platform.platformLiveApi(),
+  ));
+}
 
 class ThreadNetworkApp extends StatelessWidget {
   const ThreadNetworkApp({
     super.key,
     this.engine = const SyntheticDemoEngineService(),
+    this.liveSession,
+    this.liveApi,
   });
 
   final EngineService engine;
+  final String? liveSession;
+  final LiveApi? liveApi;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +64,11 @@ class ThreadNetworkApp extends StatelessWidget {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
-      home: AssessmentScreen(engine: engine),
+      home: liveSession != null
+          ? LiveScreen(session: liveSession!)
+          : liveApi != null
+              ? LiveScreen(api: liveApi)
+              : AssessmentScreen(engine: engine),
     );
   }
 }

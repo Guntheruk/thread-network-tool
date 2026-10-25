@@ -1,5 +1,6 @@
 #include "dataset.hpp"
 #include "probe.hpp"
+#include "discovery.hpp"
 #include <iostream>
 #include <string>
 #include <cstdlib>
@@ -11,6 +12,13 @@
 #include <unistd.h>
 #endif
 namespace {
+#if defined(__APPLE__)
+void DiscoveryTimeout(int) {
+    constexpr char json[]="{\"schema_version\":1,\"discovery_status\":\"error\",\"routers\":[]}\n";
+    (void)write(STDOUT_FILENO,json,sizeof(json)-1);
+    _exit(124);
+}
+#endif
 #if defined(TNT_WITH_COMMISSIONER) && !defined(_WIN32)
 // OT Commissioner calls are synchronous. The alarm terminates this process;
 // continuing in a C++ thread after an interrupted library call is unsafe.
@@ -49,6 +57,26 @@ bool NumericIp(const char* s) {
 }
 int main(int argc,char** argv) {
     if(argc<2) {std::cout<<tnt::ErrorJson("invalid_command")<<'\n';return 2;}
+    if(std::string(argv[1])=="discover" && argc==2) {
+#if defined(__APPLE__)
+        struct sigaction action{};action.sa_handler=DiscoveryTimeout;sigemptyset(&action.sa_mask);
+        if(sigaction(SIGALRM,&action,nullptr)!=0) {
+            std::cout<<"{\"schema_version\":1,\"discovery_status\":\"error\",\"routers\":[]}"<<'\n';return 1;
+        }
+        alarm(8);
+#endif
+        try {auto result=tnt::Discover();
+#if defined(__APPLE__)
+            alarm(0);
+#endif
+            std::cout<<result.json<<'\n';return result.exit_code;
+        } catch(...) {
+#if defined(__APPLE__)
+            alarm(0);
+#endif
+            std::cout<<"{\"schema_version\":1,\"discovery_status\":\"error\",\"routers\":[]}"<<'\n';return 1;
+        }
+    }
     const bool inspect=std::string(argv[1])=="inspect" && argc==2;
     const bool probe=std::string(argv[1])=="probe" && argc==4;
     if(!inspect && !probe) {std::cout<<tnt::ErrorJson("invalid_command")<<'\n';return 2;}
