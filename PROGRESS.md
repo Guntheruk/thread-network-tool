@@ -66,16 +66,35 @@ authorize licence selection, publication, analytics or signup collection.
   strict recursive checks, and both architectures load ThreadNetwork with
   `LC_LOAD_WEAK_DYLIB`. The native window shows all guided choices, reports the
   missing Apple entitlement, and rejects a malformed synthetic input with a
-  cleared field. The valid TestMesh fixture was entered and visibly masked;
-  the Mac locked before its submit/restart check, so those checks for this
-  package remain incomplete. No household credentials or network change was used.
+  cleared field. After the Mac was unlocked, the valid TestMesh fixture was
+  accepted through the guided flow. Quitting the new package and reopening it
+  cleared the test credentials and returned to the initial state. No household
+  credentials or network change was used. Screenshots are ignored local artifacts.
 - Draft PR #2 is stacked on #1 for source review. The protocol simulation runs
-  separately from the application and has not yet yielded a recorded result.
+  separately from the application; its evidence is recorded below.
 - GitHub Codex review of `7874ce0` found that the synthetic harness could ignore
   a stop-observation transition. A regression reproduced `complete` after stop;
   the fix updates the authoritative reservation and rejects stale callbacks.
   Final continuation analysis is clean and all 86 Flutter tests pass. This
   repairs simulated control flow, without enabling any network write.
+- GitHub Codex review of `73dd4882a6b1aaddbc5e2cdc122a29347a6a223d`
+  completed with no unresolved findings. After the owner resolved the GitHub
+  account blocker, run `40218431367` attempt 2 passed native core tests on
+  Ubuntu/macOS and Flutter analysis, tests and the release web build. The
+  base PR's previously blocked run was separately requested again.
+- The final isolated OpenThread lab passed with one source-network Pending
+  Dataset SET: both source routers received the update, converged on the target
+  dataset and partition, retained router roles and passed connectivity. The
+  target remained unchanged. The exact frozen driver hash, image/source pins,
+  redacted report and an earlier ping timeout are in `docs/PROTOCOL-LAB.md`.
+  Runtime used a no-network, read-only container without host devices or
+  household credentials, and the container was removed after completion.
+  Six Python driver tests pass. This validates simulated Thread-stack behavior,
+  not the application's Commissioner/Border Agent path or any vendor device.
+- `docs/NETWORK-MOVE-PLAN.md` names the next application slice: separate source
+  and target access, authenticated reads of observed source routers, explicit
+  controlled-empty-source evidence and a network-wide review. The existing
+  single-router model must not be relabelled as that network operation.
 
 ## Implemented
 
