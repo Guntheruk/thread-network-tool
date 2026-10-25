@@ -38,7 +38,9 @@ class _CredentialSetupDialogState extends State<CredentialSetupDialog> {
 
   bool get _showAppleRoute =>
       widget.showAppleRoute ??
-      (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS);
+      (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.macOS ||
+              defaultTargetPlatform == TargetPlatform.iOS));
 
   @override
   void dispose() {
@@ -142,15 +144,15 @@ class _CredentialSetupDialogState extends State<CredentialSetupDialog> {
   String _appleStatusMessage(AppleCredentialStatus? status) {
     switch (status) {
       case AppleCredentialStatus.available:
-        return 'Apple may ask your permission to use saved Thread credentials. After setup, choose a router and tap Check to confirm it matches. Your Mac’s preferred network may differ from the router’s advertised network.';
+        return 'Apple may ask your permission to use saved Thread credentials. After setup, choose a router and tap Check to confirm it matches. The device’s preferred network may differ from the router’s advertised network.';
       case AppleCredentialStatus.noCredentials:
-        return 'No saved Thread network credentials were found on this Mac. Use eero or Advanced to set up access: copy the Active operational dataset from the eero app, or enter a complete dataset you already have.';
+        return 'No saved Thread network credentials were found on this device. Use eero or Advanced to set up access: copy the Active operational dataset from the eero app, or enter a complete dataset you already have.';
       case AppleCredentialStatus.permissionDenied:
         return 'Access to saved credentials was declined. You can use eero or Advanced to set up access.';
       case AppleCredentialStatus.accessNotConfigured:
         return 'Apple credential access is unavailable in this build. Use eero or Advanced to set up access.';
       case AppleCredentialStatus.unavailable:
-        return 'Saved Apple credentials are unavailable on this Mac. Use eero or Advanced to set up access.';
+        return 'Saved Apple credentials are unavailable on this device. Use eero or Advanced to set up access.';
       case AppleCredentialStatus.failure:
         return 'Saved credentials could not be checked. Try again or use eero or Advanced.';
       case AppleCredentialStatus.timedOut:

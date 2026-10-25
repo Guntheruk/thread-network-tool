@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thread_network_tool/apple_credentials.dart';
@@ -14,8 +15,46 @@ void main() {
   });
 
   tearDown(() {
+    debugDefaultTargetPlatformOverride = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
+    test(
+      'default provider calls Apple bridge on $platform without fetching',
+      () async {
+        debugDefaultTargetPlatformOverride = platform;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              calls.add(call.method);
+              return {'status': 'accessNotConfigured'};
+            });
+        final result = await AppleCredentials(channel: channel).availability();
+        expect(result.status, AppleCredentialStatus.accessNotConfigured);
+        expect(result.datasetHex, isNull);
+        expect(calls, ['availability']);
+      },
+    );
+  }
+
+  test('default Android provider does not call Apple bridge', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          calls.add(call.method);
+          return {'status': 'available'};
+        });
+    final provider = AppleCredentials(channel: channel);
+    expect(
+      (await provider.availability()).status,
+      AppleCredentialStatus.unavailable,
+    );
+    expect(
+      (await provider.fetchPreferred()).status,
+      AppleCredentialStatus.unavailable,
+    );
+    expect(calls, isEmpty);
   });
 
   test('unsupported platform makes no channel calls', () async {
