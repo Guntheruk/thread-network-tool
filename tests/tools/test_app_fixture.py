@@ -152,6 +152,16 @@ class AppFixtureTests(unittest.TestCase):
                                 "preparation_failure_reason": "source_snapshot_changed_or_unavailable"}])
         self.assertNotIn("private", output.getvalue())
 
+    def test_execution_guard_marker_does_not_export_guard_details(self):
+        output, marks = io.StringIO(), {}
+        with contextlib.redirect_stdout(output):
+            fixture.emit_fixed_line(b"TNT_APP_EVENT execution_guard_blocked", "dispatch", marks)
+            fixture.emit_fixed_line(b"TNT_APP_EVENT execution_guard_blocked_private", "dispatch", marks)
+        rows = [__import__("json").loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(rows, [{"lab": "app-execution-bridge", "app_phase": "dispatch",
+                                "app_event": "execution_guard_blocked"}])
+        self.assertEqual(marks, {"dispatch": "execution_guard_blocked"})
+
     def test_preparation_reason_allowlist_matches_dart_boundary(self):
         source = (ROOT / "app/lib/native/native_move_diagnostic.dart").read_text()
         block = source.split("const nativePreparationReasons = {", 1)[1].split("};", 1)[0]

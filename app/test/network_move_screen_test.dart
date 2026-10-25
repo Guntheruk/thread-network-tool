@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:thread_network_tool/live_api.dart';
 import 'package:thread_network_tool/move/network_move_plan.dart';
 import 'package:thread_network_tool/network_move_screen.dart';
+import 'support/isolated_action.dart';
 
 Map<String, Object?> _stateJson({bool source = false, bool target = false}) => {
       'schema_version': 1,
@@ -289,6 +290,46 @@ Future<void> _ensureEndKeyVisible(WidgetTester tester, Key key) async {
 }
 
 void main() {
+  testWidgets('runtime helper refuses a current-status-blocked execution action',
+      (tester) async {
+    final api = ExecutionMoveFake()..failCurrent = true;
+    await _pump(tester, api, size: const Size(1200, 2000));
+    var blocked = 0;
+    await expectLater(
+      ensureIsolatedAction(tester, 'move-execution-prepare',
+          onBlocked: () => blocked++),
+      throwsStateError,
+    );
+    expect(blocked, 1);
+    expect(api.actions.where((action) => action.startsWith('prepare:')), isEmpty);
+    expect(find.textContaining('Execution status is unavailable'), findsOneWidget);
+  });
+  for (final height in [900.0, 2000.0]) {
+    testWidgets(
+      'runtime helper reaches execution preparation after lazy review at $height',
+      (tester) async {
+        final api = ExecutionMoveFake()
+          ..preparedPlan = _plan(
+            decision: 'ready_for_lab_review',
+            validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+          );
+        // Three routers at both the actual runtime viewport and a smaller
+        // viewport; inserting the review leaves execution controls unbuilt.
+        await _pump(tester, api, size: Size(1200, height));
+        await _tapVisible(tester, const Key('move-target-target-id'));
+        await _tapVisible(tester, const Key('move-empty-source-attestation'));
+        await _tapVisible(tester, const Key('move-prepare'));
+        expect(find.byKey(const Key('move-review')), findsOneWidget);
+        expect(find.byKey(const Key('move-execution-prepare')), findsNothing);
+        expect(api.actions.where((action) => action.startsWith('prepare:')), isEmpty);
+        await ensureIsolatedAction(tester, 'move-execution-prepare');
+        await tester.tap(find.byKey(const Key('move-execution-prepare')));
+        await tester.pumpAndSettle();
+        expect(api.actions.where((action) => action == 'prepare:review-id').length, 1);
+        expect(find.byKey(const Key('move-execution-confirm')), findsOneWidget);
+      },
+    );
+  }
   testWidgets(
     'isolated execution requires separate preparation and confirmation',
     (tester) async {

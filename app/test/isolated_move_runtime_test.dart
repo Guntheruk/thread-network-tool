@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:thread_network_tool/live_api.dart';
 import 'package:thread_network_tool/native/isolated_runtime.dart';
 import 'package:thread_network_tool/network_move_screen.dart';
+import 'support/isolated_action.dart';
 
 void main() {
   final enabled = Platform.isLinux &&
@@ -51,7 +52,11 @@ void main() {
 
     Future<void> tap(String key) async {
       final finder = find.byKey(Key(key));
-      await tester.ensureVisible(finder);
+      await ensureIsolatedAction(tester, key, onBlocked: () {
+        if (key == 'move-execution-prepare' || key == 'move-execution-confirm') {
+          stdout.writeln('TNT_APP_EVENT execution_guard_blocked');
+        }
+      });
       await tester.runAsync(() async {
         await tester.tap(finder);
         await Future<void>.delayed(const Duration(milliseconds: 50));
