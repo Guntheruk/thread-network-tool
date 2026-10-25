@@ -96,6 +96,75 @@ authorize licence selection, publication, analytics or signup collection.
   controlled-empty-source evidence and a network-wide review. The existing
   single-router model must not be relabelled as that network operation.
 
+## Source-network review continuation
+
+- Separate source and target credentials now stay in memory with explicit roles.
+  Authenticated reads retain identity and Active Timestamp privately; public
+  reports expose role counts without datasets, keys, endpoints or household IDs.
+- The review includes all observed source candidates, requires matching fresh
+  reads and controlled empty-source attestation, and blocks pending changes,
+  inconsistent timestamps or stale evidence. It states the whole-network scope
+  and unknown offline devices. Re-import, re-discovery, changed reads and expiry
+  invalidate the review. There is no dispatch API or native write command.
+- Root integration found that the UI's initial delay options were all below the
+  planner's minimum. The shared flow now offers 5, 15 or 30 minutes. Two widget
+  tests exercise the real NativeLiveApi and LiveSession, faking only native read
+  replies: two source routers pass together, and one pending source blocks the
+  review. Tests also cover role report redaction and visible review expiry.
+- Flutter analysis passes. The real session/UI integration tests pass; the six
+  source-network widget tests pass at normal and narrow/enlarged text settings.
+  Planning, HTTP adapter and loopback access-boundary scripts pass. All four
+  Commissioner-enabled native CTests pass, including raw-wire timestamp
+  encoding. CI now runs the planning and loopback scripts as well as widgets.
+- Windows PR #4 at `6498a9ed83b5a6d79d69e39b483faf37aa2a35e8` passes both
+  the native parser/CLI build and Flutter desktop build in run `40220629150`.
+  Codex review has no unresolved findings. This is build evidence, not Windows
+  discovery or router communication. Android PR #5 adds a real debug APK
+  compile gate; its first hosted run is in progress and device consent remains
+  unverified. Neither PR is merged or released.
+- The locally signed universal Mac package built from `4cc1e80` opened the new
+  workflow. Distinct synthetic LabTarget and LabSource datasets populated the
+  correct roles through the real bundled parser; the report showed both roles
+  without network names or credentials. After confirmed process exit and
+  reopening, both roles were empty. The 5-minute default and disabled move
+  control were visible. Screenshots are local ignored artifacts under
+  `build/evidence/native-move-*`. No discovery or household read was performed.
+  The first automated paste left the field empty; typing the fixture succeeded.
+- Independent review found inspection-only probes could leave a prepared move
+  review and its role evidence reusable. A new probe now invalidates the review
+  and that router's role evidence before the native call, including failures.
+  Repreparing requires a fresh role check. The regression first reproduced the
+  stale ready result and now passes. Final analysis is clean, all 96 Flutter
+  tests pass, and the planning/API/loopback scripts pass after this repair.
+- Follow-up review found that a failed probe could erase a source router
+  identified only by an earlier authenticated read. Source membership now
+  survives failed and generic probes within the same discovery and source
+  credential generation; current successful reads are still required. Target
+  credential replacement retains that membership. The focused regression
+  passes and independent review found no further census issue.
+- Hosted CI at `03f8f60` exposed two portability failures after Flutter analysis
+  and all 96 widget tests passed: the optional Commissioner header was included
+  in core-only builds, and Dart temporary staging was not private on Linux.
+  The include is now conditional and POSIX staging uses atomically private
+  `mktemp -d` before any session secret is written. The local access-boundary
+  regression and direct macOS core-only compilation pass; fresh hosted CI is
+  required to verify Linux and the final combined head.
+- Hosted Checks run `40225229885` passed at `fcc608d`, including the repaired
+  core-only builds and Linux private staging. Codex review reported no new major
+  issue on this head, but an earlier finding about review freshness across shared
+  browser tabs remains open and is being repaired separately.
+- Android PR #5 at `c60c5b4f0221fef9035700bcf947df8524605c62` passed debug APK
+  build run `40224904977` and all generic checks in `40224904969`. The APK was
+  nonempty; installation, device launch and Google consent remain unverified.
+  Codex review was requested on that exact head. No PR has been merged.
+- The shared-session review finding now has a reproduced regression and repair.
+  A screen checks its review ID against the authoritative session while visible
+  and when resumed; missing, changed, expired or unverifiable reviews lose their
+  ready status. Generation checks discard late results, lookups do not overlap,
+  and hidden screens do not issue checks. Thirteen focused widget/integration
+  tests pass, including two screens backed by one real `LiveSession` with only
+  native IO replaced. Full candidate checks remain separate validation.
+
 ## Implemented
 
 Previous source milestone: `563ffe0df6a092246aa72e847734b8e7eafdb03a`. This continuation simplifies the interface using the Recursive Systems visual direction, records Google Home and migration beta scope, and sets up GitHub PR checks.

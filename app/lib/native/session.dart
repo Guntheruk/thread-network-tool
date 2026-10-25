@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import '../move/network_move_plan.dart';
+
 typedef NativeCall = Future<NativeReply> Function(List<String>, String?);
 
 class NativeReply {
@@ -122,20 +124,42 @@ class LiveSession {
   final DateTime Function() now;
   String? _credential;
   String? _credentialName;
+  final Map<String, _RoleCredential> _roleCredentials = {};
+  final Map<String, Map<String, _RoleRead>> _roleReads = {};
+  Map<String, dynamic>? _review;
+  DateTime? _reviewExpires;
   String _discoveryStatus = 'idle';
   DateTime? _observed;
   bool _busy = false;
   final Map<String, Map<String, dynamic>> _routers = {};
   final Map<String, (String, int)> _endpoints = {};
+  final Map<String, String?> _advertisedXpans = {};
+  // Membership learned from authenticated source reads survives later failed
+  // reads. It is scoped to this discovery and source credential generation.
+  final Set<String> _knownSourceCandidates = {};
 
   Map<String, dynamic> get state => {
         'schema_version': 1,
         'mode': 'live',
         'credential_available': _credential != null,
         'credential_network_name': _credentialName,
+        'source_credential_available': _roleCredentials.containsKey('source'),
+        'source_credential_network_name': _roleCredentials['source']?.name,
+        'target_credential_available': _roleCredentials.containsKey('target'),
+        'target_credential_network_name': _roleCredentials['target']?.name,
         'discovery_status': _discoveryStatus,
         'observed_at': _observed?.toUtc().toIso8601String(),
-        'routers': _routers.values.toList(),
+        'routers': _routers.values
+            .map((router) => <String, dynamic>{
+                  ...router,
+                  'probe': router['probe'] == null
+                      ? null
+                      : Map<String, dynamic>.from(router['probe'] as Map),
+                  'role_probes': (router['role_probes'] as Map<String, dynamic>)
+                      .map((role, probe) => MapEntry(
+                          role, Map<String, dynamic>.from(probe as Map))),
+                })
+            .toList(growable: false),
       };
 
   Future<Map<String, dynamic>> perform(
@@ -145,11 +169,13 @@ class LiveSession {
     try {
       switch (action) {
         case 'credentials':
-          await _import(body['dataset']);
+          await _import(body['dataset'], body['role']);
         case 'discover':
           await _discover();
         case 'probe':
-          await _probe(body['router_id']);
+          await _probe(body['router_id'], body['role']);
+        case 'network-move/plan':
+          return _plan(body);
         default:
           throw const ApiFailure('not_found', 404);
       }
@@ -159,7 +185,10 @@ class LiveSession {
     }
   }
 
-  Future<void> _import(Object? input) async {
+  Future<void> _import(Object? input, Object? role) async {
+    if (role != null && role != 'source' && role != 'target') {
+      throw const ApiFailure('invalid_role', 400);
+    }
     if (input is! String ||
         input.isEmpty ||
         input.length > 508 ||
@@ -171,17 +200,44 @@ class LiveSession {
     if (result.exitCode != 0 || result.value['valid'] != true || name == null) {
       throw const ApiFailure('invalid_credentials', 400);
     }
-    _credential = input;
-    _credentialName = name;
-    for (final router in _routers.values) {
-      router['probe'] = null;
+    if (role == null) {
+      _credential = input;
+      _credentialName = name;
+      for (final router in _routers.values) {
+        router['probe'] = null;
+      }
+    } else {
+      final xpan = result.value['extended_pan_id'];
+      final channel = result.value['channel'];
+      final timestamp = result.value['active_timestamp'];
+      if (xpan is! String ||
+          !RegExp(r'^[0-9a-f]{16}$').hasMatch(xpan) ||
+          channel is! int ||
+          channel < 11 ||
+          channel > 26 ||
+          timestamp is! String ||
+          !RegExp(r'^[0-9a-f]{16}$').hasMatch(timestamp)) {
+        throw const ApiFailure('invalid_credentials', 400);
+      }
+      _roleCredentials[role as String] = _RoleCredential(
+          input, name, xpan, channel, timestamp, randomToken(), now());
+      _roleReads.remove(role);
+      if (role == 'source') _knownSourceCandidates.clear();
+      for (final router in _routers.values) {
+        (router['role_probes'] as Map<String, dynamic>).remove(role);
+      }
     }
+    _invalidateReview();
   }
 
   Future<void> _discover() async {
     // A fresh scan invalidates both endpoint handles and earlier verification.
     _routers.clear();
+    _roleReads.clear();
+    _invalidateReview();
     _endpoints.clear();
+    _advertisedXpans.clear();
+    _knownSourceCandidates.clear();
     _observed = null;
     _discoveryStatus = 'error';
     final result = await native(['discover'], null);
@@ -237,13 +293,24 @@ class LiveSession {
         'thread_version': safeText(item['thread_version'], 32),
         'endpoint_usable': usable,
         'probe': null,
+        'role_probes': <String, dynamic>{},
       };
+      final advertisedXpan = item['extended_pan_id'];
+      _advertisedXpans[id] = advertisedXpan is String &&
+              RegExp(r'^[0-9a-f]{16}$').hasMatch(advertisedXpan)
+          ? advertisedXpan
+          : null;
       if (usable) _endpoints[id] = (address, port);
     }
   }
 
-  Future<void> _probe(Object? id) async {
-    if (_credential == null) {
+  Future<void> _probe(Object? id, Object? role) async {
+    if (role != null && role != 'source' && role != 'target') {
+      throw const ApiFailure('invalid_role', 400);
+    }
+    final credential =
+        role == null ? _credential : _roleCredentials[role]?.dataset;
+    if (credential == null) {
       throw const ApiFailure('credentials_required', 409);
     }
     if (_observed == null ||
@@ -255,8 +322,14 @@ class LiveSession {
     }
     final endpoint = _endpoints[id];
     if (endpoint == null) throw const ApiFailure('unsupported_endpoint', 400);
+    // Any new observation attempt supersedes older role-bound evidence for
+    // this router, including when the native read times out or throws.
+    _invalidateReview();
+    _roleReads['source']?.remove(id);
+    _roleReads['target']?.remove(id);
+    (_routers[id]!['role_probes'] as Map<String, dynamic>).clear();
     final response =
-        await native(['probe', endpoint.$1, '${endpoint.$2}'], _credential);
+        await native(['probe', endpoint.$1, '${endpoint.$2}'], credential);
     final value = response.value;
     final rawStatus = value['probe_status'];
     var status = {'completed', 'partial', 'error', 'timeout', 'unsupported'}
@@ -284,7 +357,7 @@ class LiveSession {
             (response.exitCode != 0 && match == 'match'))) {
       status = 'partial';
     }
-    _routers[id]!['probe'] = {
+    final publicProbe = <String, dynamic>{
       'probe_status': status,
       'authenticated': authenticated,
       'identity_match': match,
@@ -292,13 +365,248 @@ class LiveSession {
       'pending_status': pending,
       'checked_at': now().toUtc().toIso8601String(),
     };
+    if (role == null) {
+      _routers[id]!['probe'] = publicProbe;
+      return;
+    }
+    final slot = _roleCredentials[role]!;
+    final readName = safeText(value['active_network_name'], 16);
+    final readXpan = value['active_extended_pan_id'];
+    final readChannel = value['active_channel'];
+    final readTimestamp = value['active_timestamp'];
+    final identityValid = readName != null &&
+        readXpan is String &&
+        RegExp(r'^[0-9a-f]{16}$').hasMatch(readXpan) &&
+        readChannel is int &&
+        readChannel >= 11 &&
+        readChannel <= 26;
+    final actualMatch = identityValid &&
+        readName == slot.name &&
+        readXpan == slot.xpan &&
+        readChannel == slot.channel;
+    final validTimestamp = readTimestamp is String &&
+        RegExp(r'^[0-9a-f]{16}$').hasMatch(readTimestamp);
+    // A native summary alone cannot attest an identity for planning.
+    final planningMatch = match == 'match' && actualMatch;
+    if (!planningMatch && match == 'match') {
+      publicProbe['identity_match'] = 'unknown';
+      publicProbe['probe_status'] = 'partial';
+    }
+    (_routers[id]!['role_probes'] as Map<String, dynamic>)[role as String] =
+        publicProbe;
+    _roleReads.putIfAbsent(role, () => {})[id] = _RoleRead(publicProbe,
+        planningMatch, validTimestamp ? readTimestamp : null, slot.generation);
+    if (role == 'source' &&
+        planningMatch &&
+        authenticated == true &&
+        active == 'read') {
+      _knownSourceCandidates.add(id);
+    }
   }
 
   void clear() {
     // Dart strings cannot promise zeroization; secrets are never persisted.
     _credential = null;
     _credentialName = null;
+    _roleCredentials.clear();
+    _roleReads.clear();
+    _invalidateReview();
     _routers.clear();
     _endpoints.clear();
+    _advertisedXpans.clear();
+    _knownSourceCandidates.clear();
   }
+
+  void _invalidateReview() {
+    _review = null;
+    _reviewExpires = null;
+  }
+
+  Map<String, dynamic>? get currentReview {
+    if (_reviewExpires == null || now().isAfter(_reviewExpires!)) {
+      _invalidateReview();
+    }
+    return _review == null
+        ? null
+        : Map<String, dynamic>.from(jsonDecode(jsonEncode(_review)) as Map);
+  }
+
+  Map<String, dynamic> _plan(Map<String, dynamic> body) {
+    final targetId = body['target_router_id'];
+    final delay = body['delay_seconds'];
+    if (targetId is! String ||
+        !_routers.containsKey(targetId) ||
+        delay is! int) {
+      throw const ApiFailure('invalid_plan_request', 400);
+    }
+    final attestationInput = body['empty_source_attestation'];
+    EmptySourceAttestation? attestation;
+    if (attestationInput is Map) {
+      final method = attestationInput['method'];
+      final scope = attestationInput['scope'];
+      final time = attestationInput['attested_at'];
+      if (method is String && scope is String && time is String) {
+        final parsed = DateTime.tryParse(time);
+        if (parsed != null &&
+            parsed.isUtc &&
+            time == parsed.toIso8601String()) {
+          attestation = EmptySourceAttestation(
+              method: method, scope: scope, attestedAt: parsed);
+        }
+      }
+    }
+    final source = _roleCredentials['source'];
+    final target = _roleCredentials['target'];
+    final candidates = _routers.entries.where((entry) {
+      final advertisedXpan = _advertisedXpans[entry.key];
+      final advertisementSuggestsSource = source != null &&
+          (advertisedXpan == source.xpan ||
+              (advertisedXpan == null &&
+                  entry.value['network_name'] == source.name));
+      return advertisementSuggestsSource ||
+          _knownSourceCandidates.contains(entry.key);
+    }).toList(growable: false);
+    final targetRead = _roleReads['target']?[targetId];
+    MoveRead? asRead(String role, String id, _RoleRead? value) {
+      if (value == null) return null;
+      final expectedGeneration = _roleCredentials[role]?.generation;
+      if (value.credentialGeneration != expectedGeneration) return null;
+      final fields = value.publicProbe;
+      return MoveRead(
+          routerId: id,
+          checkedAt: DateTime.parse(fields['checked_at'] as String),
+          matchesRole: value.matchesRole,
+          authenticated: fields['authenticated'] == true,
+          completed: fields['probe_status'] == 'completed' &&
+              fields['active_status'] == 'read',
+          pendingEmpty: fields['pending_status'] == 'empty',
+          activeTimestamp: value.activeTimestamp);
+    }
+
+    final assessment = assessNetworkMove(
+      now: now(),
+      sourceCredentials: source != null,
+      targetCredentials: target != null,
+      distinctIdentities: source != null &&
+          target != null &&
+          (source.name != target.name ||
+              source.xpan != target.xpan ||
+              source.channel != target.channel),
+      discoveryComplete: _discoveryStatus == 'completed' &&
+          _observed != null &&
+          !now().isBefore(_observed!) &&
+          now().difference(_observed!) <= const Duration(minutes: 5),
+      sourceReads: candidates
+          .map((e) => asRead('source', e.key, _roleReads['source']?[e.key]))
+          .toList(),
+      targetRead: asRead('target', targetId, targetRead),
+      targetIsSource: candidates.any((e) => e.key == targetId),
+      attestation: attestation,
+      delaySeconds: delay,
+    );
+    final blockers = <String>{...assessment.blockers};
+    if (attestation != null &&
+        ((_observed != null && attestation.attestedAt.isBefore(_observed!)) ||
+            (source != null &&
+                attestation.attestedAt.isBefore(source.importedAt)) ||
+            (target != null &&
+                attestation.attestedAt.isBefore(target.importedAt)) ||
+            candidates.any((entry) {
+              final read = _roleReads['source']?[entry.key];
+              return read != null &&
+                  attestation!.attestedAt.isBefore(
+                      DateTime.parse(read.publicProbe['checked_at'] as String));
+            }))) {
+      blockers.add('empty_source_attestation_stale');
+    }
+    for (final entry in candidates) {
+      final xpan = _advertisedXpans[entry.key];
+      if (xpan != null && source != null && xpan != source.xpan) {
+        blockers.add('source_advertisement_conflict');
+      }
+      final read = _roleReads['source']?[entry.key];
+      if (read != null &&
+          source != null &&
+          read.activeTimestamp != null &&
+          read.activeTimestamp != source.activeTimestamp) {
+        blockers.add('source_timestamp_mismatch');
+      }
+    }
+    if (targetRead != null &&
+        target != null &&
+        targetRead.activeTimestamp != null &&
+        targetRead.activeTimestamp != target.activeTimestamp) {
+      blockers.add('target_timestamp_mismatch');
+    }
+    var expires = now().add(const Duration(minutes: 5));
+    void limit(DateTime? evidenceAt) {
+      if (evidenceAt == null) return;
+      final boundary = evidenceAt.add(const Duration(minutes: 5));
+      if (boundary.isBefore(expires)) expires = boundary;
+    }
+
+    limit(_observed);
+    limit(attestation?.attestedAt);
+    limit(targetRead == null
+        ? null
+        : DateTime.parse(targetRead.publicProbe['checked_at'] as String));
+    for (final entry in candidates) {
+      final read = _roleReads['source']?[entry.key];
+      limit(read == null
+          ? null
+          : DateTime.parse(read.publicProbe['checked_at'] as String));
+    }
+    final review = <String, dynamic>{
+      'schema_version': 1,
+      'mode': 'network_move_review',
+      'decision': blockers.isEmpty ? 'ready_for_lab_review' : 'needs_evidence',
+      'blockers': blockers.toList(growable: false),
+      'review_id': randomToken(),
+      'review_valid_until': expires.toUtc().toIso8601String(),
+      'affected_scope': 'whole_source_network',
+      'source_routers': candidates
+          .map((e) => {
+                'router_id': e.key,
+                'service_name': e.value['service_name'],
+                'read_checked_at':
+                    _roleReads['source']?[e.key]?.publicProbe['checked_at'],
+                'read_status':
+                    _roleReads['source']?[e.key]?.publicProbe['probe_status'] ??
+                        'not_checked',
+              })
+          .toList(growable: false),
+      'target_router_id': targetId,
+      'target_read_checked_at': targetRead?.publicProbe['checked_at'],
+      'unknown_offline_devices': true,
+      'inventory_complete': false,
+      'delay_seconds': delay,
+      'verification':
+          'Fresh source and target reads after propagation; operational accessory reads if any are present.',
+      'recovery': 'Manual recovery; rollback is not guaranteed.',
+    };
+    _review = review;
+    _reviewExpires = expires;
+    return currentReview ?? review;
+  }
+}
+
+class _RoleCredential {
+  const _RoleCredential(this.dataset, this.name, this.xpan, this.channel,
+      this.activeTimestamp, this.generation, this.importedAt);
+  final String dataset;
+  final String name;
+  final String xpan;
+  final int channel;
+  final String activeTimestamp;
+  final String generation;
+  final DateTime importedAt;
+}
+
+class _RoleRead {
+  const _RoleRead(this.publicProbe, this.matchesRole, this.activeTimestamp,
+      this.credentialGeneration);
+  final Map<String, dynamic> publicProbe;
+  final bool matchesRole;
+  final String? activeTimestamp;
+  final String credentialGeneration;
 }

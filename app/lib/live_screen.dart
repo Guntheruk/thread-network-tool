@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'credential_setup_dialog.dart';
 import 'live_api.dart';
+import 'network_move_screen.dart';
 
 String liveReport(LiveState state) {
   final attempted = state.routers.where((r) => r.probe != null).length;
@@ -11,15 +12,25 @@ String liveReport(LiveState state) {
       state.routers.where((r) => r.probe?.identityMatch == 'mismatch').length;
   final timedOut =
       state.routers.where((r) => r.probe?.probeStatus == 'timeout').length;
+  int roleAttempts(String role) =>
+      state.routers.where((r) => r.roleProbes[role] != null).length;
+  int roleMatches(String role) =>
+      state.routers.where((r) => r.roleProbes[role]?.verified == true).length;
   return [
     'Thread Network Tool — read-only live assessment',
     'Discovery status: ${state.discoveryStatus}',
     'Advertised routers: ${state.routers.length} (unverified advertisements)',
-    'Credentials available: ${state.credentialAvailable ? 'yes' : 'no'}',
+    'Inspection credentials available: ${state.credentialAvailable ? 'yes' : 'no'}',
     'Router reads attempted: $attempted',
     'Authenticated identity matches: $verified',
     'Identity mismatches: $mismatched',
     'Read timeouts: $timedOut',
+    'Source credentials available: ${state.sourceCredentialAvailable ? 'yes' : 'no'}',
+    'Source router reads attempted: ${roleAttempts('source')}',
+    'Source authenticated identity matches: ${roleMatches('source')}',
+    'Target credentials available: ${state.targetCredentialAvailable ? 'yes' : 'no'}',
+    'Target router reads attempted: ${roleAttempts('target')}',
+    'Target authenticated identity matches: ${roleMatches('target')}',
     'Joining: disabled pending compatible router and lab validation',
     'Network names, device IDs, endpoints and credentials: excluded',
   ].join('\n');
@@ -85,6 +96,16 @@ class _LiveScreenState extends State<LiveScreen> {
       builder: (_) => CredentialSetupDialog(importDataset: _api.credentials),
     );
     if (mounted && next != null) setState(() => _state = next);
+  }
+
+  Future<void> _openNetworkMove() async {
+    final api = _api;
+    final state = _state;
+    if (api is! NetworkMoveApi || state == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NetworkMoveScreen(api: api, initialState: state),
+    ));
+    if (mounted) await _run(_api.state);
   }
 
   String _probeSummary(LiveProbe? probe) {
@@ -273,6 +294,17 @@ class _LiveScreenState extends State<LiveScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
+                  if (_api is NetworkMoveApi) ...[
+                    OutlinedButton.icon(
+                      key: const Key('live-network-move'),
+                      onPressed: _busy || state.discoveryStatus == 'unsupported'
+                          ? null
+                          : _openNetworkMove,
+                      icon: const Icon(Icons.account_tree_outlined),
+                      label: const Text('Prepare a network move'),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   OutlinedButton.icon(
                     key: const Key('live-join-disabled'),
                     onPressed: null,

@@ -64,5 +64,10 @@ jobs:
         run: flutter analyze
       - name: Test
         run: flutter test
+      - name: Test native session and loopback API contracts
+        run: |
+          dart run tool/network_move_plan_test.dart
+          dart run tool/network_move_api_test.dart
+          dart run tool/local_server_test.dart
       - name: Build release web app
         run: flutter build web --release --no-web-resources-cdn

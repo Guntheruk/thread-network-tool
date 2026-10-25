@@ -73,6 +73,24 @@ class FixtureApi implements LiveApi {
   }
 }
 
+class CapabilityFixtureApi extends FixtureApi implements NetworkMoveApi {
+  CapabilityFixtureApi(super.current);
+
+  @override
+  Future<LiveState> credentialsForRole(String role, String dataset) async =>
+      current;
+  @override
+  Future<LiveState> probeForRole(String role, String routerId) async => current;
+  @override
+  Future<NetworkMovePlan> networkMovePlan(
+          {required String targetRouterId,
+          required EmptySourceAttestationInput attestation,
+          required int delaySeconds}) =>
+      throw StateError('No plan requested');
+  @override
+  Future<NetworkMovePlan?> currentNetworkMovePlan() async => null;
+}
+
 void main() {
   test('live route requires an exact lowercase fragment token', () {
     expect(liveSessionFromFragment('session=${'a' * 64}'), 'a' * 64);
@@ -152,6 +170,50 @@ void main() {
     }
   });
 
+  test('report counts role-bound reads separately without household data', () {
+    final data = fixture(credentials: false);
+    data['source_credential_available'] = true;
+    data['source_credential_network_name'] = 'SourceMesh';
+    data['target_credential_available'] = true;
+    data['target_credential_network_name'] = 'TargetMesh';
+    ((data['routers'] as List).single as Map)['role_probes'] = {
+      'source': {
+        'probe_status': 'completed',
+        'authenticated': true,
+        'identity_match': 'match',
+        'active_status': 'read',
+        'pending_status': 'empty',
+        'checked_at': '2026-10-25T10:01:00Z',
+      },
+      'target': {
+        'probe_status': 'completed',
+        'authenticated': true,
+        'identity_match': 'mismatch',
+        'active_status': 'read',
+        'pending_status': 'empty',
+        'checked_at': '2026-10-25T10:02:00Z',
+      },
+    };
+    final report = liveReport(LiveState.fromJson(data));
+    expect(report, contains('Inspection credentials available: no'));
+    expect(report, contains('Router reads attempted: 0'));
+    expect(report, contains('Source credentials available: yes'));
+    expect(report, contains('Source router reads attempted: 1'));
+    expect(report, contains('Source authenticated identity matches: 1'));
+    expect(report, contains('Target credentials available: yes'));
+    expect(report, contains('Target router reads attempted: 1'));
+    expect(report, contains('Target authenticated identity matches: 0'));
+    for (final private in [
+      'PrivateMesh',
+      'SourceMesh',
+      'TargetMesh',
+      'device-secret-id',
+      'Living room router',
+    ]) {
+      expect(report, isNot(contains(private)));
+    }
+  });
+
   test('partial matching read is not verified or counted', () {
     final state = LiveState.fromJson(fixture(
         probeStatus: 'partial', authenticated: true, identityMatch: 'match'));
@@ -193,6 +255,21 @@ void main() {
             .widget<OutlinedButton>(find.byKey(const Key('live-join-disabled')))
             .onPressed,
         isNull);
+  });
+
+  testWidgets('network-move entry appears only for a capable live adapter',
+      (tester) async {
+    await pumpLive(tester, FixtureApi(LiveState.fromJson(fixture())));
+    expect(find.byKey(const Key('live-network-move')), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await pumpLive(tester, CapabilityFixtureApi(LiveState.fromJson(fixture())));
+    expect(find.byKey(const Key('live-network-move')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('live-network-move')));
+    await tester.pumpAndSettle();
+    expect(find.text('Network move review'), findsOneWidget);
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('move-dispatch-disabled')), 250);
+    expect(find.byKey(const Key('move-dispatch-disabled')), findsOneWidget);
   });
 
   testWidgets('timeout, request failure and missing credentials remain safe',
