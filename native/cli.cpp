@@ -6,10 +6,20 @@
 #include <cerrno>
 #if !defined(_WIN32)
 #include <arpa/inet.h>
+#include <csignal>
 #include <sys/resource.h>
 #include <unistd.h>
 #endif
 namespace {
+#if defined(TNT_WITH_COMMISSIONER) && !defined(_WIN32)
+// OT Commissioner calls are synchronous. The alarm terminates this process;
+// continuing in a C++ thread after an interrupted library call is unsafe.
+void ProbeTimeout(int) {
+    constexpr char json[]="{\"schema_version\":1,\"probe_status\":\"timeout\",\"authenticated\":\"unknown\",\"active_status\":\"unknown\",\"pending_status\":\"unknown\"}\n";
+    (void)write(STDOUT_FILENO,json,sizeof(json)-1);
+    _exit(124);
+}
+#endif
 void Wipe(std::string& s) {volatile char* p=s.data();for(size_t i=0;i<s.size();++i)p[i]=0;}
 std::string ReadLine() {
     std::string line;
@@ -62,8 +72,33 @@ int main(int argc,char** argv) {
     Wipe(line);
     if(inspect) {std::cout<<tnt::InspectJson(dataset)<<'\n';return 0;}
 #if defined(TNT_WITH_COMMISSIONER)
-    std::cout<<tnt::Probe(argv[2],port,dataset)<<'\n';
-    return 0;
+#if !defined(_WIN32)
+    struct sigaction action{};
+    action.sa_handler=ProbeTimeout;
+    sigemptyset(&action.sa_mask);
+    struct sigaction previous{};
+    if(sigaction(SIGALRM,&action,&previous)!=0) {
+        std::cout<<"{\"schema_version\":1,\"probe_status\":\"error\",\"stage\":\"deadline_setup\",\"authenticated\":\"unknown\",\"active_status\":\"unknown\",\"pending_status\":\"unknown\"}"<<'\n';
+        return 1;
+    }
+    alarm(30);
+#endif
+    try {
+        tnt::ProbeResult result=tnt::Probe(argv[2],port,dataset);
+#if !defined(_WIN32)
+        alarm(0);
+        sigaction(SIGALRM,&previous,nullptr);
+#endif
+        std::cout<<result.json<<'\n';
+        return result.exit_code;
+    } catch(...) {
+#if !defined(_WIN32)
+        alarm(0);
+        sigaction(SIGALRM,&previous,nullptr);
+#endif
+        std::cout<<"{\"schema_version\":1,\"probe_status\":\"error\",\"stage\":\"unexpected\",\"authenticated\":\"unknown\",\"active_status\":\"unknown\",\"pending_status\":\"unknown\"}"<<'\n';
+        return 1;
+    }
 #else
     std::cout<<"{\"schema_version\":1,\"probe_status\":\"unsupported\",\"reason\":\"commissioner_not_built\"}"<<'\n';
     return 2;

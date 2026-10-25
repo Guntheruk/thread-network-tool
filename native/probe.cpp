@@ -14,22 +14,22 @@ struct PskcWiper {
     ~PskcWiper() {volatile uint8_t* p=value.data();for(size_t i=0;i<value.size();++i)p[i]=0;}
 };
 }
-std::string Probe(const std::string& address,unsigned port,const Dataset& imported) {
+ProbeResult Probe(const std::string& address,unsigned port,const Dataset& imported) {
     using namespace ot::commissioner;
     Config config;config.mEnableCcm=false;config.mEnableDtlsDebugLogging=false;config.mLogger.reset();
     config.mPSKc.assign(imported.pskc.begin(),imported.pskc.end());
     PskcWiper wipe{config.mPSKc};
     QuietHandler handler;auto commissioner=Commissioner::Create(handler);
     if(commissioner->Init(config)!=ErrorCode::kNone)
-        return "{\"schema_version\":1,\"probe_status\":\"error\",\"stage\":\"init\",\"authenticated\":false,\"active_status\":\"unknown\",\"pending_status\":\"unknown\"}";
+        return {"{\"schema_version\":1,\"probe_status\":\"error\",\"stage\":\"init\",\"authenticated\":false,\"active_status\":\"unknown\",\"pending_status\":\"unknown\"}",1};
     if(commissioner->Connect(address,static_cast<uint16_t>(port))!=ErrorCode::kNone)
-        return "{\"schema_version\":1,\"probe_status\":\"error\",\"stage\":\"connect\",\"authenticated\":false,\"active_status\":\"unknown\",\"pending_status\":\"unknown\"}";
+        return {"{\"schema_version\":1,\"probe_status\":\"error\",\"stage\":\"connect\",\"authenticated\":false,\"active_status\":\"unknown\",\"pending_status\":\"unknown\"}",1};
     constexpr uint16_t fields=ActiveOperationalDataset::kActiveTimestampBit |
         ActiveOperationalDataset::kChannelBit | ActiveOperationalDataset::kExtendedPanIdBit |
         ActiveOperationalDataset::kNetworkNameBit;
     ActiveOperationalDataset active;
     if(commissioner->GetActiveDataset(active,fields)!=ErrorCode::kNone)
-        return "{\"schema_version\":1,\"probe_status\":\"partial\",\"authenticated\":true,\"active_status\":\"error\",\"pending_status\":\"unknown\"}";
+        return {"{\"schema_version\":1,\"probe_status\":\"partial\",\"authenticated\":true,\"active_status\":\"error\",\"pending_status\":\"unknown\"}",1};
     constexpr uint16_t pendingFields=PendingOperationalDataset::kPendingTimestampBit |
         PendingOperationalDataset::kActiveTimestampBit | PendingOperationalDataset::kDelayTimerBit;
     PendingOperationalDataset pending;
@@ -39,8 +39,10 @@ std::string Probe(const std::string& address,unsigned port,const Dataset& import
     bool has_channel=(active.mPresentFlags & ActiveOperationalDataset::kChannelBit)!=0;
     bool matched=has_xpan && has_name && has_channel && Hex(active.mExtendedPanId)==imported.extended_pan_id &&
         active.mNetworkName==imported.network_name && active.mChannel.mPage==0 && active.mChannel.mNumber==imported.channel;
+    bool complete=pending_ok && has_xpan && has_name && has_channel;
     std::ostringstream o;
-    o<<"{\"schema_version\":1,\"probe_status\":\"completed\",\"authenticated\":true,\"active_status\":\"read\",\"identity_match\":";
+    o<<"{\"schema_version\":1,\"probe_status\":\""<<(complete?"completed":"partial")
+     <<"\",\"authenticated\":true,\"active_status\":\"read\",\"identity_match\":";
     if(!has_xpan||!has_name||!has_channel) o<<"\"unknown\"";
     else o<<(matched?"\"match\"":"\"mismatch\"");
     o<<",\"active_network_name\":";
@@ -50,6 +52,6 @@ std::string Probe(const std::string& address,unsigned port,const Dataset& import
     o<<",\"active_channel\":";
     if(has_channel)o<<active.mChannel.mNumber;else o<<"null";
     o<<",\"pending_status\":\""<<(pending_ok?(pending.mPresentFlags?"present":"empty"):"error")<<"\"}";
-    return o.str();
+    return {o.str(),complete && matched?0:1};
 }
 }
