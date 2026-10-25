@@ -17,6 +17,46 @@ All responses use schema version 1 and mode `live`.
 - `POST /api/credentials {dataset}`: validate one bounded hex dataset, retain it in process memory, and clear previous read results on successful replacement. Input and native errors are never echoed.
 - `POST /api/probe {router_id}`: perform one read against an opaque handle from the last scan. Handles expire after five minutes. No caller-supplied address or port is accepted.
 
+The original credential and probe calls remain an inspection slot. They cannot
+feed a network move review. For that review, `POST /api/credentials` requires an
+explicit `role` of `source` or `target` alongside `dataset`; `POST /api/probe`
+requires that same role alongside `router_id`. The two role credentials remain
+separate in memory. A successful role import changes its private generation and
+clears that role's reads and any earlier review. Discovery clears all role reads
+and the review. A new role read also invalidates the prior review.
+
+`POST /api/network-move/plan` accepts only `target_router_id`, `delay_seconds`
+(300–86400), and `empty_source_attestation` with method
+`operator_controlled_inventory`, scope `whole_source_network`, and a UTC
+`attested_at`. The attestation must be no more than five minutes old and follow
+the current credential imports, discovery and source reads. A missing or old
+attestation blocks readiness. `GET /api/network-move/plan` returns the current
+review or null; evidence changes and expiry clear it. There is no confirm,
+dispatch, Petition or SET route.
+
+The server derives source candidates from the authorized source identity,
+authenticated source-role reads and provisional advertisements. A matching
+advertised Extended PAN ID is a candidate; if that field is absent, a matching
+name is a candidate requiring a role-bound read. Advertisements cannot prove
+identity or complete inventory. Every observed candidate appears in the preview
+and must have a fresh authenticated source-role Active read matching the private
+source identity. All source reads must have empty Pending status and the same
+Active Timestamp, matching the imported source dataset. The selected target
+requires an equivalent fresh target-role read and its Active Timestamp must
+match the imported target dataset. Source and target identities must differ.
+All checks are made in the session from native evidence; callers cannot supply
+readiness booleans or a subset of source routers.
+
+The plan response is local review data (`mode: network_move_review`) with an
+opaque `review_id`, `decision` (`ready_for_lab_review` or `needs_evidence`),
+blocker codes, all observed candidate router handles/display names/read times,
+selected target handle/read time, delay, verification and manual recovery text.
+It always says `affected_scope: whole_source_network`,
+`unknown_offline_devices: true`, and `inventory_complete: false`. It omits
+datasets, keys, PSKc, Extended PAN IDs, channel, Active Timestamp, addresses,
+private credential generations and endpoints. `ready_for_lab_review` is not
+authorization or evidence that any vendor device supports a network move.
+
 The initial helper permits discovered private IPv4, IPv4 link-local, and ULA IPv6 endpoints. Scoped IPv6 and public/global endpoints remain unavailable in this development adapter; this is a limitation, not evidence that a router is unhealthy.
 
 Router public fields: `id`, `service_name`, `network_name`, `thread_version`, `endpoint_usable`, `probe`. Read fields: `probe_status`, `authenticated`, `identity_match`, `active_status`, `pending_status`, `checked_at`. Addresses, raw TXT records and native payloads are not returned by the helper API. Network names and service names are visible locally; exported reports omit them and contain only counts/statuses.

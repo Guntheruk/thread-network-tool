@@ -176,6 +176,13 @@ Future<void> main() async {
     check((await request('/api/join', method: 'POST', body: '{}')).$1 == 404,
         'mutation route exists');
     check(
+        (await request('/api/network-move/send', method: 'POST', body: '{}'))
+                .$1 ==
+            404,
+        'network move mutation route exists');
+    check((await request('/api/network-move/plan')).$2 == '{"plan":null}',
+        'empty review should be explicit');
+    check(
         (await request('/api/credentials',
                     method: 'POST', body: jsonEncode({'dataset': 'x' * 3000})))
                 .$1 ==

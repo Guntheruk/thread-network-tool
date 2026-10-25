@@ -3,7 +3,7 @@ import 'native/session.dart';
 
 /// Direct in-process adapter for desktop Flutter. It uses the same bounded
 /// native calls and state transitions as the loopback helper, without HTTP.
-class NativeLiveApi implements LiveApi {
+class NativeLiveApi implements NetworkMoveApi {
   NativeLiveApi({required NativeCall native}) : _session = LiveSession(native);
 
   final LiveSession _session;
@@ -29,6 +29,37 @@ class NativeLiveApi implements LiveApi {
   @override
   Future<LiveState> probe(String routerId) =>
       _perform('probe', {'router_id': routerId});
+
+  @override
+  Future<LiveState> credentialsForRole(String role, String dataset) =>
+      _perform('credentials', {'role': role, 'dataset': dataset});
+
+  @override
+  Future<LiveState> probeForRole(String role, String routerId) =>
+      _perform('probe', {'role': role, 'router_id': routerId});
+
+  @override
+  Future<NetworkMovePlan> networkMovePlan(
+      {required String targetRouterId,
+      required EmptySourceAttestationInput attestation,
+      required int delaySeconds}) async {
+    try {
+      return NetworkMovePlan.fromJson(
+          await _session.perform('network-move/plan', {
+        'target_router_id': targetRouterId,
+        'empty_source_attestation': attestation.toJson(),
+        'delay_seconds': delaySeconds,
+      }));
+    } catch (_) {
+      throw const LiveApiException();
+    }
+  }
+
+  @override
+  Future<NetworkMovePlan?> currentNetworkMovePlan() async {
+    final current = _session.currentReview;
+    return current == null ? null : NetworkMovePlan.fromJson(current);
+  }
 }
 
 /// A desktop or phone with no supported native helper remains visibly live

@@ -96,6 +96,33 @@ authorize licence selection, publication, analytics or signup collection.
   controlled-empty-source evidence and a network-wide review. The existing
   single-router model must not be relabelled as that network operation.
 
+## Source-network review continuation
+
+- Separate source and target credentials now stay in memory with explicit roles.
+  Authenticated reads retain identity and Active Timestamp privately; public
+  reports expose role counts without datasets, keys, endpoints or household IDs.
+- The review includes all observed source candidates, requires matching fresh
+  reads and controlled empty-source attestation, and blocks pending changes,
+  inconsistent timestamps or stale evidence. It states the whole-network scope
+  and unknown offline devices. Re-import, re-discovery, changed reads and expiry
+  invalidate the review. There is no dispatch API or native write command.
+- Root integration found that the UI's initial delay options were all below the
+  planner's minimum. The shared flow now offers 5, 15 or 30 minutes. Two widget
+  tests exercise the real NativeLiveApi and LiveSession, faking only native read
+  replies: two source routers pass together, and one pending source blocks the
+  review. Tests also cover role report redaction and visible review expiry.
+- Flutter analysis passes. The real session/UI integration tests pass; the six
+  source-network widget tests pass at normal and narrow/enlarged text settings.
+  Planning, HTTP adapter and loopback access-boundary scripts pass. All four
+  Commissioner-enabled native CTests pass, including raw-wire timestamp
+  encoding. CI now runs the planning and loopback scripts as well as widgets.
+- Windows PR #4 at `6498a9ed83b5a6d79d69e39b483faf37aa2a35e8` passes both
+  the native parser/CLI build and Flutter desktop build in run `40220629150`.
+  Codex review has no unresolved findings. This is build evidence, not Windows
+  discovery or router communication. Android PR #5 adds a real debug APK
+  compile gate; its first hosted run is in progress and device consent remains
+  unverified. Neither PR is merged or released.
+
 ## Implemented
 
 Previous source milestone: `563ffe0df6a092246aa72e847734b8e7eafdb03a`. This continuation simplifies the interface using the Recursive Systems visual direction, records Google Home and migration beta scope, and sets up GitHub PR checks.

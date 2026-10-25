@@ -83,9 +83,16 @@ class LocalServer {
         }
         if (request.method == 'GET' && request.uri.path == '/api/state') {
           _json(response, session.state);
+        } else if (request.method == 'GET' &&
+            request.uri.path == '/api/network-move/plan') {
+          _json(response, {'plan': session.currentReview});
         } else if (request.method == 'POST' &&
-            {'/api/discover', '/api/credentials', '/api/probe'}
-                .contains(request.uri.path)) {
+            {
+              '/api/discover',
+              '/api/credentials',
+              '/api/probe',
+              '/api/network-move/plan'
+            }.contains(request.uri.path)) {
           if (request.headers.contentType?.mimeType != 'application/json') {
             throw const ApiFailure('json_required', 415);
           }
