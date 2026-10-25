@@ -24,6 +24,8 @@ void main() {
     final source = bootstrap['source_dataset'] as String;
     final target = bootstrap['target_dataset'] as String;
     final move = runtime.adapter;
+    move.onPreparationFailure =
+        (failure) => stdout.writeln(failure.fixtureMarker);
     final session = runtime.session;
     final api = runtime.api;
     expect(api.executionAvailable, isTrue);

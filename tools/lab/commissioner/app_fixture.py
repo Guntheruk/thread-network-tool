@@ -25,6 +25,38 @@ MANIFEST = ROOT / "fixture"
 CONTROL = ROOT / "control"
 MAX_REQUEST = 1024
 EVENT_PATTERN = re.compile(rb"TNT_APP_EVENT (opened|import_target|target_read|import_source|source_read|review|native_prepare|native_confirm|dispatch_complete|stopped|restored|observing|verified|redaction)(?![A-Za-z0-9_])")
+PREPARATION_PATTERN = re.compile(rb"TNT_APP_PREPARE_FAILURE ([a-z_]+) ([a-z_]+)(?![A-Za-z0-9_])")
+PREPARATION_STAGES = {"journal", "recovery", "fixture_refresh", "native_process", "native_result", "evidence", "plan"}
+PREPARATION_REASONS = {
+    "journal_failure", "unresolved_operation", "fixture_unavailable", "worker_failure",
+    "uncorrelated_native_result", "native_reason_unknown", "invalid_native_evidence",
+    "execution_unavailable", "review_expired", "invalid_plan", "invalid_request",
+    "fixture_untrusted", "connectivity_stale", "isolated_network_required",
+    "fixture_process_missing", "fixture_process_invalid", "fixture_process_replaced",
+    "fixture_fd_unavailable", "fixture_socket_unowned", "fixture_socket_ambiguous",
+    "fixture_duplicate", "linux_fixture_required", "lease_unavailable", "lifecycle_untrusted",
+    "lifecycle_unavailable", "worker_busy", "hash_failed", "binding_mismatch", "invalid_dataset",
+    "unsupported_dataset_fields", "same_network", "authorization_incomplete", "endpoint_role_conflict",
+    "duplicate_endpoint", "invalid_endpoint", "timestamp_rollback_without_key_change", "unsupported_delay",
+    "pending_dataset_overflow", "source_snapshot_changed_or_unavailable",
+    "target_snapshot_changed_or_unavailable", "preflight_deadline", "operation_consumed",
+}
+
+
+def emit_fixed_line(line, phase, last_event):
+    match = EVENT_PATTERN.search(line)
+    if match:
+        event = match.group(1).decode("ascii")
+        last_event[phase] = event
+        print(json.dumps({"lab": "app-execution-bridge", "app_phase": phase,
+                          "app_event": event}, sort_keys=True), flush=True)
+    diagnostic = PREPARATION_PATTERN.search(line)
+    if diagnostic:
+        stage, reason = (part.decode("ascii") for part in diagnostic.groups())
+        if stage in PREPARATION_STAGES and reason in PREPARATION_REASONS:
+            print(json.dumps({"lab": "app-execution-bridge", "app_phase": phase,
+                              "preparation_failure_stage": stage,
+                              "preparation_failure_reason": reason}, sort_keys=True), flush=True)
 
 
 def drain_events(stream, phase, last_event):
@@ -38,12 +70,7 @@ def drain_events(stream, phase, last_event):
         for byte in block:
             if byte == 10:
                 if not dropping:
-                    match = EVENT_PATTERN.search(pending)
-                    if match:
-                        event = match.group(1).decode("ascii")
-                        last_event[phase] = event
-                        print(json.dumps({"lab": "app-execution-bridge", "app_phase": phase,
-                                          "app_event": event}, sort_keys=True), flush=True)
+                    emit_fixed_line(pending, phase, last_event)
                 pending = b""
                 dropping = False
             elif not dropping:
@@ -53,12 +80,7 @@ def drain_events(stream, phase, last_event):
                 else:
                     pending += bytes((byte,))
     if pending and not dropping:
-        match = EVENT_PATTERN.search(pending)
-        if match:
-            event = match.group(1).decode("ascii")
-            last_event[phase] = event
-            print(json.dumps({"lab": "app-execution-bridge", "app_phase": phase,
-                              "app_event": event}, sort_keys=True), flush=True)
+        emit_fixed_line(pending, phase, last_event)
 
 
 def process_startticks(pid):

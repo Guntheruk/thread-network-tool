@@ -5,6 +5,7 @@ import 'dart:io';
 import '../move/move_execution.dart';
 import '../move/move_execution_controller.dart';
 import '../move/native_move_journal.dart';
+import 'native_move_diagnostic.dart';
 
 /// Private IPC to the isolated simulator supervisor. This is never a household
 /// discovery/provider fallback and never uses a TCP listener.
@@ -122,6 +123,9 @@ class NativeMoveAdapter {
   int? lastDispatchPetitions;
   int? lastDispatchSetInvocations;
 
+  /// Explicit isolated test hook; ordinary app construction emits no markers.
+  void Function(NativePreparationDiagnostic)? onPreparationFailure;
+
   bool get available =>
       Platform.isLinux &&
       File(workerExecutable).isAbsolute &&
@@ -150,33 +154,73 @@ class NativeMoveAdapter {
   void invalidateReviews() => _prepared.clear();
 
   Future<MoveExecutionPlan> prepare(NativeMoveRequest request) async {
-    await initialize();
-    final existing = await controller.current();
-    if (existing != null && !existing.terminal) {
-      throw const MoveExecutionFailure('unresolved_operation');
+    var stage = NativePreparationStage.journal;
+    Map<String, dynamic>? nativeResult;
+    try {
+      await initialize();
+      stage = NativePreparationStage.recovery;
+      final existing = await controller.current();
+      if (existing != null && !existing.terminal) {
+        throw const MoveExecutionFailure('unresolved_operation');
+      }
+      stage = NativePreparationStage.fixtureRefresh;
+      await fixture.call('refresh');
+      stage = NativePreparationStage.nativeProcess;
+      final result = await _run(request.encode('inspect', this));
+      nativeResult = result;
+      stage = result['ready'] == true
+          ? NativePreparationStage.evidence : NativePreparationStage.nativeResult;
+      _requireEvidence(result, request.operationId);
+      if (result['ready'] != true) {
+        throw const MoveExecutionFailure('preflight_failed');
+      }
+      stage = NativePreparationStage.plan;
+      final checked = _time(result['checked_at_ms']);
+      final plan = MoveExecutionPlan(
+        reviewId: request.reviewId,
+        operationId: request.operationId,
+        profileId: isolatedMoveProfile,
+        bindingCommitment: _commitment(result['binding_commitment']),
+        sourceCommitment: _commitment(result['source_commitment']),
+        targetCommitment: _commitment(result['target_commitment']),
+        targetRouterBinding: _commitment(result['target_binding']),
+        routerBindings: _commitments(result['source_bindings']),
+        expiresAt: checked.add(const Duration(seconds: 30)),
+        delaySeconds: 300,
+        observationSeconds: 30,
+      );
+      _prepared[request.operationId] = _PreparedMove(request, plan);
+      return plan;
+    } catch (failure) {
+      final NativePreparationDiagnostic diagnostic;
+      if (stage == NativePreparationStage.nativeResult &&
+          nativeResult != null) {
+        diagnostic = NativePreparationDiagnostic.nativeRefusal(
+            nativeResult, request.operationId);
+      } else {
+        final code = switch (stage) {
+          NativePreparationStage.journal => 'journal_failure',
+          NativePreparationStage.recovery =>
+            failure is MoveExecutionFailure && failure.code == 'unresolved_operation'
+                ? 'unresolved_operation' : 'journal_failure',
+          NativePreparationStage.fixtureRefresh => 'fixture_unavailable',
+          NativePreparationStage.nativeProcess => 'worker_failure',
+          NativePreparationStage.evidence =>
+            failure is MoveExecutionFailure && failure.code == 'review_expired'
+                ? 'review_expired'
+                : 'invalid_native_evidence',
+          NativePreparationStage.plan => 'invalid_plan',
+          _ => 'worker_failure',
+        };
+        diagnostic = NativePreparationDiagnostic.fixed(stage, code);
+      }
+      try {
+        onPreparationFailure?.call(diagnostic);
+      } catch (_) {
+        // Diagnostics cannot change the failure or grant dispatch authority.
+      }
+      rethrow;
     }
-    await fixture.call('refresh');
-    final result = await _run(request.encode('inspect', this));
-    _requireEvidence(result, request.operationId);
-    if (result['ready'] != true) {
-      throw const MoveExecutionFailure('preflight_failed');
-    }
-    final checked = _time(result['checked_at_ms']);
-    final plan = MoveExecutionPlan(
-      reviewId: request.reviewId,
-      operationId: request.operationId,
-      profileId: isolatedMoveProfile,
-      bindingCommitment: _commitment(result['binding_commitment']),
-      sourceCommitment: _commitment(result['source_commitment']),
-      targetCommitment: _commitment(result['target_commitment']),
-      targetRouterBinding: _commitment(result['target_binding']),
-      routerBindings: _commitments(result['source_bindings']),
-      expiresAt: checked.add(const Duration(seconds: 30)),
-      delaySeconds: 300,
-      observationSeconds: 30,
-    );
-    _prepared[request.operationId] = _PreparedMove(request, plan);
-    return plan;
   }
 
   MoveExecutionPlan resolveReview(String reviewId) => _prepared.values

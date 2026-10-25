@@ -133,6 +133,31 @@ class AppFixtureTests(unittest.TestCase):
                          ["review", "verified"])
         self.assertNotIn("secret", output.getvalue())
 
+    def test_preparation_diagnostics_only_emit_fixed_stage_and_reason(self):
+        reader, writer = os.pipe()
+        try:
+            os.write(writer, b"TNT_APP_PREPARE_FAILURE native_result source_snapshot_changed_or_unavailable\n"
+                     b"TNT_APP_PREPARE_FAILURE private_stage invalid_request\n"
+                     b"TNT_APP_PREPARE_FAILURE native_result private_error_data\n"
+                     b"TNT_APP_PREPARE_FAILURE native_result invalid_request_extra\n"
+                     b"private data\n")
+        finally:
+            os.close(writer)
+        output = io.StringIO()
+        with os.fdopen(reader, "rb") as stream, contextlib.redirect_stdout(output):
+            fixture.drain_events(stream, "dispatch", {})
+        rows = [__import__("json").loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(rows, [{"lab": "app-execution-bridge", "app_phase": "dispatch",
+                                "preparation_failure_stage": "native_result",
+                                "preparation_failure_reason": "source_snapshot_changed_or_unavailable"}])
+        self.assertNotIn("private", output.getvalue())
+
+    def test_preparation_reason_allowlist_matches_dart_boundary(self):
+        source = (ROOT / "app/lib/native/native_move_diagnostic.dart").read_text()
+        block = source.split("const nativePreparationReasons = {", 1)[1].split("};", 1)[0]
+        reasons = set(__import__("re").findall(r"'([a-z_]+)'", block))
+        self.assertEqual(reasons, fixture.PREPARATION_REASONS)
+
     def test_supervisor_runs_dispatch_then_recovery_with_same_fixture(self):
         self.require_unix_socket()
         with tempfile.TemporaryDirectory() as temporary:
