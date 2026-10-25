@@ -5,7 +5,7 @@ Version 1. C ABI:
     const char* tnt_version(void);
     int tnt_inspect_dataset(const char* hex, char* output, size_t output_capacity);
 
-Caller owns buffers. Inputs are bounded, NUL-terminated text. Function never throws across ABI. Return 0 success, 1 invalid input, 2 output too small or invalid output buffer. Write bounded JSON only where capacity permits. No secrets in output or error text. Engine exports via a shared library named thread_network_core (platform extension).
+Caller owns buffers. The current parser accepts a maximum of 254 decoded bytes, page 0 and channels 11–26; this is a supported subset, not universal Thread policy validation. Inputs are bounded, NUL-terminated text. Function never throws across ABI. Return 0 success, 1 invalid input, 2 output too small or invalid output buffer. Write bounded JSON only where capacity permits. No secrets in output or error text. Engine exports via a shared library named thread_network_core (platform extension).
 
 Successful JSON keys: schema_version (1), valid (true), network_name, extended_pan_id (16 lowercase hex chars), channel (integer), pan_id (4 hex chars), active_timestamp (16 hex chars), has_network_key (true), has_pskc (true), unknown_tlv_types (integer array). Failed inspection: schema_version (1), valid (false), error_code, message. No raw field bytes in errors.
 
