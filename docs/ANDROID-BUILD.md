@@ -63,6 +63,35 @@ and activity results are ignored, including when a new fetch has started.
 
 ## Verification status
 
+The Android debug build check in `.github/workflows/android-build.yml` runs on
+Ubuntu 24.04 with Flutter 3.47.8 and Temurin Java 17. It resolves the locked
+Flutter packages, compiles `app-debug.apk`, and checks that the APK is nonempty.
+It requests read-only repository permissions and has a 60-minute deadline.
+It neither signs a release package nor uploads the APK. The generated project
+pins Android Gradle plugin 9.1.0 and Gradle 9.3.1; Flutter supplies missing
+wrapper scripts/JAR during the build without replacing the checked-in wrapper
+properties. A passing hosted run will establish compilation and debug APK
+packaging for its exact source SHA, including Kotlin bridge compilation. The
+check must run before that result can be claimed.
+
+The first hosted Android run, `40221044175` at `0016ea7`, reached
+`:app:checkDebugAarMetadata` and found that the pinned Thread Network SDK
+requires core library desugaring. The app module now enables it and pins
+`com.android.tools:desugar_jdk_libs:2.1.3`, matching the pinned Google Thread
+SDK's `META-INF/com/android/build/gradle/aar-metadata.properties`. The
+[Android Gradle configuration](https://developer.android.com/studio/write/java8-support)
+documents the required flag and dependency form. The SDK metadata also
+requires AGP 8.2.0 or newer; this project pins AGP 9.1.0. A new hosted run is
+required to establish whether Kotlin compilation and APK packaging pass; the
+first run did not.
+
+The next hosted Android run, `40221882673` at `8563d39`, passed dependency
+metadata checks but stopped at `:app:processDebugMainManifest`: the app's
+generated minimum SDK was 24 while the pinned Thread Network AAR declares
+minimum SDK 26. The app now pins `minSdk = 26` (Android 8.0), matching the
+SDK's manifest and its [Android support guidance](https://developers.home.google.com/thread).
+This is a build configuration repair; another hosted APK run is required.
+
 The Dart channel contract can be tested with
 `cd app && ../.tooling/flutter/bin/flutter test test/android_credentials_test.dart`.
 This uses mock channel responses and does not establish device support.
