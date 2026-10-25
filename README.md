@@ -105,6 +105,8 @@ Run helper regression checks with `dart run tool/local_server_test.dart` from `a
 - [Interface direction](docs/INTERFACE.md)
 - [Proposed migration beta](docs/MIGRATION-BETA.md)
 - [Synthetic join assessment and recovery](docs/JOIN-LAB.md)
+- [Isolated OpenThread network-move lab](docs/PROTOCOL-LAB.md)
+- [Next source-network review implementation](docs/NETWORK-MOVE-PLAN.md)
 - [Android credential bridge and build limits](docs/ANDROID-BUILD.md)
 - [Dependency notice inventory](docs/DEPENDENCY-INVENTORY.md)
 - [Progress and evidence](PROGRESS.md)
