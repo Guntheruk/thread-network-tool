@@ -8,7 +8,14 @@ add_library(thread_network_core SHARED native/dataset.cpp)
 target_compile_definitions(thread_network_core PRIVATE TNT_BUILDING_CORE)
 target_include_directories(thread_network_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/native)
 add_executable(thread-network native/cli.cpp native/discovery.cpp)
-target_link_libraries(thread-network PRIVATE thread_network_core)
+if(WIN32)
+  # The DLL exports only its C ABI; the CLI also needs private C++ parser symbols.
+  # Compile the parser into the CLI instead of exporting its std::string ABI.
+  target_sources(thread-network PRIVATE native/dataset.cpp)
+  target_compile_definitions(thread-network PRIVATE TNT_BUILDING_CORE)
+else()
+  target_link_libraries(thread-network PRIVATE thread_network_core)
+endif()
 if(APPLE)
   # An installed helper lives in Contents/Helpers and finds its core in
   # Contents/Frameworks. Build-tree targets keep CMake's separate build RPATH.
