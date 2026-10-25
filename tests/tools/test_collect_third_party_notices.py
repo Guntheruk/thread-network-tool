@@ -38,6 +38,9 @@ class NoticeCollectorTest(unittest.TestCase):
             path = self.commissioner / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(f"{relative}\n", encoding="utf-8")
+        everest = self.commissioner/'third_party/mbedtls/repo/3rdparty/everest/example.c'
+        everest.parent.mkdir(parents=True)
+        everest.write_text('/* Copyright Example; SPDX-License-Identifier: Apache-2.0 */\nint excluded;')
         self.flutter = self.root / "flutter"
         for relative in ("packages/flutter/LICENSE", "bin/cache/dart-sdk/LICENSE"):
             path = self.flutter / relative
@@ -58,10 +61,36 @@ class NoticeCollectorTest(unittest.TestCase):
             return_value=("a" * 40, ""),
         )
         self.revision_mock = self.revision_patcher.start()
+        from tools.prepare_commissioner_source import MANIFEST
+        self.provenance = json.loads(MANIFEST.read_text())
+        self.provenance['prepared_tree_sha256'] = 'b' * 64
+        (self.commissioner / 'tnt-source-provenance.json').write_text(json.dumps(self.provenance))
+        self.verify_patcher = patch('tools.collect_third_party_notices.verify_prepared', return_value=self.provenance)
+        self.verify_mock = self.verify_patcher.start()
 
     def tearDown(self):
         self.revision_patcher.stop()
+        self.verify_patcher.stop()
         self.tmp.cleanup()
+
+    def test_generated_source_records_pins_patch_and_tree(self):
+        _, errors = collect(self.args)
+        self.assertFalse(errors)
+        self.assertEqual(json.loads((self.output/'commissioner/source-provenance.json').read_text()),self.provenance)
+        manifest=(self.output/'MANIFEST.md').read_text()
+        for pin in self.provenance['submodules'].values():
+            if pin != self.provenance['submodules']['third_party/mbedtls/repo/framework']:
+                self.assertIn(pin,manifest)
+        self.assertTrue((self.output/'commissioner/source.patch').is_file())
+
+    def test_rejects_tampered_generated_source_before_output(self):
+        self.verify_mock.side_effect=ValueError('tree changed')
+        with self.assertRaisesRegex(ValueError,'tree changed'):collect(self.args)
+        self.assertFalse(self.output.exists())
+
+    def test_detects_changed_tree_after_collection(self):
+        self.verify_mock.side_effect=[self.provenance,ValueError('tree changed')]
+        with self.assertRaisesRegex(ValueError,'tree changed'):collect(self.args)
 
     def test_missing_revision_marks_collection_incomplete(self):
         self.revision_mock.return_value = ("not established", "source revision unavailable")

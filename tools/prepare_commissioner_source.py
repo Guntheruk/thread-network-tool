@@ -70,8 +70,9 @@ def source_repositories(source: Path, manifest: dict) -> list[tuple[str, str]]:
 
 
 def extract_archive(repo: Path, destination: Path, revision: str) -> None:
+    if not callable(getattr(tarfile, "data_filter", None)):
+        raise ValueError("Source preparation requires Python tarfile.data_filter (Python 3.12+ or patched 3.11)")
     payload = git(repo, 'archive', '--format=tar', revision)
-    destination.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(payload)) as archive:
         for item in archive.getmembers():
             name = PurePosixPath(item.name)
@@ -81,6 +82,7 @@ def extract_archive(repo: Path, destination: Path, revision: str) -> None:
                 target = PurePosixPath(item.linkname)
                 if target.is_absolute() or '..' in target.parts:
                     raise ValueError('Unsafe source archive symlink')
+        destination.mkdir(parents=True, exist_ok=True)
         archive.extractall(destination, filter='data')
 
 

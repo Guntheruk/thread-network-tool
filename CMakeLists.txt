@@ -35,7 +35,7 @@ if(TNT_WITH_COMMISSIONER)
   if(NOT TNT_COMMISSIONER_SOURCE OR NOT EXISTS "${TNT_COMMISSIONER_SOURCE}/CMakeLists.txt")
     message(FATAL_ERROR "Set TNT_COMMISSIONER_SOURCE to the pinned OpenThread Commissioner checkout")
   endif()
-  find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)
+  find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
   execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_commissioner_source.py"
     --verify-only --output "${TNT_COMMISSIONER_SOURCE}" RESULT_VARIABLE TNT_SOURCE_RESULT OUTPUT_QUIET)
   if(NOT TNT_SOURCE_RESULT EQUAL 0)

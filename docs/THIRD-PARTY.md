@@ -9,3 +9,21 @@ Relevant transitive libraries: libevent (BSD-3-Clause), fmt (MIT), and Mbed TLS 
 UI/toolchain used for this initial build: Flutter 3.47.8, framework revision `737ba8f885dc774b53b442759999a312c9461e4e`, Dart 3.13.7. The macOS arm64 SDK archive SHA-256 was verified against the official release manifest: `6114edc2dae3636cfefb7e4456a4510399ee856e324149b34dbacb509e329d05`. Flutter framework is BSD-3-Clause; engine/bundled dependencies have their own notices. App Dart dependencies are pinned in app/pubspec.lock; ffi 2.2.0 is BSD-3-Clause.
 
 Apple ThreadNetwork and Google Home/Play services integrations are planned, not included. Their SDK access and distribution terms are distinct from open-source sample licenses.
+
+
+Current collection uses only a verified generated Commissioner tree. Run
+`tools/collect_third_party_notices.py --commissioner-root /absolute/generated/source`
+with the matching Flutter SDK, resolved app packages and packaged Flutter notices.
+The collector verifies the complete tree before and after collection, takes
+original revisions from its verified provenance instead of expecting `.git`,
+and copies the source provenance, original-pin manifest and exact modification
+patch beside the verbatim license inputs. Missing Flutter/package/artifact
+inputs still produce an incomplete notice inventory; provenance is not guessed.
+
+Mbed TLS's bundled p256-m source carries its dual Apache-2.0 OR
+GPL-2.0-or-later terms. Bundled Project Everest source/header notices separately
+state Apache-2.0 and retain INRIA/Microsoft and other upstream copyrights. The
+collector preserves every distinct leading Everest copyright/license block in
+`commissioner/Everest-NOTICES.txt` alongside the Mbed TLS license containing the
+full Apache text. The inventory does not choose between the Mbed TLS alternatives
+or approve a distribution license.

@@ -1,5 +1,7 @@
 """Offline source-preparation checks; optional integration uses a read-only pin."""
 import hashlib
+import io
+import tarfile
 import importlib.util
 import json
 import os
@@ -96,6 +98,37 @@ class PreparationTests(unittest.TestCase):
         (self.source/'file').chmod(0o700)
         self.assertNotEqual(module.tree_hash(self.source),original)
 
+    def archive(self, entries):
+        output=io.BytesIO()
+        with tarfile.open(fileobj=output,mode='w') as archive:
+            for item in entries:
+                archive.addfile(item,io.BytesIO(b'x') if item.isfile() else None)
+        return output.getvalue()
+
+    def test_requires_safe_extraction_filter_capability(self):
+        with patch.object(module.tarfile,'data_filter',None), self.assertRaisesRegex(ValueError,'data_filter'):
+            module.extract_archive(self.source,self.output,module.PIN)
+        self.assertFalse(self.output.exists())
+
+    def test_rejects_escape_links_special_files_and_parent_paths(self):
+        for name,kind,target in [('/absolute',tarfile.REGTYPE,''),('../parent',tarfile.REGTYPE,''),
+                                 ('link',tarfile.SYMTYPE,'../outside'),('link',tarfile.SYMTYPE,'/outside'),
+                                 ('link',tarfile.LNKTYPE,'safe'),('device',tarfile.CHRTYPE,'')]:
+            item=tarfile.TarInfo(name);item.type=kind;item.linkname=target
+            payload=self.archive([item])
+            with patch.object(module,'git',return_value=payload), self.assertRaisesRegex(ValueError,'Unsafe'):
+                module.extract_archive(self.source,self.output,module.PIN)
+            self.assertFalse(self.output.exists())
+
+    def test_earlier_symlink_cannot_redirect_later_member(self):
+        link=tarfile.TarInfo('directory');link.type=tarfile.SYMTYPE;link.linkname='../outside'
+        later=tarfile.TarInfo('directory/file');later.size=1
+        payload=self.archive([link,later])
+        with patch.object(module,'git',return_value=payload), self.assertRaisesRegex(ValueError,'Unsafe'):
+            module.extract_archive(self.source,self.output,module.PIN)
+        self.assertFalse((self.root/'outside/file').exists())
+        self.assertFalse(self.output.exists())
+
     @unittest.skipUnless(os.environ.get('TNT_COMMISSIONER_TEST_SOURCE'),'provide clean pinned local source for integration')
     def test_actual_pin_reproducible_and_verify_tamper(self):
         source=Path(os.environ['TNT_COMMISSIONER_TEST_SOURCE'])
@@ -105,6 +138,9 @@ class PreparationTests(unittest.TestCase):
         second=module.prepare(source,other)
         self.assertEqual(first,second)
         self.assertEqual(module.verify_prepared(self.output),first)
+        # Frozen Python 3.11 images only verify; extraction filters are irrelevant.
+        with patch.object(module.tarfile,'data_filter',None):
+            self.assertEqual(module.verify_prepared(self.output),first)
         self.assertEqual(module.source_repositories(source,self.manifest),before)
         self.assertFalse((self.output/'.git').exists())
         self.assertEqual((source/'LICENSE').read_bytes(),(self.output/'LICENSE').read_bytes())
