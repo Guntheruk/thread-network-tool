@@ -3,6 +3,8 @@ build*/
 .flutter-plugins*
 .packages
 .DS_Store
+__pycache__/
+*.py[cod]
 *.log
 .env*
 *.xcuserstate

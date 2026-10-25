@@ -54,14 +54,18 @@ class FixtureApi implements LiveApi {
   Future<LiveState> Function()? onProbe;
   Future<LiveState> Function(String)? onCredentials;
   int probeCalls = 0;
+  int credentialCalls = 0;
 
   @override
   Future<LiveState> state() async => current;
   @override
   Future<LiveState> discover() async => current;
   @override
-  Future<LiveState> credentials(String dataset) async =>
-      onCredentials == null ? current : onCredentials!(dataset);
+  Future<LiveState> credentials(String dataset) async {
+    credentialCalls++;
+    return onCredentials == null ? current : onCredentials!(dataset);
+  }
+
   @override
   Future<LiveState> probe(String routerId) async {
     probeCalls++;
@@ -219,14 +223,55 @@ void main() {
     expect(api.probeCalls, 1);
   });
 
-  testWidgets('credential failure clears masked entry without echo',
+  testWidgets('guided eero route explains copied dataset and imports it',
+      (tester) async {
+    final api = FixtureApi(LiveState.fromJson(fixture(credentials: false)));
+    api.onCredentials = (_) async => LiveState.fromJson(fixture());
+    await pumpLive(tester, api);
+    await tester.tap(find.byKey(const Key('live-import')));
+    await tester.pumpAndSettle();
+    expect(find.text('Set up network access'), findsWidgets);
+    expect(find.byKey(const Key('live-dataset-input')), findsNothing);
+    await tester.tap(find.byKey(const Key('live-eero-route')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Active operational dataset'), findsWidgets);
+    expect(find.textContaining('Thread Network Key'), findsWidgets);
+    final input =
+        tester.widget<TextField>(find.byKey(const Key('live-dataset-input')));
+    expect(input.obscureText, isTrue);
+    await tester.enterText(find.byKey(const Key('live-dataset-input')), 'AABB');
+    await tester.tap(find.byKey(const Key('live-import-submit')));
+    await tester.pumpAndSettle();
+    expect(api.credentialCalls, 1);
+    expect(find.textContaining('Credentials ready'), findsOneWidget);
+  });
+
+  testWidgets('advanced route remains explicit', (tester) async {
+    final api = FixtureApi(LiveState.fromJson(fixture(credentials: false)));
+    await pumpLive(tester, api);
+    await tester.tap(find.byKey(const Key('live-import')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('live-advanced-route')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('hex'), findsWidgets);
+    expect(find.byKey(const Key('live-dataset-input')), findsOneWidget);
+  });
+
+  testWidgets('malformed and server failure clear masked input without echo',
       (tester) async {
     final api = FixtureApi(LiveState.fromJson(fixture(credentials: false)));
     api.onCredentials = (_) async => throw const LiveApiException();
     await pumpLive(tester, api);
     await tester.tap(find.byKey(const Key('live-import')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('live-eero-route')));
+    await tester.pumpAndSettle();
     const secret = 'DEADBEEFDEADBEEF';
+    await tester.enterText(find.byKey(const Key('live-dataset-input')), 'bad');
+    await tester.tap(find.byKey(const Key('live-import-submit')));
+    await tester.pumpAndSettle();
+    expect(api.credentialCalls, 0);
+    expect(find.byKey(const Key('live-import-error')), findsOneWidget);
     await tester.enterText(find.byKey(const Key('live-dataset-input')), secret);
     await tester.tap(find.byKey(const Key('live-import-submit')));
     await tester.pumpAndSettle();
@@ -238,6 +283,79 @@ void main() {
             .text,
         isEmpty);
     expect(find.text(secret), findsNothing);
+    expect(api.credentialCalls, 1);
+  });
+
+  testWidgets('cancel clears draft and Check stays disabled without access',
+      (tester) async {
+    final api = FixtureApi(LiveState.fromJson(fixture(credentials: false)));
+    await pumpLive(tester, api);
+    expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('live-read-0')))
+            .onPressed,
+        isNull);
+    await tester.tap(find.byKey(const Key('live-import')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('live-eero-route')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('live-dataset-input')), 'AABB');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('live-import')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('live-eero-route')));
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('live-dataset-input')))
+            .controller!
+            .text,
+        isEmpty);
+    expect(api.credentialCalls, 0);
+  });
+
+  testWidgets('initial idle search does not claim no routers found',
+      (tester) async {
+    final idle = fixture(credentials: false)
+      ..['discovery_status'] = 'idle'
+      ..['observed_at'] = null
+      ..['routers'] = [];
+    await pumpLive(tester, FixtureApi(LiveState.fromJson(idle)));
+    expect(find.textContaining('No routers found'), findsNothing);
+    expect(find.textContaining('Find routers'), findsWidgets);
+  });
+
+  testWidgets('guided dialog fits narrow screen with enlarged text',
+      (tester) async {
+    final api = FixtureApi(LiveState.fromJson(fixture(credentials: false)));
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MediaQuery(
+      data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+      child: ThreadNetworkApp(liveApi: api),
+    ));
+    await tester.pumpAndSettle();
+    final accessButton = find.byKey(const Key('live-import'));
+    await tester.scrollUntilVisible(accessButton, 200);
+    await tester.ensureVisible(accessButton);
+    await tester.pumpAndSettle();
+    final accessButtonRect = tester.getRect(accessButton);
+    expect(accessButtonRect.top, greaterThanOrEqualTo(0));
+    expect(accessButtonRect.bottom, lessThanOrEqualTo(640));
+    await tester.tap(accessButton);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Set up network access'), findsWidgets);
+    await tester.ensureVisible(find.byKey(const Key('live-eero-route')));
+    await tester.tap(find.byKey(const Key('live-eero-route')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('live-dataset-input')));
+    expect(find.byKey(const Key('live-dataset-input')), findsOneWidget);
+    expect(find.byKey(const Key('live-import-submit')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('compact viewport keeps read, join and report accessible',

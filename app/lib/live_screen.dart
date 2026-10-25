@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'credential_setup_dialog.dart';
 import 'live_api.dart';
 
 String liveReport(LiveState state) {
@@ -78,90 +79,12 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _importCredentials() async {
-    final controller = TextEditingController();
-    var submitting = false;
-    var failed = false;
-    try {
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, updateDialog) => AlertDialog(
-            title: const Text('Import network credentials'),
-            content: SizedBox(
-              width: 450,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                      'Paste a dataset you are authorized to use. It stays in memory for this session.'),
-                  const SizedBox(height: 14),
-                  TextField(
-                    key: const Key('live-dataset-input'),
-                    controller: controller,
-                    obscureText: true,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    decoration: const InputDecoration(
-                        labelText: 'Dataset hex (advanced)'),
-                  ),
-                  if (failed) ...[
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Credential import failed. Check the dataset and try again.',
-                      key: Key('live-import-error'),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed:
-                    submitting ? null : () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                key: const Key('live-import-submit'),
-                onPressed: submitting
-                    ? null
-                    : () async {
-                        final input = controller.text;
-                        controller.clear();
-                        if (input.isEmpty || input.length > 508) {
-                          updateDialog(() => failed = true);
-                          return;
-                        }
-                        updateDialog(() {
-                          submitting = true;
-                          failed = false;
-                        });
-                        try {
-                          final next = await _api
-                              .credentials(input)
-                              .timeout(const Duration(seconds: 38));
-                          if (!dialogContext.mounted) return;
-                          setState(() => _state = next);
-                          Navigator.pop(dialogContext);
-                        } catch (_) {
-                          if (dialogContext.mounted) {
-                            updateDialog(() {
-                              submitting = false;
-                              failed = true;
-                            });
-                          }
-                        }
-                      },
-                child: const Text('Import'),
-              ),
-            ],
-          ),
-        ),
-      );
-    } finally {
-      controller.clear();
-      controller.dispose();
-    }
+    final next = await showDialog<LiveState>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => CredentialSetupDialog(importDataset: _api.credentials),
+    );
+    if (mounted && next != null) setState(() => _state = next);
   }
 
   String _probeSummary(LiveProbe? probe) {
@@ -296,7 +219,7 @@ class _LiveScreenState extends State<LiveScreen> {
                               ? null
                               : _importCredentials,
                       icon: const Icon(Icons.key_outlined),
-                      label: const Text('Import credentials'),
+                      label: const Text('Set up network access'),
                     ),
                   ],
                 ),
@@ -320,13 +243,15 @@ class _LiveScreenState extends State<LiveScreen> {
                   Text(
                     state.credentialAvailable
                         ? 'Credentials ready for ${state.credentialNetworkName ?? 'your network'}'
-                        : 'Import credentials to check a router.',
+                        : 'Set up network access to check a router.',
                     key: const Key('live-credentials-status'),
                   ),
                   const SizedBox(height: 10),
                   for (var i = 0; i < state.routers.length; i++)
                     _routerCard(state.routers[i], i, state.credentialAvailable),
-                  if (state.routers.isEmpty)
+                  if (state.routers.isEmpty &&
+                      state.discoveryStatus != 'idle' &&
+                      state.discoveryStatus != 'unsupported')
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text('No routers found. Try Find routers again.'),
@@ -394,7 +319,7 @@ class _LiveScreenState extends State<LiveScreen> {
       return 'Find border routers on your local network.';
     }
     if (!state.credentialAvailable) {
-      return 'Import credentials, then check a router.';
+      return 'Set up network access, then check a router.';
     }
     if (state.routers.any((router) => router.probe?.verified == true)) {
       return 'A router matches your imported network. Check others individually.';
