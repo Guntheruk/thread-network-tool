@@ -26,6 +26,7 @@ Source milestone: `a08b2c0b8b649c0ac34d6f5c3d282ebac5b4c9bd`.
 - Flutter release web build passed. It emitted a Cupertino font-family warning; the inspected UI uses Material icons and rendered normally.
 - In-app browser visual check passed for target selection and review; join control visibly disabled. Local screenshot: build/evidence/preview-review.png (ignored build artifact).
 - One authorized live Eero read at 14:30 UTC returned the built-in timeout (exit 124). Authentication, current dataset, and pending state remain unknown from this attempt. No key material was logged. The subsequent firewall UI inspection could not proceed because the Mac was locked. Do not attribute the timeout to the firewall as an established cause.
+- A retry at 16:05 UTC, after the owner allowed the helper's Little Snitch connection, completed successfully (exit 0): authenticated=true, identity_match=match, active_status=read, pending_status=empty. This verifies the new native probe against one Eero; it does not establish other vendors, restart persistence, or app UI integration. The probe performed GET operations only; household identifiers and credentials remain outside this repository.
 
 ## Running preview and reproducibility
 
@@ -36,7 +37,7 @@ Build instructions: README.md. Root build output is build/native; optional-probe
 ## Next work and gates
 
 1. Implement real native discovery and bind authenticated results into the app, keeping advertised identity provisional until read.
-2. Complete a successful live read after checking endpoint/interface/firewall permission; the timed-out attempt is not compatibility proof.
+2. First successful live native read is complete for one Eero. Preserve its bounded read-only behavior when integrating discovery and UI results; broader device/platform compatibility still requires separate checks.
 3. Native Mac/iPhone packaging needs full Xcode. This Mac has Command Line Tools only. Windows and phone builds/runtime tests remain unverified.
 4. Add supported credential providers; Apple entitlement and actual Google/Nest command support remain unresolved. HA stays optional.
 5. Validate joining on a controlled empty/new source network before adding mutating application commands. Existing accessory transfer can remain unsupported with an explicit explanation; never reset devices automatically.
