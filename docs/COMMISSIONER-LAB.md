@@ -80,8 +80,9 @@ An external kill or host failure may prevent a JSON report.
    the source audit and executable capability permit GET operations only.
 4. The runtime uses the complete isolation/deadline/resource command above;
    reports omit datasets, keys, PSKc, endpoints, labels and raw subprocess output.
-5. `python3 tests/tools/test_commissioner_lab.py -v` passes six tests covering
-   strict success classification, wrong-key construction, malformed/oversized
+5. `python3 tests/tools/test_commissioner_lab.py -v` passes eight tests covering
+   strict success classification, exact baseline Active Timestamp comparison,
+   malformed/duplicate timestamp TLVs, wrong-key construction, malformed/oversized
    output, bounded probe timeout, typed timeout outcome and report redaction.
 
 The lab's JSON contains only fixed pins, enumerated stages/errors and boolean
@@ -89,14 +90,14 @@ checks. Its random synthetic credentials live only in runtime memory/tmpfs.
 This stage establishes no vendor support, router restart persistence, physical
 radio behavior, packaged macOS sandbox networking, or network move capability.
 
-## Recorded evidence
+## Historical initial run
 
 On 25 October 2026, the frozen image built successfully offline and the corrected
 runtime exited **0**, `stage: complete`, with all six checks true. This exercised
-the exact production Probe function, including Active Timestamp, through real
+the exact production Probe function, including an Active Timestamp format check, through real
 Commissioner DTLS and Border Agent GET requests over loopback platform UDP.
 
-Final image ID: `sha256:7448126f05e5f3617e58a06b9dce0b8f083efacaf7ed169cea43edc64bcc8d29`.
+Historical image ID: `sha256:7448126f05e5f3617e58a06b9dce0b8f083efacaf7ed169cea43edc64bcc8d29`.
 The run command above used this immutable ID instead of the tag and the unique
 name `tnt-commissioner-read-20261025-retry`. It retained every isolation flag.
 `docker inspect` after completion reported no such object: `--rm` had already
@@ -129,3 +130,43 @@ unknown command labels/error details cannot leak secrets. Stage 1 establishes
 a real read-only Commissioner/Border Agent path in this simulator arrangement.
 A Petition/Pending SET adapter, source authorization, propagation, convergence,
 one-shot dispatch and observation/recovery remain separate Stage 2 work.
+
+## Exact timestamp repair and new runtime proof
+
+Independent review found that the initial classifier accepted any timestamp
+matching the 16-hex-digit format. A regression using `ffffffffffffffff` against
+baseline `00000000000a0000` failed before the repair: the old classifier returned
+true. The corrected classifier extracts type 14 from each exact simulator Active
+Dataset and requires the authenticated probe's timestamp to equal those eight
+bytes. Missing, duplicate, truncated and incorrectly sized timestamp TLVs fail
+closed. This fixes the lab's evidence check; production Probe is unchanged.
+
+On 25 October 2026, eight driver tests passed. A new offline image was built in
+fresh Linux context `/tmp/tnt-commissioner-lab-20261025-timestamp`, preserving the
+historical context and manifest. It retains app head
+`4cc1e80e7f1df1b810b252bdef5d729f41d2dde1` and all prior dependency/build pins.
+
+- New image: `sha256:14522db1edfe1186a74ff0de1882b1a9577d24428e80da2542b79c860c5fb6f5`.
+- New driver SHA-256: `abcc13e602ddab47307b9335c7c16d2685d787d6f3f2ec2d7c8f89464be1ef7d`.
+- Dockerfile and app-source manifest hashes remain those recorded above.
+
+The build used `docker build --network none -t tnt-commissioner-lab:20261025-timestamp /tmp/tnt-commissioner-lab-20261025-timestamp`.
+The runtime used exactly:
+
+```sh
+timeout --signal=TERM --kill-after=5s 210s \
+  docker run --rm --name tnt-commissioner-read-20261025-timestamp \
+  --network none --read-only --tmpfs /tmp:mode=1777 \
+  --user 65534:65534 --cap-drop ALL --security-opt no-new-privileges \
+  --pids-limit 64 --memory 1g --cpus 2 \
+  sha256:14522db1edfe1186a74ff0de1882b1a9577d24428e80da2542b79c860c5fb6f5
+```
+
+It exited 0 with this report; exact-name container inspection afterward was
+empty, confirming cleanup. No privileges, TUN, mounts or external networking
+were added. Source and target authenticated checks now include exact timestamp
+comparison with each baseline, not merely formatting.
+
+```json
+{"checks":{"datasets_unchanged":true,"distinct_networks":true,"read_only_capability":true,"source_authenticated":true,"target_authenticated":true,"wrong_pskc_rejected":true},"lab":"commissioner-border-agent-read","pins":{"app":"4cc1e80e7f1df1b810b252bdef5d729f41d2dde1","commissioner":"448f807e3246c46e5b82e4cdc12a9b0fb2a646ae","openthread":"53e8322140dde7b26827332100504507cec9cc4e"},"schema_version":1,"stage":"complete","status":"passed"}
+```

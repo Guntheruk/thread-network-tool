@@ -56,11 +56,27 @@ class CommissionerLabTests(unittest.TestCase):
         good = {"probe_status": "completed", "authenticated": True,
                 "identity_match": "match", "active_status": "read",
                 "pending_status": "empty", "active_timestamp": "00000000000a0000"}
-        self.assertTrue(lab.authenticated((0, good)))
+        self.assertTrue(lab.authenticated((0, good), "00000000000a0000"))
         for field, value in (("authenticated", False), ("identity_match", "mismatch"),
                              ("pending_status", "error"), ("active_timestamp", None)):
-            self.assertFalse(lab.authenticated((0, dict(good, **{field: value}))))
-        self.assertFalse(lab.authenticated((1, good)))
+            self.assertFalse(lab.authenticated((0, dict(good, **{field: value})), "00000000000a0000"))
+        self.assertFalse(lab.authenticated((1, good), "00000000000a0000"))
+
+    def test_mismatched_timestamp_is_rejected(self):
+        result = {"probe_status": "completed", "authenticated": True,
+                  "identity_match": "match", "active_status": "read",
+                  "pending_status": "empty", "active_timestamp": "ffffffffffffffff"}
+        dataset = "0e08" + "00000000000a0000"
+        self.assertFalse(lab.authenticated((0, result), lab.active_timestamp(dataset)))
+        result["active_timestamp"] = "00000000000a0000"
+        self.assertTrue(lab.authenticated((0, result), lab.active_timestamp(dataset)))
+
+    def test_timestamp_baseline_rejects_missing_truncated_duplicate_tlv(self):
+        for dataset in ("", "0e07" + "00" * 7, "0e08" + "00" * 7,
+                        "0e08" + "00" * 8 + "0e08" + "00" * 8,
+                        "0e08" + "00" * 8 + "00", "secret"):
+            with self.assertRaisesRegex(lab.LabError, "invalid_dataset"):
+                lab.active_timestamp(dataset)
 
     def test_wrong_pskc_changes_only_one_key_byte(self):
         dataset = "040f" + "11" * 15

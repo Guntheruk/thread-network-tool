@@ -131,12 +131,34 @@ def probe(dataset, port, runner=subprocess.run):
     return result.returncode, output
 
 
-def authenticated(result):
+def active_timestamp(dataset):
+    try:
+        raw = bytes.fromhex(dataset)
+    except ValueError:
+        raise LabError("invalid_dataset") from None
+    fields = {}
+    offset = 0
+    while offset < len(raw):
+        if offset + 2 > len(raw):
+            raise LabError("invalid_dataset")
+        kind, length = raw[offset:offset+2]
+        offset += 2
+        if offset + length > len(raw) or kind in fields:
+            raise LabError("invalid_dataset")
+        fields[kind] = raw[offset:offset+length]
+        offset += length
+    if 14 not in fields or len(fields[14]) != 8:
+        raise LabError("invalid_dataset")
+    return fields[14].hex()
+
+
+def authenticated(result, expected_timestamp):
     code, output = result
     return (code == 0 and output.get("probe_status") == "completed" and
             output.get("authenticated") is True and output.get("identity_match") == "match" and
             output.get("active_status") == "read" and output.get("pending_status") == "empty" and
-            bool(re.fullmatch(r"[0-9a-f]{16}", output.get("active_timestamp") or "")))
+            bool(re.fullmatch(r"[0-9a-f]{16}", expected_timestamp)) and
+            output.get("active_timestamp") == expected_timestamp)
 
 
 def report(checks, stage, error=None, command=None, cli_error=None):
@@ -146,7 +168,7 @@ def report(checks, stage, error=None, command=None, cli_error=None):
               "checks": {key: checks.get(key) is True for key in CHECKS}}
     if error:
         output["error_code"] = error if error in {"deadline", "simulator_exit", "output_limit",
-            "simulator_command", "missing_value", "missing_pskc", "probe_output", "assertion"} else "unexpected"
+            "simulator_command", "missing_value", "missing_pskc", "probe_output", "invalid_dataset", "assertion"} else "unexpected"
     if error == "simulator_command":
         output["failed_command"] = command if command in {
             "dataset_init", "dataset_channel", "dataset_activetimestamp", "dataset_commit",
@@ -186,7 +208,7 @@ def run():
             raise LabError("assertion")
         for role, dataset, port in zip(("source", "target"), datasets, ports):
             stage = role + "-probe"
-            checks[role + "_authenticated"] = authenticated(probe(dataset, port))
+            checks[role + "_authenticated"] = authenticated(probe(dataset, port), active_timestamp(dataset))
             if not checks[role + "_authenticated"]:
                 raise LabError("assertion")
         stage = "wrong-pskc"
