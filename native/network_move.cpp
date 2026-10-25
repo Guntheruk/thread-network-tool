@@ -111,8 +111,11 @@ bool Operation::Prepare(Request request,std::string& reason) {
 }
 Result Operation::Confirm(Fence& fence) {
     std::scoped_lock lock(dispatch_mutex,mutex_);
-    Result result;result.operation_id=request_.operation_id;
-    if(consumed_){result.reason="operation_consumed";return result;}
+    // A repeated confirmation must preserve this operation's dispatch evidence.
+    // In particular an uncertain SET can never become proof that nothing was sent.
+    Result& result=confirmation_result_;
+    if(consumed_)return result;
+    result.operation_id=request_.operation_id;
     consumed_=true;
     if(!ready_){return result;}
     if(now_()-prepared_at_>std::chrono::seconds(30)){result.reason="review_expired";return result;}

@@ -67,6 +67,7 @@ private:
     Clock now_;
     Request request_;
     Fields source_, target_, pending_;
+    Result confirmation_result_;
     std::chrono::steady_clock::time_point prepared_at_;
     bool ready_ = false, consumed_ = false, prepare_attempted_ = false, dispatched_ = false;
 };
