@@ -1,0 +1,136 @@
+{
+  "base_image_id": "sha256:14522db1edfe1186a74ff0de1882b1a9577d24428e80da2542b79c860c5fb6f5",
+  "default_build": {
+    "ctests_passed": 4,
+    "image_id": "sha256:227493dff8c1e4734b3c00ef40a8b16c22710aea3e756d9c27a261951d44f0b3",
+    "move_worker_present": false,
+    "network_writes": false
+  },
+  "image_id": "sha256:d06ee88cce40159e84fc2041f835c6743c4333be95abe064c8626a53cf26de99",
+  "owned_runtime_containers_remaining": 0,
+  "reports": [
+    {
+      "checks": {
+        "bounded_stdin_guard": true,
+        "connectivity": true,
+        "default_cli_read_only": true,
+        "initial_two_source_routers": true,
+        "loopback_guard": true,
+        "native_authenticated_observation": true,
+        "native_guarded_submission": true,
+        "one_pending_set_invocation": true,
+        "pending_propagated": true,
+        "read_only_oracle": true,
+        "same_partition": true,
+        "source_converged": true,
+        "source_only_petition": true,
+        "source_router_roles": true,
+        "target_unchanged": true,
+        "uncertainty_preserved": true
+      },
+      "dispatch_disposition": "accepted",
+      "lab": "guarded-commissioner-network-move",
+      "pins": {
+        "app_base": "242ba69a085d25b1bb9a4a04187c21553d32dd63",
+        "commissioner": "448f807e3246c46e5b82e4cdc12a9b0fb2a646ae",
+        "openthread": "53e8322140dde7b26827332100504507cec9cc4e"
+      },
+      "scenario": "key-change-older-target",
+      "schema_version": 1,
+      "stage": "complete",
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "bounded_stdin_guard": true,
+        "connectivity": true,
+        "default_cli_read_only": true,
+        "initial_two_source_routers": true,
+        "loopback_guard": true,
+        "native_authenticated_observation": true,
+        "native_guarded_submission": true,
+        "one_pending_set_invocation": true,
+        "pending_propagated": true,
+        "read_only_oracle": true,
+        "same_partition": true,
+        "source_converged": true,
+        "source_only_petition": true,
+        "source_router_roles": true,
+        "target_unchanged": true,
+        "uncertainty_preserved": true
+      },
+      "dispatch_disposition": "accepted",
+      "lab": "guarded-commissioner-network-move",
+      "pins": {
+        "app_base": "242ba69a085d25b1bb9a4a04187c21553d32dd63",
+        "commissioner": "448f807e3246c46e5b82e4cdc12a9b0fb2a646ae",
+        "openthread": "53e8322140dde7b26827332100504507cec9cc4e"
+      },
+      "scenario": "same-key-newer-target",
+      "schema_version": 1,
+      "stage": "complete",
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "bounded_stdin_guard": true,
+        "connectivity": true,
+        "default_cli_read_only": true,
+        "initial_two_source_routers": true,
+        "loopback_guard": true,
+        "native_authenticated_observation": true,
+        "native_guarded_submission": true,
+        "one_pending_set_invocation": true,
+        "pending_propagated": true,
+        "read_only_oracle": true,
+        "same_partition": true,
+        "source_converged": true,
+        "source_only_petition": true,
+        "source_router_roles": true,
+        "target_unchanged": true,
+        "uncertainty_preserved": true
+      },
+      "dispatch_disposition": "uncertain",
+      "lab": "guarded-commissioner-network-move",
+      "pins": {
+        "app_base": "242ba69a085d25b1bb9a4a04187c21553d32dd63",
+        "commissioner": "448f807e3246c46e5b82e4cdc12a9b0fb2a646ae",
+        "openthread": "53e8322140dde7b26827332100504507cec9cc4e"
+      },
+      "scenario": "lost-api-result",
+      "schema_version": 1,
+      "stage": "complete",
+      "status": "passed"
+    }
+  ],
+  "runtime_isolation": {
+    "cap_drop": [
+      "ALL"
+    ],
+    "cpus": 2,
+    "devices": false,
+    "host_mounts": false,
+    "internal_deadline_seconds": 1000,
+    "memory_bytes": 1073741824,
+    "network": "none",
+    "no_new_privileges": true,
+    "outer_kill_after_seconds": 5,
+    "outer_timeout_seconds": 1100,
+    "pids": 64,
+    "privileged": false,
+    "published_ports": false,
+    "read_only_root": true,
+    "tmpfs": "/tmp:mode=1777",
+    "user": "65534:65534"
+  },
+  "schema_version": 1,
+  "sha256": {
+    "Dockerfile.move": "917dcaf1dbb6e26592945fe8da6cb7e6e9454b319ce259419ba9639bed48e999",
+    "move-source.sha256": "fcee2c3325f5b46969c6e418a618e434bfbb68dead3c64149e557feb957a0085",
+    "move_driver.py": "ed11248d03c6386a3ec161ab4cbc98be1c88283cc0db38b35549f6d1bd230f9c"
+  },
+  "unit_checks": {
+    "native_guard_cases": 35,
+    "python_driver_tests": 4
+  }
+}
