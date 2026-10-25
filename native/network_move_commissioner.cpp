@@ -2,6 +2,7 @@
 #include <commissioner/commissioner.hpp>
 #include <memory>
 #include <cstdio>
+#include <algorithm>
 
 namespace tnt::move {
 namespace {
@@ -20,6 +21,7 @@ Fields PendingFields(const PendingOperationalDataset& p) {
     Fields out;
     if(p.mPresentFlags&p.kActiveTimestampBit)out[14]=Number(p.mActiveTimestamp.Encode(),8);
     if(p.mPresentFlags&p.kChannelBit)out[0]=Bytes{p.mChannel.mPage,uint8_t(p.mChannel.mNumber>>8),uint8_t(p.mChannel.mNumber)};
+    if(p.mPresentFlags&p.kLegacyWakeupChannelBit)out[74]=Bytes{p.mLegacyWakeupChannel.mPage,uint8_t(p.mLegacyWakeupChannel.mNumber>>8),uint8_t(p.mLegacyWakeupChannel.mNumber)};
     if(p.mPresentFlags&p.kPanIdBit)out[1]=Number(p.mPanId,2);
     if(p.mPresentFlags&p.kExtendedPanIdBit)out[2]=p.mExtendedPanId;
     if(p.mPresentFlags&p.kNetworkNameBit)out[3]=Bytes(p.mNetworkName.begin(),p.mNetworkName.end());
@@ -35,6 +37,50 @@ Fields PendingFields(const PendingOperationalDataset& p) {
     if(p.mPresentFlags&p.kPendingTimestampBit)out[51]=Number(p.mPendingTimestamp.Encode(),8);
     if(p.mPresentFlags&p.kDelayTimerBit)out[52]=Number(p.mDelayTimer,4);
     return out;
+}
+// Never pass a lossy typed GET through the guard. Empty means exactly zero wire
+// bytes; every nonempty response must be a complete, supported Pending Dataset.
+bool DecodePendingFields(const Bytes& raw, Fields& out) {
+    for(auto& f:out)Wipe(f.second);out.clear();
+    if(raw.empty())return true;
+    if(raw.size()>254)return false;
+    Fields fields;Bytes active;size_t offset=0;
+    auto clear=[&]{for(auto& f:fields)Wipe(f.second);Wipe(active);};
+    while(offset<raw.size()) {
+        if(raw.size()-offset<2){clear();return false;}
+        auto type=raw[offset++];size_t size=raw[offset++];
+        if(size>raw.size()-offset||fields.count(type)){clear();return false;}
+        fields[type]=Bytes(raw.begin()+offset,raw.begin()+offset+size);
+        if(type!=51&&type!=52){active.push_back(type);active.push_back(uint8_t(size));active.insert(active.end(),raw.begin()+offset,raw.begin()+offset+size);}
+        offset+=size;
+    }
+    Fields decoded;std::string reason;
+    bool valid=fields.count(51)&&fields.at(51).size()==8&&Number(fields.at(51))!=UINT64_MAX&&
+        fields.count(52)&&fields.at(52).size()==4&&DecodeDataset(active,decoded,reason);
+    static const std::vector<uint8_t> supported{0,1,2,3,4,5,7,12,14,51,52,53,74};
+    for(const auto& f:fields)if(std::find(supported.begin(),supported.end(),f.first)==supported.end())valid=false;
+    for(auto& f:decoded)Wipe(f.second);
+    Wipe(active);
+    if(!valid){clear();return false;}
+    out=std::move(fields);return true;
+}
+bool BuildPending(const Fields& fields, PendingOperationalDataset& p) {
+    Bytes raw;for(const auto& f:fields){if(f.second.size()>255)return false;raw.push_back(f.first);raw.push_back(uint8_t(f.second.size()));raw.insert(raw.end(),f.second.begin(),f.second.end());}
+    Fields checked;bool valid=DecodePendingFields(raw,checked)&&!checked.empty();Wipe(raw);
+    for(auto& f:checked)Wipe(f.second);
+    if(!valid)return false;
+    p.mPresentFlags=p.kActiveTimestampBit|p.kChannelBit|p.kChannelMaskBit|p.kExtendedPanIdBit|p.kMeshLocalPrefixBit|
+        p.kNetworkMasterKeyBit|p.kNetworkNameBit|p.kPanIdBit|p.kPSKcBit|p.kSecurityPolicyBit|p.kPendingTimestampBit|p.kDelayTimerBit;
+    p.mActiveTimestamp=Timestamp::Decode(Number(fields.at(14)));
+    p.mChannel={fields.at(0)[0],uint16_t(Number(Bytes(fields.at(0).begin()+1,fields.at(0).end())))};
+    if(fields.count(74)){p.mPresentFlags|=p.kLegacyWakeupChannelBit;p.mLegacyWakeupChannel={fields.at(74)[0],uint16_t(Number(Bytes(fields.at(74).begin()+1,fields.at(74).end())))};}
+    p.mPanId=uint16_t(Number(fields.at(1)));p.mExtendedPanId=fields.at(2);
+    p.mNetworkName=std::string(fields.at(3).begin(),fields.at(3).end());p.mPSKc=fields.at(4);p.mNetworkMasterKey=fields.at(5);p.mMeshLocalPrefix=fields.at(7);
+    const auto& policy=fields.at(12);p.mSecurityPolicy.mRotationTime=uint16_t((policy[0]<<8)|policy[1]);p.mSecurityPolicy.mFlags=Bytes(policy.begin()+2,policy.end());
+    const auto& masks=fields.at(53);size_t offset=0;
+    while(offset<masks.size()){ChannelMaskEntry entry;entry.mPage=masks.at(offset++);size_t size=masks.at(offset++);entry.mMasks=Bytes(masks.begin()+offset,masks.begin()+offset+size);offset+=size;p.mChannelMask.push_back(entry);}
+    p.mPendingTimestamp=Timestamp::Decode(Number(fields.at(51)));p.mDelayTimer=uint32_t(Number(fields.at(52)));
+    auto projected=PendingFields(p);bool exact=projected==fields;for(auto& f:projected)Wipe(f.second);return exact;
 }
 void WipePending(PendingOperationalDataset& p){Wipe(p.mNetworkMasterKey);Wipe(p.mPSKc);}
 class Adapter final:public Transport {
@@ -56,10 +102,10 @@ public:
     void ResetReadSessions() override {source_=nullptr;sessions_.clear();}
     ReadResult Read(const Endpoint& endpoint,const Bytes& pskc) override {
         ReadResult read;auto session=Connect(endpoint,pskc);if(!session)return read;
-        PendingOperationalDataset pending;
+        Bytes pending;
         Trace("active_begin");auto active_error=session->commissioner->GetRawActiveDataset(read.active,0);Trace("active_result",int(active_error.GetCode()));if(active_error!=ErrorCode::kNone)return read;
-        Trace("pending_begin");auto pending_error=session->commissioner->GetPendingDataset(pending,0);Trace("pending_result",int(pending_error.GetCode()));if(pending_error!=ErrorCode::kNone){WipePending(pending);return read;}
-        read.pending=PendingFields(pending);WipePending(pending);read.ok=true;return read;
+        Trace("pending_begin");auto pending_error=session->commissioner->GetRawPendingDataset(pending,0);Trace("pending_result",int(pending_error.GetCode()));if(pending_error!=ErrorCode::kNone){Wipe(pending);return read;}
+        read.ok=DecodePendingFields(pending,read.pending);Wipe(pending);return read;
     }
     bool PetitionSource(const Endpoint& endpoint,const Bytes& pskc) override {
         source_=Connect(endpoint,pskc);if(!source_)return false;
@@ -68,16 +114,7 @@ public:
     Disposition SetSourcePending(const Fields& fields) override {
         if(!source_)return Disposition::proven_not_sent;
         PendingOperationalDataset p;
-        p.mPresentFlags=p.kActiveTimestampBit|p.kChannelBit|p.kChannelMaskBit|p.kExtendedPanIdBit|p.kMeshLocalPrefixBit|
-            p.kNetworkMasterKeyBit|p.kNetworkNameBit|p.kPanIdBit|p.kPSKcBit|p.kSecurityPolicyBit|p.kPendingTimestampBit|p.kDelayTimerBit;
-        p.mActiveTimestamp=Timestamp::Decode(Number(fields.at(14)));
-        p.mChannel.mPage=fields.at(0).at(0);p.mChannel.mNumber=uint16_t((fields.at(0).at(1)<<8)|fields.at(0).at(2));
-        p.mPanId=uint16_t(Number(fields.at(1)));p.mExtendedPanId=fields.at(2);
-        p.mNetworkName=std::string(fields.at(3).begin(),fields.at(3).end());p.mPSKc=fields.at(4);p.mNetworkMasterKey=fields.at(5);p.mMeshLocalPrefix=fields.at(7);
-        const auto& policy=fields.at(12);p.mSecurityPolicy.mRotationTime=uint16_t((policy.at(0)<<8)|policy.at(1));p.mSecurityPolicy.mFlags=Bytes(policy.begin()+2,policy.end());
-        const auto& masks=fields.at(53);size_t offset=0;
-        while(offset<masks.size()) {ChannelMaskEntry entry;entry.mPage=masks.at(offset++);size_t size=masks.at(offset++);entry.mMasks=Bytes(masks.begin()+offset,masks.begin()+offset+size);offset+=size;p.mChannelMask.push_back(entry);}
-        p.mPendingTimestamp=Timestamp::Decode(Number(fields.at(51)));p.mDelayTimer=uint32_t(Number(fields.at(52)));
+        if(!BuildPending(fields,p)){WipePending(p);return Disposition::proven_not_sent;}
         Trace("set_begin");auto error=source_->commissioner->SetPendingDataset(p);Trace("set_result",int(error.GetCode()));WipePending(p);
         // Destroy directly after the synchronous result. Do not enqueue async Disconnect
         // immediately before CommissionerSafe destruction: its one-item Invoke queue

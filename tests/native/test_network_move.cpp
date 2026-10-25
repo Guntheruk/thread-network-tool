@@ -36,7 +36,8 @@ int main(){
         if(expected){Marker marker;auto result=op.Confirm(marker);CHECK(result.disposition==Disposition::accepted);CHECK(fake.sets==1&&fake.petitions==1&&fake.petition_port==1001);CHECK(fake.captured.at(14)==fake.target.at(14));CHECK(fake.captured.at(5)==fake.target.at(5));CHECK(fake.captured.size()==fake.target.size()+2);}
         else CHECK(fake.sets==0&&fake.petitions==0);
     }
-    for(bool source:{false,true}){Fake fake;(source?fake.source:fake.target)[74]={0,0,15};Operation op(fake);std::string reason;CHECK(!Prepare(op,fake,reason));CHECK(reason=="unsupported_dataset_fields");CHECK(fake.reads==0);++cases;}
+    for(bool source:{false,true}){Fake fake;(source?fake.source:fake.target)[74]={0,0,15};Operation op(fake);std::string reason;CHECK(Prepare(op,fake,reason));Marker marker;CHECK(op.Confirm(marker).disposition==Disposition::accepted);CHECK(fake.captured.count(74)==fake.target.count(74));++cases;}
+    for(bool source:{false,true}){Fake fake;(source?fake.source:fake.target)[75]={0,0,15};Operation op(fake);std::string reason;CHECK(!Prepare(op,fake,reason));CHECK(reason=="unsupported_dataset_fields");CHECK(fake.reads==0);++cases;}
     for(unsigned type:{5u,7u,12u,1u,53u}){Fake fake;Operation op(fake);std::string reason;CHECK(Prepare(op,fake,reason));fake.source[uint8_t(type)][0]^=1;Marker marker;auto result=op.Confirm(marker);CHECK(result.disposition==Disposition::proven_not_sent);CHECK(fake.sets==0&&fake.petitions==0);++cases;}
     {Fake fake;Operation op(fake);std::string reason;CHECK(Prepare(op,fake,reason));fake.on_petition=[&]{fake.target[5][0]^=1;};Marker marker;auto r=op.Confirm(marker);CHECK(r.disposition==Disposition::proven_not_sent&&fake.sets==0&&fake.petitions==1);++cases;}
     {Fake fake;fake.source_pending[51]=N(1,8);Operation op(fake);std::string reason;CHECK(!Prepare(op,fake,reason));CHECK(fake.sets==0);++cases;}

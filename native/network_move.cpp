@@ -12,7 +12,7 @@ void Clear(Fields& fields) { for (auto& entry : fields) Wipe(entry.second); fiel
 uint64_t Integer(const Bytes& bytes) { uint64_t value = 0; for (auto byte : bytes) value = (value << 8) | byte; return value; }
 Bytes Encode(uint64_t value, size_t size) { Bytes result(size); for(size_t i=size;i>0;--i) { result[i-1]=value&255; value>>=8; } return result; }
 bool Representable(const Fields& fields) {
-    static const std::vector<uint8_t> allowed{0,1,2,3,4,5,7,12,14,53};
+    static const std::vector<uint8_t> allowed{0,1,2,3,4,5,7,12,14,53,74};
     return std::all_of(fields.begin(), fields.end(), [](const auto& entry) {
         return std::find(allowed.begin(), allowed.end(), entry.first) != allowed.end();
     });
@@ -51,6 +51,10 @@ bool DecodeDataset(const Bytes& bytes, Fields& fields, std::string& reason) {
     Dataset parsed;std::string error;
     if(!ParseDataset(hex.str().c_str(),parsed,error)||result.count(51)||result.count(52)||
        !result.count(14)||result[14].size()!=8||Integer(result[14])==UINT64_MAX) {Clear(result);return false;}
+    if(result.count(74)) {
+        const auto& wake=result.at(74);
+        if(wake.size()!=3||wake[0]!=0||wake[1]!=0||wake[2]<11||wake[2]>26){Clear(result);return false;}
+    }
     // A full operational snapshot includes every mandatory Active Dataset component.
     for(auto type:{0,1,2,3,4,5,7,12,14,53})if(!result.count(type)){Clear(result);return false;}
     fields=std::move(result);return true;

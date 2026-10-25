@@ -1,7 +1,7 @@
 {
   "patch": "legacy-wakeup-channel.patch",
-  "patch_sha256": "058610706ec0c7f80b8484c536ae67ab91b20ec1211ac9895c7240389cfa4f57",
-  "profile": "legacy-wakeup-channel-page0-11-26-v1",
+  "patch_sha256": "bd24b1717c9ad9fe787b121f801d97cf72f8326a10735253cb45d93cf7c1f3ff",
+  "profile": "legacy-wakeup-channel-raw-pending-page0-11-26-v2",
   "required_options": {
     "OT_COMM_APP": "OFF",
     "OT_COMM_CCM": "OFF",

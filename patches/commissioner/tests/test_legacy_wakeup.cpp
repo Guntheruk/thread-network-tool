@@ -131,5 +131,8 @@ int main() {
     using PublicPendingSetter=Error (Commissioner::*)(const PendingOperationalDataset &);
     PublicPendingSetter setter=static_cast<PublicPendingSetter>(&Commissioner::SetPendingDataset);
     check(setter != nullptr,"existing public typed Pending SET remains available");
+    using RawPendingGetter=Error (Commissioner::*)(ByteArray &, uint16_t);
+    RawPendingGetter getter=static_cast<RawPendingGetter>(&Commissioner::GetRawPendingDataset);
+    check(getter != nullptr,"bounded read-only raw Pending GET public API available");
     std::cout << checks << " native checks; 3 roundtrips; " << negatives << " negative codec fixtures passed\n";
 }
