@@ -142,6 +142,13 @@ authorize licence selection, publication, analytics or signup collection.
   credential generation; current successful reads are still required. Target
   credential replacement retains that membership. The focused regression
   passes and independent review found no further census issue.
+- Hosted CI at `03f8f60` exposed two portability failures after Flutter analysis
+  and all 96 widget tests passed: the optional Commissioner header was included
+  in core-only builds, and Dart temporary staging was not private on Linux.
+  The include is now conditional and POSIX staging uses atomically private
+  `mktemp -d` before any session secret is written. The local access-boundary
+  regression and direct macOS core-only compilation pass; fresh hosted CI is
+  required to verify Linux and the final combined head.
 
 ## Implemented
 
