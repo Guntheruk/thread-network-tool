@@ -52,5 +52,5 @@ flutter {
 dependencies {
     // Preferred Thread credentials are held by Google Play services, not Home APIs.
     implementation("com.google.android.gms:play-services-threadnetwork:16.3.0")
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }

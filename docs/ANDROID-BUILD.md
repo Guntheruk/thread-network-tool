@@ -77,10 +77,13 @@ check must run before that result can be claimed.
 The first hosted Android run, `40221044175` at `0016ea7`, reached
 `:app:checkDebugAarMetadata` and found that the pinned Thread Network SDK
 requires core library desugaring. The app module now enables it and pins
-`com.android.tools:desugar_jdk_libs:2.0.3`, using the
+`com.android.tools:desugar_jdk_libs:2.1.3`, matching the pinned Google Thread
+SDK's `META-INF/com/android/build/gradle/aar-metadata.properties`. The
 [Android Gradle configuration](https://developer.android.com/studio/write/java8-support)
-documented for AGP 7.4 and newer. A new hosted run is required to establish
-whether Kotlin compilation and APK packaging pass; the first run did not.
+documents the required flag and dependency form. The SDK metadata also
+requires AGP 8.2.0 or newer; this project pins AGP 9.1.0. A new hosted run is
+required to establish whether Kotlin compilation and APK packaging pass; the
+first run did not.
 
 The Dart channel contract can be tested with
 `cd app && ../.tooling/flutter/bin/flutter test test/android_credentials_test.dart`.
