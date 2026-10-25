@@ -39,3 +39,9 @@ native Kotlin/Swift bridge for consent and read-only capability enumeration,
 followed by testing one actual Nest model. The shared Flutter interface can reuse
 the same states, but it must not display an operational Google connection before
 that bridge exists. Home Assistant and AI remain optional.
+
+Desktop clarification: Apple's own preferred-credential API is documented for
+macOS 13+ as well as iOS. This is a separate possible Mac credential provider,
+not a desktop Google Home SDK. Its entitlement/signing and runtime behavior in
+this app remain unverified. Consumer credential setup, including the eero app's
+observed copy route, is specified in [INTERFACE.md](INTERFACE.md).

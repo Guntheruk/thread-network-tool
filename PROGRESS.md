@@ -6,6 +6,12 @@ Build the four-platform Flutter/C++ application. Automatic transfer of existing 
 
 No home-network writes, resets, accessory removal, credential regeneration, public release or purchases were performed during this build. The owner subsequently authorized a private GitHub repository and PR reviews.
 
+The owner also clarified that ordinary users must not need to understand or find
+hex datasets unaided. Planned credential setup combines supported consent-based
+retrieval with guided vendor-app copying; the observed eero app exposes an
+Active operational dataset field. See docs/INTERFACE.md. The current manual
+dialog has not yet been replaced, and no credential provider is implemented.
+
 ## Implemented
 
 Previous source milestone: `563ffe0df6a092246aa72e847734b8e7eafdb03a`. This continuation simplifies the interface using the Recursive Systems visual direction, records Google Home and migration beta scope, and sets up GitHub PR checks.
@@ -70,7 +76,7 @@ Build instructions: README.md, docs/LIVE-READ-CONTRACT.md and docs/MACOS-BUILD.m
 1. Real discovery, live UI reads and the direct native adapter are implemented and verified as described above. Preserve the observation/authentication distinction; broader device/platform compatibility still requires separate checks.
 2. The packaged macOS window, bundled helper, sandboxed discovery and synthetic imports are verified. Verify a specifically authorized authenticated read from that packaged sandbox next; direct-adapter reads do not establish this path. Distribution signing remains unconfigured, and Intel execution has not been tested.
 3. Windows and phone native networking, builds/runtime tests and credential-provider integration remain unverified. Their current native entry points explicitly report unavailable.
-4. Add supported credential providers; Apple entitlement and actual Google/Nest command support remain unresolved. HA stays optional.
+4. Add consumer credential setup: a guided eero dataset-copy route, then test the documented Apple macOS/iPhone consent APIs and Android Thread SDK. Keep raw import under Advanced and check returned network identity. Apple entitlement/runtime access and actual Google/Nest command support remain unresolved. HA stays optional.
 5. Validate joining on a controlled empty/new source network before adding mutating application commands. Existing accessory transfer can remain unsupported with an explicit explanation; never reset devices automatically.
 6. Review dependency versions/licenses, complete release notices, choose project license, and arrange signing before publication.
 

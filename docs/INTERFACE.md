@@ -37,3 +37,46 @@ actually available.
 Verification includes narrow and desktop layouts, long names, enlarged text,
 loading/error/unsupported states, detail disclosure, credential clearing, report
 redaction and the disabled join control. Visual checks are separate from unit tests.
+
+## Credential setup for ordinary users
+
+Owner correction: asking people to find a hexadecimal dataset is not a finished
+consumer setup flow. The current manual dialog remains a development capability;
+the following flow is planned, not implemented.
+
+The primary action should be **Set up network access**. Explain that access lets
+the app check the selected network and does not change it. Offer only working
+routes for the current platform, with manual dataset entry under **Advanced**.
+
+1. **Use saved credentials**, where a native provider is implemented: request OS
+   consent, retrieve the available credentials, validate them internally and
+   confirm the network identity. Do not assume the phone's preferred network is
+   the one the user selected. An unavailable provider must not look connected.
+2. **Get credentials from eero**: guide the person to Thread settings in the eero
+   app, copy the field labelled **Active operational dataset**, then return and
+   paste. The app validates the data without requiring the person to interpret
+   hex. The separate **Thread Network Key** is insufficient. The owner's app
+   screenshot on 25 October 2026 shows both the dataset field and tap-and-hold
+   copying; confirm app-version differences rather than inventing a universal
+   menu path. Never suggest regenerating credentials for this task.
+3. If a supported route is unavailable, say whether access was declined,
+   credentials were absent, permissions are missing, or the platform is not
+   supported. Give a specific next step without resetting a router or device.
+
+Apple documents consent-based preferred-credential retrieval on macOS 13+ and
+iPhone. The local Xcode SDK also contains the ThreadNetwork framework. Those are
+implementation leads, not proof that our locally signed app has the required
+access. Test the Mac provider and entitlement path before requiring a phone
+handoff. [Apple credential API](https://developer.apple.com/documentation/threadnetwork/thclient/retrievepreferredcredentials(_:)),
+[Apple entitlement requirements](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.networking.manage-thread-network-credentials).
+
+Android's Thread Network SDK provides a consent flow for stored preferred or
+network-specific credentials. eero documents syncing its credentials into Apple
+and Google mobile keychains. A desktop-to-phone handoff needs a separately
+implemented secure transfer; it must not put credentials in a URL or report.
+[Google Thread SDK](https://developers.home.google.com/thread),
+[eero Thread guide](https://eero.zendesk.com/hc/en-us/articles/360000104706-What-is-Thread).
+
+Router discovery reveals advertisements, not secret credentials. Keep provider
+authorization, dataset validation and authenticated router verification as
+separate internal states while presenting each next action in ordinary language.
