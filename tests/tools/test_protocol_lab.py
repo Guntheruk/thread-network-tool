@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import signal
 import unittest
 
 MODULE = Path(__file__).resolve().parents[2] / "tools/lab/protocol_lab.py"
@@ -72,6 +73,40 @@ class ProtocolLabTests(unittest.TestCase):
             self.assertEqual(node.calls, 2)
         finally:
             lab.time.sleep = original_sleep
+
+    def test_overall_deadline_during_ping_does_not_retry(self):
+        class FakeNode:
+            calls = 0
+            def cmd(self, _command):
+                self.calls += 1
+                return "Done\n"
+            def _read_until(self, _pattern, _timeout):
+                signal.raise_signal(signal.SIGALRM)
+
+        node = FakeNode()
+        prior_handler = signal.getsignal(signal.SIGALRM)
+        signal.signal(signal.SIGALRM, lab.overall_deadline_signal)
+        try:
+            with self.assertRaises(lab.OverallDeadlineExceeded):
+                lab.ping_reachable(node, "fd00::1", attempts=5)
+            self.assertEqual(node.calls, 1)
+        finally:
+            signal.signal(signal.SIGALRM, prior_handler)
+
+    def test_overall_deadline_has_typed_redacted_report(self):
+        original_node = lab.Node
+        def expired(_number):
+            raise lab.OverallDeadlineExceeded()
+        lab.Node = expired
+        try:
+            result, exit_code = lab.run()
+        finally:
+            lab.Node = original_node
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error_code"], "overall_deadline")
+        self.assertEqual(result["pending_set_calls"], 0)
+        self.assertNotIn("dataset", str(result))
 
 
 if __name__ == "__main__":

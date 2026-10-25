@@ -86,6 +86,29 @@ Its isolated Linux run exited 0 with this allowlisted report:
 {"checks":{"connectivity":true,"same_partition":true,"source_converged":true,"source_distinct_before":true,"source_propagated":true,"source_router_roles":true,"target_unchanged":true},"lab":"openthread-network-pending-set","pending_set_calls":1,"schema_version":1,"stage":"complete","status":"passed"}
 ```
 
+### Overall deadline review repair
+
+Review of head `dce9d30b3e06d7ba7bdd8d2f746f365a6a51a9a2` found that the
+one-shot SIGALRM raised ordinary `TimeoutError`. If it fired while waiting for
+a ping response, `ping_reachable` treated it as a retryable ping timeout. An
+accelerated signal reproduction returned `False` after two ping commands,
+instead of stopping at the overall deadline. The fix gives SIGALRM and SIGTERM
+a distinct `OverallDeadlineExceeded` exception, which propagates through ping
+retries and produces `error_code: overall_deadline` in the allowlisted failure
+report. Ordinary per-ping timeouts remain retryable. Two focused regression
+tests check one ping maximum after the overall deadline and the typed report;
+all eight protocol-lab tests pass.
+
+The repaired driver SHA-256 is
+`a26a4a9daf27fe01b93a7e1f9a3660524c424d6d1bba4f02ffaec495023a84e7`.
+It was rebuilt offline against the same source and base pins above; the image
+ID is `sha256:df3c9dd494036c735821c6218644bba47d26e7e0b3e94db24560094d203e16e8`.
+One full isolated Linux run with `--network none`, read-only filesystem,
+unprivileged UID, and no host mounts exited 0. Its report had the same all-true
+checks and `pending_set_calls: 1` as the JSON above. This run validates the
+normal protocol path with the repaired driver; the accelerated signal test
+validates the deadline failure path.
+
 Local Python tests cover Pending TLV construction, duplicate TLV rejection,
 Pending read classification, retry behavior, and the allowlisted report:
 

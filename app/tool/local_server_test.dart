@@ -134,10 +134,16 @@ Future<void> main() async {
   await writePrivateSessionFile(privatePath, 'private-fixture-token');
   check((await File(privatePath).stat()).mode & 0x3f == 0,
       'session file permissions');
+  check((await root.list().where((entry) =>
+      entry.path.split(Platform.pathSeparator).last.startsWith('.tnt-session-'))
+      .toList()).isEmpty, 'private staging directory leaked');
   try {
-    await writePrivateSessionFile(privatePath, 'replacement');
+    await writePrivateSessionFile(privatePath, 'replacement-secret');
     throw StateError('existing session file replaced');
-  } on FileSystemException {/* Expected: exclusive publication. */}
+  } on FileSystemException catch (error) {
+    check(!error.toString().contains('replacement-secret'),
+        'failure exposed replacement token');
+  }
   check(await File(privatePath).readAsString() == 'private-fixture-token',
       'session overwritten');
   await File('${web.path}/index.html').writeAsString('<p>fixture</p>');

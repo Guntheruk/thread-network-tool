@@ -1,5 +1,7 @@
 #include "dataset.hpp"
+#if defined(TNT_WITH_COMMISSIONER)
 #include "probe.hpp"
+#endif
 #include "discovery.hpp"
 #include <iostream>
 #include <string>

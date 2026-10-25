@@ -122,6 +122,33 @@ authorize licence selection, publication, analytics or signup collection.
   discovery or router communication. Android PR #5 adds a real debug APK
   compile gate; its first hosted run is in progress and device consent remains
   unverified. Neither PR is merged or released.
+- The locally signed universal Mac package built from `4cc1e80` opened the new
+  workflow. Distinct synthetic LabTarget and LabSource datasets populated the
+  correct roles through the real bundled parser; the report showed both roles
+  without network names or credentials. After confirmed process exit and
+  reopening, both roles were empty. The 5-minute default and disabled move
+  control were visible. Screenshots are local ignored artifacts under
+  `build/evidence/native-move-*`. No discovery or household read was performed.
+  The first automated paste left the field empty; typing the fixture succeeded.
+- Independent review found inspection-only probes could leave a prepared move
+  review and its role evidence reusable. A new probe now invalidates the review
+  and that router's role evidence before the native call, including failures.
+  Repreparing requires a fresh role check. The regression first reproduced the
+  stale ready result and now passes. Final analysis is clean, all 96 Flutter
+  tests pass, and the planning/API/loopback scripts pass after this repair.
+- Follow-up review found that a failed probe could erase a source router
+  identified only by an earlier authenticated read. Source membership now
+  survives failed and generic probes within the same discovery and source
+  credential generation; current successful reads are still required. Target
+  credential replacement retains that membership. The focused regression
+  passes and independent review found no further census issue.
+- Hosted CI at `03f8f60` exposed two portability failures after Flutter analysis
+  and all 96 widget tests passed: the optional Commissioner header was included
+  in core-only builds, and Dart temporary staging was not private on Linux.
+  The include is now conditional and POSIX staging uses atomically private
+  `mktemp -d` before any session secret is written. The local access-boundary
+  regression and direct macOS core-only compilation pass; fresh hosted CI is
+  required to verify Linux and the final combined head.
 
 ## Implemented
 

@@ -18,6 +18,14 @@ COMMAND_TIMEOUT = 12
 SETTLE_TIMEOUT = 480
 
 
+class OverallDeadlineExceeded(Exception):
+    """The whole lab's one-shot process deadline has expired."""
+
+
+def overall_deadline_signal(_signum, _frame):
+    raise OverallDeadlineExceeded()
+
+
 def tlvs(hex_text):
     raw = bytes.fromhex(hex_text)
     result = {}
@@ -227,6 +235,8 @@ def run():
         if not checks["target_unchanged"]:
             raise RuntimeError("target_changed")
         return report("passed", checks, "complete"), 0
+    except OverallDeadlineExceeded:
+        return report("failed", checks, stage, "overall_deadline"), 1
     except TimeoutError:
         return report("failed", checks, stage, "deadline"), 1
     except Exception as exc:
@@ -241,11 +251,8 @@ def run():
 
 
 if __name__ == "__main__":
-    def _deadline(_signum, _frame):
-        raise TimeoutError("overall deadline")
-
-    signal.signal(signal.SIGALRM, _deadline)
-    signal.signal(signal.SIGTERM, _deadline)
+    signal.signal(signal.SIGALRM, overall_deadline_signal)
+    signal.signal(signal.SIGTERM, overall_deadline_signal)
     signal.alarm(600)
     result, exit_code = run()
     signal.alarm(0)

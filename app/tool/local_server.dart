@@ -6,8 +6,8 @@ import 'package:thread_network_tool/native/session.dart';
 export 'package:thread_network_tool/native/session.dart';
 
 Future<void> writePrivateSessionFile(String path, String contents) async {
-  // The current local helper is tested on macOS. POSIX mkdtemp creates a
-  // private directory; the final hard link publishes an already-private file.
+  // POSIX mktemp -d creates owner-only staging before any secret is written.
+  // The final hard link publishes an already-private file atomically.
   if (Platform.isWindows) throw const FileSystemException();
   final target = File(path);
   if (await FileSystemEntity.type(path, followLinks: false) !=
@@ -15,7 +15,16 @@ Future<void> writePrivateSessionFile(String path, String contents) async {
     throw const FileSystemException();
   }
   await target.parent.create(recursive: true);
-  final staging = await target.parent.createTemp('.tnt-session-');
+  final created = await Process.run('/usr/bin/mktemp',
+      ['-d', '${target.parent.absolute.path}/.tnt-session-XXXXXX']);
+  if (created.exitCode != 0 || created.stdout is! String) {
+    throw const FileSystemException();
+  }
+  final stagingPath = (created.stdout as String).trimRight();
+  if (!stagingPath.startsWith('${target.parent.absolute.path}/.tnt-session-')) {
+    throw const FileSystemException();
+  }
+  final staging = Directory(stagingPath);
   try {
     if ((await staging.stat()).mode & 0x3f != 0) {
       throw const FileSystemException();
