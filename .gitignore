@@ -1,0 +1,10 @@
+build*/
+.dart_tool/
+.flutter-plugins*
+.packages
+.DS_Store
+*.log
+.env*
+*.xcuserstate
+vendor/
+.tooling/
