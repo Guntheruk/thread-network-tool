@@ -136,6 +136,12 @@ authorize licence selection, publication, analytics or signup collection.
   Repreparing requires a fresh role check. The regression first reproduced the
   stale ready result and now passes. Final analysis is clean, all 96 Flutter
   tests pass, and the planning/API/loopback scripts pass after this repair.
+- Follow-up review found that a failed probe could erase a source router
+  identified only by an earlier authenticated read. Source membership now
+  survives failed and generic probes within the same discovery and source
+  credential generation; current successful reads are still required. Target
+  credential replacement retains that membership. The focused regression
+  passes and independent review found no further census issue.
 
 ## Implemented
 

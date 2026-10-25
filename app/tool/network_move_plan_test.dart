@@ -32,7 +32,8 @@ Future<void> main() async {
     replies['aa:$ip'] = reply('SourceNet', sourceXpan, sourceStamp);
   }
   replies['bb:192.168.5.13'] = reply('TargetNet', targetXpan, targetStamp);
-  final session = LiveSession((arguments, credential) async {
+  var hideSecondSourceAdvertisement = false;
+  Future<NativeReply> native(List<String> arguments, String? credential) async {
     calls.add(arguments.first);
     check({'inspect', 'discover', 'probe'}.contains(arguments.first),
         'unexpected native mutation');
@@ -48,7 +49,7 @@ Future<void> main() async {
           'active_timestamp': credential == 'aa' ? sourceStamp : targetStamp,
         });
       case 'discover':
-        return const NativeReply(0, {
+        return NativeReply(0, {
           'schema_version': 1,
           'discovery_status': 'completed',
           'routers': [
@@ -61,8 +62,10 @@ Future<void> main() async {
             },
             {
               'service_name': 'Source B',
-              'network_name': 'SourceNet',
-              'extended_pan_id': sourceXpan,
+              'network_name':
+                  hideSecondSourceAdvertisement ? 'Unclassified' : 'SourceNet',
+              'extended_pan_id':
+                  hideSecondSourceAdvertisement ? null : sourceXpan,
               'address': '192.168.5.12',
               'port': 10012
             },
@@ -81,7 +84,9 @@ Future<void> main() async {
         return NativeReply(0, result!);
     }
     throw StateError('unreachable');
-  }, now: () => instant);
+  }
+
+  final session = LiveSession(native, now: () => instant);
 
   Map<String, dynamic> request(String targetId, {DateTime? attestedAt}) => {
         'target_router_id': targetId,
@@ -235,6 +240,107 @@ Future<void> main() async {
       'stale reads passed');
   await session.perform('discover', {});
   check(session.currentReview == null, 'rediscovery retained review');
+
+  // B is identifiable as source only through its authenticated role read.
+  // Once identified, a later failed or generic read must not erase it from
+  // the source census while the source credential and discovery are unchanged.
+  hideSecondSourceAdvertisement = true;
+  replies['aa:192.168.5.11'] = reply('SourceNet', sourceXpan, sourceStamp);
+  replies['aa:192.168.5.12'] = reply('SourceNet', sourceXpan, sourceStamp);
+  replies['bb:192.168.5.13'] = reply('TargetNet', targetXpan, targetStamp);
+  final hiddenSession = LiveSession(native, now: () => instant);
+  await hiddenSession
+      .perform('credentials', {'role': 'source', 'dataset': 'aa'});
+  await hiddenSession
+      .perform('credentials', {'role': 'target', 'dataset': 'bb'});
+  await hiddenSession.perform('credentials', {'dataset': 'aa'});
+  await hiddenSession.perform('discover', {});
+  final hiddenIds = (hiddenSession.state['routers'] as List)
+      .map((r) => r['id'] as String)
+      .toList();
+  for (final id in hiddenIds.take(2)) {
+    await hiddenSession.perform('probe', {'role': 'source', 'router_id': id});
+  }
+  await hiddenSession
+      .perform('probe', {'role': 'target', 'router_id': hiddenIds[2]});
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check(
+      plan['decision'] == 'ready_for_lab_review' &&
+          (plan['source_routers'] as List).length == 2,
+      'authenticated-only source B did not join ready census');
+  replies['aa:192.168.5.12'] = {
+    ...reply('SourceNet', sourceXpan, sourceStamp),
+    'pending_status': 'present',
+  };
+  await hiddenSession.perform('probe', {'router_id': hiddenIds[1]});
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check(
+      (plan['source_routers'] as List).length == 2 &&
+          (plan['blockers'] as List).contains('source_read_missing_or_stale'),
+      'generic reprobe shrank authenticated source census');
+  replies['aa:192.168.5.12'] = reply('SourceNet', sourceXpan, sourceStamp);
+  await hiddenSession
+      .perform('probe', {'role': 'source', 'router_id': hiddenIds[1]});
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check(plan['decision'] == 'ready_for_lab_review',
+      'fresh B role read failed to restore ready review');
+
+  await hiddenSession
+      .perform('credentials', {'role': 'target', 'dataset': 'bb'});
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check(
+      (plan['source_routers'] as List).length == 2 &&
+          (plan['blockers'] as List).contains('target_read_missing_or_stale'),
+      'target import erased source membership');
+  await hiddenSession
+      .perform('probe', {'role': 'target', 'router_id': hiddenIds[2]});
+  replies.remove('aa:192.168.5.12');
+  try {
+    await hiddenSession
+        .perform('probe', {'role': 'source', 'router_id': hiddenIds[1]});
+    throw StateError('expected synthetic native failure');
+  } on StateError catch (error) {
+    check(error.message != 'expected synthetic native failure',
+        'synthetic native failure was not raised');
+  }
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check(
+      (plan['source_routers'] as List).length == 2 &&
+          (plan['blockers'] as List).contains('source_read_missing_or_stale'),
+      'throwing reprobe shrank authenticated source census');
+  replies['aa:192.168.5.12'] = reply('SourceNet', sourceXpan, sourceStamp);
+  await hiddenSession
+      .perform('probe', {'role': 'source', 'router_id': hiddenIds[1]});
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check(plan['decision'] == 'ready_for_lab_review',
+      'fresh B role read after failure did not restore readiness');
+
+  await hiddenSession
+      .perform('credentials', {'role': 'source', 'dataset': 'aa'});
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check((plan['source_routers'] as List).length == 1,
+      'source import retained old membership');
+  await hiddenSession
+      .perform('probe', {'role': 'source', 'router_id': hiddenIds[1]});
+  plan =
+      await hiddenSession.perform('network-move/plan', request(hiddenIds[2]));
+  check((plan['source_routers'] as List).length == 2,
+      'fresh source role read failed to reestablish membership');
+  await hiddenSession.perform('discover', {});
+  final rediscovered = (hiddenSession.state['routers'] as List)
+      .map((r) => r['id'] as String)
+      .toList();
+  plan = await hiddenSession.perform(
+      'network-move/plan', request(rediscovered[2]));
+  check((plan['source_routers'] as List).length == 1,
+      'rediscovery retained stale authenticated membership');
   check(calls.every((c) => {'inspect', 'discover', 'probe'}.contains(c)),
       'native mutation call occurred');
 }

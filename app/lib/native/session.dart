@@ -134,6 +134,9 @@ class LiveSession {
   final Map<String, Map<String, dynamic>> _routers = {};
   final Map<String, (String, int)> _endpoints = {};
   final Map<String, String?> _advertisedXpans = {};
+  // Membership learned from authenticated source reads survives later failed
+  // reads. It is scoped to this discovery and source credential generation.
+  final Set<String> _knownSourceCandidates = {};
 
   Map<String, dynamic> get state => {
         'schema_version': 1,
@@ -219,6 +222,7 @@ class LiveSession {
       _roleCredentials[role as String] = _RoleCredential(
           input, name, xpan, channel, timestamp, randomToken(), now());
       _roleReads.remove(role);
+      if (role == 'source') _knownSourceCandidates.clear();
       for (final router in _routers.values) {
         (router['role_probes'] as Map<String, dynamic>).remove(role);
       }
@@ -233,6 +237,7 @@ class LiveSession {
     _invalidateReview();
     _endpoints.clear();
     _advertisedXpans.clear();
+    _knownSourceCandidates.clear();
     _observed = null;
     _discoveryStatus = 'error';
     final result = await native(['discover'], null);
@@ -391,6 +396,12 @@ class LiveSession {
         publicProbe;
     _roleReads.putIfAbsent(role, () => {})[id] = _RoleRead(publicProbe,
         planningMatch, validTimestamp ? readTimestamp : null, slot.generation);
+    if (role == 'source' &&
+        planningMatch &&
+        authenticated == true &&
+        active == 'read') {
+      _knownSourceCandidates.add(id);
+    }
   }
 
   void clear() {
@@ -403,6 +414,7 @@ class LiveSession {
     _routers.clear();
     _endpoints.clear();
     _advertisedXpans.clear();
+    _knownSourceCandidates.clear();
   }
 
   void _invalidateReview() {
@@ -446,13 +458,13 @@ class LiveSession {
     final source = _roleCredentials['source'];
     final target = _roleCredentials['target'];
     final candidates = _routers.entries.where((entry) {
-      final sourceRead = _roleReads['source']?[entry.key];
       final advertisedXpan = _advertisedXpans[entry.key];
       final advertisementSuggestsSource = source != null &&
           (advertisedXpan == source.xpan ||
               (advertisedXpan == null &&
                   entry.value['network_name'] == source.name));
-      return advertisementSuggestsSource || sourceRead?.matchesRole == true;
+      return advertisementSuggestsSource ||
+          _knownSourceCandidates.contains(entry.key);
     }).toList(growable: false);
     final targetRead = _roleReads['target']?[targetId];
     MoveRead? asRead(String role, String id, _RoleRead? value) {
