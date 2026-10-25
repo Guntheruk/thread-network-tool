@@ -134,7 +134,7 @@ Future<NativeLiveApi> _runReview(
       findsOneWidget);
   expect(
       find.descendant(
-          of: review, matching: find.text('Observed source routers (2)')),
+          of: review, matching: find.text('Observed border routers to move (2)')),
       findsOneWidget);
   expect(
       find.descendant(
@@ -179,7 +179,7 @@ void main() {
         find.descendant(
             of: review,
             matching:
-                find.textContaining('A source router has a pending change')),
+                find.textContaining('A router being moved has a pending change')),
         findsOneWidget);
   });
 

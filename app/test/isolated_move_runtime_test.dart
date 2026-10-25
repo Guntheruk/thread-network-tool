@@ -79,8 +79,11 @@ void main() {
       final sourceRouters = discovered.routers
           .where((router) => router.id != targetRouter.id)
           .toList();
-      await tester.pumpWidget(MaterialApp(
-          home: NetworkMoveScreen(api: api, initialState: discovered)));
+      await tester.runAsync(() async {
+        await tester.pumpWidget(MaterialApp(
+            home: NetworkMoveScreen(api: api, initialState: discovered)));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
       await settleReal();
       event('opened');
       await import('target', target);
@@ -154,8 +157,11 @@ void main() {
     await tester.runAsync(() => api.credentialsForRole('source', source));
     final restoredState =
         await tester.runAsync(() => api.credentialsForRole('target', target));
-    await tester.pumpWidget(MaterialApp(
-        home: NetworkMoveScreen(api: api, initialState: restoredState!)));
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MaterialApp(
+          home: NetworkMoveScreen(api: api, initialState: restoredState!)));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
     await settleReal();
     await tap('move-execution-resume');
     event('observing');

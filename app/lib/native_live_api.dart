@@ -12,6 +12,9 @@ class NativeLiveApi implements NetworkMoveExecutionApi {
   @override
   bool get executionAvailable => _session.executionAvailable;
 
+  @override
+  bool get executionRecoveryAvailable => _session.executionRecoveryAvailable;
+
   Future<Object?> _execution(String action, Map<String, dynamic> body) async {
     try {
       return await _session.perform(action, body);

@@ -126,6 +126,7 @@ class LiveSession {
   final DateTime Function() now;
   final NativeMoveAdapter? execution;
   bool get executionAvailable => execution?.available ?? false;
+  bool get executionRecoveryAvailable => execution != null;
   final String _sessionId = randomToken();
   String _discoveryRevision = randomToken();
   final Map<String, String> _fixtureNodes = {};
@@ -193,12 +194,12 @@ class LiveSession {
           final result = await adapter.controller.confirmAndStart(plan);
           return _executionStatus(result);
         case 'network-move/execution/current':
-          final adapter = _execution();
+          final adapter = _execution(requireAvailable: false);
           await adapter.initialize();
           final result = await adapter.controller.current();
           return {'status': result == null ? null : _executionStatus(result)};
         case 'network-move/execution/check':
-          final adapter = _execution();
+          final adapter = _execution(requireAvailable: false);
           final id = safeText(body['operation_id'], 64);
           if (id == null ||
               (body['resume'] != null && body['resume'] is! bool)) {
@@ -207,7 +208,7 @@ class LiveSession {
           return _executionStatus(await adapter.controller
               .checkOutcome(id, resume: body['resume'] == true));
         case 'network-move/execution/stop':
-          final adapter = _execution();
+          final adapter = _execution(requireAvailable: false);
           final id = safeText(body['operation_id'], 64);
           if (id == null) throw const ApiFailure('invalid_operation', 400);
           return _executionStatus(await adapter.controller.stopObservation(id));
@@ -472,8 +473,11 @@ class LiveSession {
       localEndpoint(address) ||
       (executionAvailable && (address == '::1' || address == '127.0.0.1'));
 
-  NativeMoveAdapter _execution() {
-    if (!executionAvailable) throw const ApiFailure('not_found', 404);
+  NativeMoveAdapter _execution({bool requireAvailable = true}) {
+    if (!executionRecoveryAvailable ||
+        (requireAvailable && !executionAvailable)) {
+      throw const ApiFailure('not_found', 404);
+    }
     return execution!;
   }
 
@@ -729,7 +733,7 @@ class LiveSession {
       'inventory_complete': false,
       'delay_seconds': delay,
       'verification':
-          'Fresh source and target reads after propagation; operational accessory reads if any are present.',
+          'After the delay, recheck the routers being moved and the network being kept. Accessories require a separate supported step.',
       'recovery': 'Manual recovery; rollback is not guaranteed.',
     };
     _review = review;

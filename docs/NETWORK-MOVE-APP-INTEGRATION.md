@@ -12,6 +12,12 @@ Linux. The default application and default native build remain read-only.
 `platformLiveApi()` does not construct that assembly or inspect these environment
 variables. No household endpoint can be used by this fixture profile.
 
+Startup mounts local API state before discovery. The mounted screen restores
+the durable journal independently of fixture, manifest and dispatch-worker
+availability, placing an unresolved operation before setup controls. A missing
+fixture cannot hide that fence. Preparation and confirmation still require the
+separate execution capability; read-only recovery does not grant dispatch.
+
 The screen first prepares a read-only review, then requests native preparation,
 then presents separate confirmation. It supplies review IDs only. Session-owned
 private requests retain both credential roles, native dataset commitments,
@@ -49,6 +55,12 @@ router commitments, so refreshed endpoints remain associated with the original
 processes. A replaced process or an endpoint owned by a different process fails
 closed. Names, discovered handles and matching network datasets do not establish
 original-router identity.
+
+Ownership covers the actual IPv6 `::1` destination used by DTLS. IPv4-only
+ownership at the same port is insufficient. More than one applicable IPv6
+socket inode is ambiguous and blocks, including a second process using socket
+reuse options. A sole original-process IPv6 wildcard socket is supported only
+inside the verified namespace containing exactly `lo`.
 
 Each worker arms its independent 1000-second process deadline before parsing
 input and holds an exclusive process lease until it exits. Dispatch writes and

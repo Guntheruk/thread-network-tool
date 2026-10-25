@@ -485,6 +485,7 @@ class NetworkMoveExecutionStatus {
 
 abstract class NetworkMoveExecutionApi implements NetworkMoveApi {
   bool get executionAvailable;
+  bool get executionRecoveryAvailable;
   Future<NetworkMoveExecutionReview> prepareExecution(String reviewId);
   Future<NetworkMoveExecutionStatus> confirmExecution(String reviewId);
   Future<NetworkMoveExecutionStatus?> currentExecution();

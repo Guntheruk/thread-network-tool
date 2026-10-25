@@ -151,6 +151,8 @@ class MoveFake implements NetworkMoveApi {
 class ExecutionMoveFake extends MoveFake implements NetworkMoveExecutionApi {
   @override
   bool get executionAvailable => true;
+  @override
+  bool get executionRecoveryAvailable => true;
   NetworkMoveExecutionStatus? status;
   final actions = <String>[];
   bool failConfirm = false;
@@ -313,7 +315,7 @@ void main() {
       expect(api.actions, ['current', 'prepare:review-id']);
       expect(
         find.textContaining(
-            'The isolated source must have no attached devices'),
+            'Network to move must have no attached devices'),
         findsOneWidget,
       );
       await _tapVisible(tester, const Key('move-execution-confirm'));
@@ -494,7 +496,7 @@ void main() {
       await _ensureVisible(tester, const Key('move-review'));
       expect(find.text('Source router one'), findsWidgets);
       expect(find.text('Source router two'), findsWidgets);
-      expect(find.textContaining('entire source Thread network'), findsWidgets);
+      expect(find.textContaining('accessories are not moved'), findsOneWidget);
       expect(
         find.textContaining('Offline or unobserved devices'),
         findsWidgets,

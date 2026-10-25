@@ -56,7 +56,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
 
   NetworkMoveExecutionApi? get _executionApi =>
       widget.api is NetworkMoveExecutionApi &&
-              (widget.api as NetworkMoveExecutionApi).executionAvailable
+              (widget.api as NetworkMoveExecutionApi).executionRecoveryAvailable
           ? widget.api as NetworkMoveExecutionApi
           : null;
 
@@ -93,6 +93,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
     final plan = _plan;
     final generation = _reviewGeneration;
     if (api == null ||
+        !api.executionAvailable ||
         plan == null ||
         _executionBusy ||
         !_executionStatusVerified ||
@@ -423,39 +424,39 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
 
   String _blocker(String code) {
     const messages = <String, String>{
-      'source_credentials_required': 'Set up source network access.',
-      'target_credentials_required': 'Set up target network access.',
-      'same_network': 'Source and target must be different networks.',
+      'source_credentials_required': 'Set up access to Network to move.',
+      'target_credentials_required': 'Set up access to Network to keep.',
+      'same_network': 'Network to move and Network to keep must be different.',
       'discovery_incomplete': 'Refresh router discovery.',
-      'source_routers_unverified': 'No source routers have been identified.',
+      'source_routers_unverified': 'No border routers to move have been identified.',
       'target_is_source':
-          'The selected target also appears on the source network.',
+          'The selected router also appears on Network to move.',
       'empty_source_attestation_required':
-          'Controlled empty-source evidence is required.',
+          'Confirm that Network to move has no attached devices.',
       'empty_source_attestation_stale':
-          'The controlled empty-source evidence has expired. Establish it again.',
+          'The empty-network evidence has expired. Establish it again.',
       'invalid_delay': 'Choose a supported propagation delay.',
       'source_read_missing_or_stale':
-          'Check every observed source router again.',
+          'Check every observed border router being moved again.',
       'source_identity_unverified':
-          'A source router did not match authenticated source access.',
+          'A router being moved did not match access to Network to move.',
       'source_pending_not_empty':
-          'A source router has a pending change or unknown pending state.',
-      'source_timestamp_unknown': 'A source active timestamp is unknown.',
+          'A router being moved has a pending change or unknown pending state.',
+      'source_timestamp_unknown': 'A router being moved has an unknown active timestamp.',
       'source_timestamp_inconsistent':
-          'Source router active timestamps differ.',
+          'Active timestamps differ among routers being moved.',
       'source_timestamp_mismatch':
-          'A source router active timestamp changed after its check.',
-      'target_read_missing_or_stale': 'Check the target router again.',
+          'A router being moved changed its active timestamp after the check.',
+      'target_read_missing_or_stale': 'Check the router on Network to keep again.',
       'target_identity_unverified':
-          'The target did not match authenticated target access.',
+          'The router did not match access to Network to keep.',
       'target_pending_not_empty':
-          'The target has a pending change or unknown pending state.',
-      'target_timestamp_unknown': 'The target active timestamp is unknown.',
+          'The router on Network to keep has a pending change or unknown pending state.',
+      'target_timestamp_unknown': 'The router on Network to keep has an unknown active timestamp.',
       'target_timestamp_mismatch':
-          'The target active timestamp changed after its check.',
+          'The router on Network to keep changed its active timestamp after the check.',
       'source_advertisement_conflict':
-          'A source advertisement conflicts with authenticated identity.',
+          'An advertisement for a router being moved conflicts with its authenticated identity.',
     };
     return messages[code] ?? 'Additional evidence is required ($code).';
   }
@@ -464,6 +465,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final canExecute = _executionApi?.executionAvailable ?? false;
     final target =
         _state.routers.where((r) => r.id == _targetRouterId).firstOrNull;
     return Scaffold(
@@ -483,14 +485,21 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 Text(
                   _executionApi == null
                       ? 'Read only · No network changes'
-                      : 'Review first · Isolated lab execution available',
+                      : canExecute
+                          ? 'Review first · Isolated lab execution available'
+                          : 'Saved operation recovery · Execution unavailable',
                 ),
                 const SizedBox(height: 12),
                 Text(
                   _executionApi == null
-                      ? 'A move would affect the entire source Thread network and all devices on it. This page only prepares a review; it cannot start a move.'
-                      : 'A move affects the entire source Thread network and all devices on it. The isolated lab route requires a separate execution preparation and confirmation.',
+                      ? 'A move would change the border routers on Network to move so they join Network to keep. Other devices may lose connectivity. Accessories need a separate supported move. This page only prepares a review.'
+                      : 'A move changes the border routers on Network to move so they join Network to keep. Other devices may lose connectivity; accessories need a separate supported move. The isolated lab route requires separate preparation and confirmation.',
                 ),
+                if (_executionApi != null &&
+                    (_executionStatus != null || !_executionStatusVerified)) ...[
+                  const SizedBox(height: 12),
+                  _executionSection(),
+                ],
                 if (_busy) ...[
                   const SizedBox(height: 12),
                   const LinearProgressIndicator(key: Key('move-busy')),
@@ -507,13 +516,13 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 Text('1. Network to keep', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 6),
                 const Text(
-                  'Set up target access, choose its border router, then check it. An advertised name alone does not confirm the network.',
+                  'Set up access to the network you want to keep, choose its border router, then check it. An advertised name alone does not confirm the network.',
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _state.targetCredentialAvailable
-                      ? 'Target access ready: ${_state.targetCredentialNetworkName ?? 'network name unavailable'}'
-                      : 'Target access not set up',
+                      ? 'Network to keep access ready: ${_state.targetCredentialNetworkName ?? 'network name unavailable'}'
+                      : 'Network to keep access not set up',
                   key: const Key('move-target-access-status'),
                 ),
                 const SizedBox(height: 8),
@@ -521,11 +530,11 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   key: const Key('move-target-access'),
                   onPressed: _busy ? null : () => _setUpAccess('target'),
                   icon: const Icon(Icons.key_outlined),
-                  label: const Text('Set up target access'),
+                  label: const Text('Set up Network to keep access'),
                 ),
                 const SizedBox(height: 8),
                 if (_state.routers.isEmpty)
-                  const Text('Find routers before choosing a target.')
+                  const Text('Find routers before choosing one on Network to keep.')
                 else
                   for (final router in _state.routers)
                     ListTile(
@@ -564,19 +573,19 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                               () =>
                                   widget.api.probeForRole('target', target.id),
                             ),
-                    child: const Text('Check target router'),
+                    child: const Text('Check router on Network to keep'),
                   ),
                 const SizedBox(height: 18),
-                Text('2. Source network', style: theme.textTheme.titleLarge),
+                Text('2. Network to move', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 6),
                 const Text(
-                  'Set up separate source access. Check each observed router that may belong to the source network. The planner will list every observed source router together.',
+                  'Set up access to the network whose border routers you want to move. Check each observed router that may belong to it. The review lists those routers together.',
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _state.sourceCredentialAvailable
-                      ? 'Source access ready: ${_state.sourceCredentialNetworkName ?? 'network name unavailable'}'
-                      : 'Source access not set up',
+                      ? 'Network to move access ready: ${_state.sourceCredentialNetworkName ?? 'network name unavailable'}'
+                      : 'Network to move access not set up',
                   key: const Key('move-source-access-status'),
                 ),
                 const SizedBox(height: 8),
@@ -584,7 +593,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   key: const Key('move-source-access'),
                   onPressed: _busy ? null : () => _setUpAccess('source'),
                   icon: const Icon(Icons.key_outlined),
-                  label: const Text('Set up source access'),
+                  label: const Text('Set up Network to move access'),
                 ),
                 const SizedBox(height: 8),
                 for (final router in _state.routers.where(
@@ -601,7 +610,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                             style: theme.textTheme.titleMedium,
                           ),
                           Text(
-                            'Source check: ${_readStatus(router.roleProbes['source'])}',
+                            'Network to move check: ${_readStatus(router.roleProbes['source'])}',
                           ),
                           const SizedBox(height: 6),
                           OutlinedButton(
@@ -616,7 +625,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                                         router.id,
                                       ),
                                     ),
-                            child: const Text('Check as source'),
+                            child: const Text('Check for Network to move'),
                           ),
                         ],
                       ),
@@ -637,12 +646,12 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  '3. Controlled empty-source evidence',
+                  '3. Confirm Network to move is empty',
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'The first supported case requires an operator-controlled inventory showing that the whole source network is empty. Missing advertisements or an empty child table do not establish this.',
+                  'This first supported case requires a controlled inventory showing no attached devices on Network to move. Its border routers remain present. Missing advertisements or an empty child table do not prove this.',
                 ),
                 CheckboxListTile(
                   key: const Key('move-empty-source-attestation'),
@@ -655,7 +664,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                             _clearReview();
                           }),
                   title: const Text(
-                    'I established a controlled inventory and confirm the whole source network has no attached devices.',
+                    'I established a controlled inventory and confirm Network to move has no attached devices.',
                   ),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
@@ -702,7 +711,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                     icon: const Icon(Icons.lock_outline),
                     label: const Text('Start network move · unavailable'),
                   )
-                else
+                else if (_executionStatus == null && _executionStatusVerified)
                   _executionSection(),
                 const SizedBox(height: 8),
                 const Text(
@@ -726,7 +735,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Source network review', style: theme.textTheme.titleLarge),
+            Text('Network to move review', style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
               _reviewExpired
@@ -741,18 +750,18 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
             ),
             const SizedBox(height: 8),
             const Text(
-              'Affected scope: the entire source Thread network and all devices on it.',
+              'Proposed change: move the border routers on Network to move to Network to keep. Other devices may lose connectivity; accessories are not moved by this action.',
             ),
             const Text(
               'Offline or unobserved devices remain unknown. This is not a complete inventory.',
             ),
             const SizedBox(height: 10),
             Text(
-              'Observed source routers (${plan.sourceRouters.length})',
+              'Observed border routers to move (${plan.sourceRouters.length})',
               style: theme.textTheme.titleMedium,
             ),
             if (plan.sourceRouters.isEmpty)
-              const Text('No source routers identified by the planner.'),
+              const Text('No border routers to move identified by the review.'),
             for (final router in plan.sourceRouters)
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -774,10 +783,10 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   : 'Propagation delay: ${plan.delaySeconds} seconds',
             ),
             const Text(
-              'A move could interrupt the source network during propagation.',
+              'A move could interrupt Network to move during propagation.',
             ),
             Text(
-              'Verification schedule: after the proposed propagation delay, ${plan.verification}',
+              'After the propagation delay, recheck the routers being moved and the network being kept.',
             ),
             Text('Recovery: ${plan.recovery}'),
             const Text(
@@ -815,7 +824,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
             if (status == null && review == null) ...[
               FilledButton(
                 key: const Key('move-execution-prepare'),
-                onPressed: _executionBusy ||
+                onPressed: !_executionApi!.executionAvailable ||
+                        _executionBusy ||
                         !_executionStatusVerified ||
                         _confirmationAttempted ||
                         plan == null ||
@@ -837,17 +847,17 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
               Text('Operation: ${review.operationId}'),
               Text('Profile: ${review.profileId}'),
               const Text(
-                'Scope: the whole source Thread network, including offline or unobserved devices.',
+                'Scope: border routers on Network to move. Offline or unobserved devices may be affected; this does not move accessories.',
               ),
               Text(
-                'Observed source routers: ${review.sourceRouterIds.join(', ')}',
+                'Observed border routers to move: ${review.sourceRouterIds.join(', ')}',
               ),
-              Text('Target router: ${review.targetRouterId}'),
+              Text('Router on Network to keep: ${review.targetRouterId}'),
               Text(
                 'Propagation delay: ${review.delaySeconds} seconds; observation: ${review.observationSeconds} seconds.',
               ),
               const Text(
-                'The isolated source must have no attached devices. The move may interrupt it. Manual recovery may be required; rollback is not guaranteed.',
+                'Network to move must have no attached devices in this isolated lab profile. The move may interrupt it. Manual recovery may be required; rollback is not guaranteed.',
               ),
               Text('Confirmation expires: ${review.expiresAt.toLocal()}'),
               FilledButton(

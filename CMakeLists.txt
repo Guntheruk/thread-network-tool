@@ -132,6 +132,10 @@ if(TNT_BUILD_MOVE_LAB OR TNT_BUILD_APP_MOVE_LAB)
         native/network_move_worker_lifecycle.cpp)
       target_include_directories(tnt-move-app-lifecycle-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/native")
       add_test(NAME native-move-app-lifecycle COMMAND tnt-move-app-lifecycle-tests)
+      add_executable(tnt-move-app-socket-owner-tests
+        tests/native/test_network_move_worker_socket_owner.cpp
+        native/network_move_worker_fixture.cpp)
+      target_include_directories(tnt-move-app-socket-owner-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/native")
     endif()
   endif()
 endif()

@@ -197,12 +197,12 @@ void main() {
     final report = liveReport(LiveState.fromJson(data));
     expect(report, contains('Inspection credentials available: no'));
     expect(report, contains('Router reads attempted: 0'));
-    expect(report, contains('Source credentials available: yes'));
-    expect(report, contains('Source router reads attempted: 1'));
-    expect(report, contains('Source authenticated identity matches: 1'));
-    expect(report, contains('Target credentials available: yes'));
-    expect(report, contains('Target router reads attempted: 1'));
-    expect(report, contains('Target authenticated identity matches: 0'));
+    expect(report, contains('Network to move access available: yes'));
+    expect(report, contains('Border router reads for Network to move: 1'));
+    expect(report, contains('Authenticated matches for Network to move: 1'));
+    expect(report, contains('Network to keep access available: yes'));
+    expect(report, contains('Border router reads for Network to keep: 1'));
+    expect(report, contains('Authenticated matches for Network to keep: 0'));
     for (final private in [
       'PrivateMesh',
       'SourceMesh',
