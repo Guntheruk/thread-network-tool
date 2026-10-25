@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 if(NOT TNT_COMMISSIONER_SOURCE)
   message(FATAL_ERROR "Provide the generated patched Commissioner source")
 endif()
-find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
+find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 execute_process(COMMAND "${Python3_EXECUTABLE}"
   "${CMAKE_CURRENT_LIST_DIR}/../../../tools/prepare_commissioner_source.py"
   --verify-only --output "${TNT_COMMISSIONER_SOURCE}"

@@ -15,9 +15,9 @@ the separate native-window checks below record the current evidence.
 - CMake, supplied by `TNT_CMAKE_BIN` or available on `PATH`.
 - A clean checkout of OpenThread Commissioner at the commit required by the
   manifest, or its verified generated source. Set `TNT_COMMISSIONER_SOURCE` to
-  either input. Python 3.11+ is required (`TNT_PYTHON_BIN` selects it); preparing
+  either input. Python 3.10+ can verify generated source (`TNT_PYTHON_BIN` selects it); preparing
   from Git additionally requires `tarfile.data_filter` (Python 3.12+ or a
-  security-patched 3.11). The build
+  security-patched interpreter providing that API). The build
   script requires the optional authenticated probe and confirms the resulting
   helper reports `authenticated_probe: true` and `network_writes: false`.
 
@@ -148,7 +148,7 @@ python3 /absolute/context/app-source/tools/prepare_commissioner_source.py \
 Include the preparer, manifest and patch in the current app-source checksum
 manifest. Both Dockerfiles verify the generated tree before and after compiling;
 the image keeps its provenance and original license files. Frozen images may
-have Python 3.11: they only run verification, which requires no archive extraction
+have Python 3.10: they only run verification, which requires no archive extraction
 filter. No Python download or package installation is required. The original
 clean Git cache remains available for the Stage 1 independent pin audit, but is
 not the configured application dependency. Existing frozen Docker image IDs,

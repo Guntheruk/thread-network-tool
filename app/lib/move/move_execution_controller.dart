@@ -121,8 +121,7 @@ class MoveExecutionController {
     var reason = 'worker_uncertain';
     try {
       final result = await worker(plan);
-      disposition =
-          result.operationId == plan.operationId &&
+      disposition = result.operationId == plan.operationId &&
               result.disposition != MoveDisposition.unknown
           ? result.disposition
           : MoveDisposition.uncertain;
@@ -289,8 +288,7 @@ class MoveExecutionController {
     // A definite native rejection can be reconciled as unchanged. An uncertain
     // send can never use this route: a delayed accepted update may look unchanged.
     final rejected = record.disposition == MoveDisposition.rejected;
-    final matching =
-        bindings.join(',') == record.routerBindings.join(',') &&
+    final matching = bindings.join(',') == record.routerBindings.join(',') &&
         evidence.sources.every(
           (e) => valid(
             e,
@@ -300,18 +298,14 @@ class MoveExecutionController {
         evidence.target.binding == record.targetRouterBinding &&
         valid(evidence.target, record.targetCommitment);
     final samples = [evidence.target, ...evidence.sources];
-    final sampleAt = samples
-        .map((e) => e.checkedAt)
-        .reduce((a, b) => a.isBefore(b) ? a : b);
-    final continuous =
-        record.stableLast != null &&
+    final sampleAt =
+        samples.map((e) => e.checkedAt).reduce((a, b) => a.isBefore(b) ? a : b);
+    final continuous = record.stableLast != null &&
         !record.stableLast!.isAfter(at) &&
         at.difference(record.stableLast!) <= const Duration(seconds: 30);
-    final since = matching
-        ? (continuous ? record.stableSince : sampleAt)
-        : null;
-    final complete =
-        matching &&
+    final since =
+        matching ? (continuous ? record.stableSince : sampleAt) : null;
+    final complete = matching &&
         evidence.workerTerminated &&
         !at.isBefore(record.observeUntil) &&
         !sampleAt.isBefore(record.observeUntil) &&
@@ -323,18 +317,18 @@ class MoveExecutionController {
       record.next(
         complete
             ? rejected
-                  ? MoveStage.verifiedUnchanged
-                  : MoveStage.verifiedComplete
+                ? MoveStage.verifiedUnchanged
+                : MoveStage.verifiedComplete
             : waiting
-            ? MoveStage.observing
-            : MoveStage.needsAttention,
+                ? MoveStage.observing
+                : MoveStage.needsAttention,
         complete
             ? rejected
-                  ? 'verification_unchanged'
-                  : 'verification_complete'
+                ? 'verification_unchanged'
+                : 'verification_complete'
             : waiting
-            ? 'verification_pending'
-            : 'verification_failed',
+                ? 'verification_pending'
+                : 'verification_failed',
         nextStableSince: since,
         nextStableLast: matching ? sampleAt : null,
         resetStability: !matching,

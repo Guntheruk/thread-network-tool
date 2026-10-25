@@ -79,8 +79,8 @@ class Rig {
             datasetCommitment: changed
                 ? hex('9')
                 : sourceUnchanged && record.routerBindings.contains(binding)
-                ? record.sourceCommitment
-                : record.targetCommitment,
+                    ? record.sourceCommitment
+                    : record.targetCommitment,
             checkedAt: staleReads
                 ? clock.subtract(const Duration(seconds: 31))
                 : clock,
@@ -110,19 +110,20 @@ class Rig {
   MoveExecutionPlan plan({
     String id = 'a',
     String profile = isolatedMoveProfile,
-  }) => MoveExecutionPlan(
-    reviewId: hex('0'),
-    operationId: hex(id),
-    profileId: profile,
-    bindingCommitment: hex('1'),
-    sourceCommitment: hex('b'),
-    targetCommitment: hex('c'),
-    targetRouterBinding: hex('f'),
-    routerBindings: [hex('d'), hex('e')],
-    expiresAt: clock.add(const Duration(minutes: 5)),
-    delaySeconds: 300,
-    observationSeconds: 10,
-  );
+  }) =>
+      MoveExecutionPlan(
+        reviewId: hex('0'),
+        operationId: hex(id),
+        profileId: profile,
+        bindingCommitment: hex('1'),
+        sourceCommitment: hex('b'),
+        targetCommitment: hex('c'),
+        targetRouterBinding: hex('f'),
+        routerBindings: [hex('d'), hex('e')],
+        expiresAt: clock.add(const Duration(minutes: 5)),
+        delaySeconds: 300,
+        observationSeconds: 10,
+      );
 }
 
 class FailBegin implements MoveJournal {
@@ -352,7 +353,8 @@ Future<void> main(List<String> args) async {
         expect(
           (await reader.controller.checkOutcome(
             recovered.operationId,
-          )).terminal,
+          ))
+              .terminal,
           'Fresh interval survives retry',
         );
         expect(reader.calls == 0, 'Recovery cannot invoke worker');
@@ -362,9 +364,8 @@ Future<void> main(List<String> args) async {
       await test('read spanning deadline stays pending rejected=$rejected', (
         r,
       ) async {
-        r.disposition = rejected
-            ? MoveDisposition.rejected
-            : MoveDisposition.accepted;
+        r.disposition =
+            rejected ? MoveDisposition.rejected : MoveDisposition.accepted;
         r.sourceUnchanged = rejected;
         final operation = await r.controller.confirmAndStart(r.plan());
         r.clock = r.clock.add(const Duration(seconds: 298));

@@ -279,3 +279,19 @@ Known limits: the native Mac app is a locally signed development build, without 
   Flutter job passed; the tooling job failed because its journal tests lacked
   the helper executable environment. CI now builds those fixtures and provides
   their paths before the full tooling suite. Fresh hosted proof is pending.
+- The tooling fixture repair at `53a740875d77f9c196d6772479ea181ab6ce07af`
+  passed all hosted Checks in run `40241784835`; the unsigned iOS workflow
+  also passed in `40241784788`.
+- PR #8 review found three actionable issues despite earlier local reviews:
+  editable provenance could authorize unrelated dependency source; transient
+  journal contention poisoned cached recovery futures; and a sample spanning
+  the observation deadline could throw instead of remaining pending. Regressions
+  reproduced all three. Source verification now uses a committed independently
+  reconstructed tree digest. Recovery evicts failed cached attempts and requires
+  the sample itself to reach the deadline. The repaired slices passed 37 focused
+  source/resolver/notice checks and 43 real-journal execution checks respectively.
+- Verification of the exact generated source also passed in the frozen Linux
+  image's Python 3.10.12. CMake now permits that interpreter for verification;
+  preparing archives still requires the safe `tarfile.data_filter` API. Python
+  tar transport preserved the committed tree; Mac tar AppleDouble extras remain
+  invalid inputs.
