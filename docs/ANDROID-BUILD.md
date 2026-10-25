@@ -63,6 +63,17 @@ and activity results are ignored, including when a new fetch has started.
 
 ## Verification status
 
+The Android debug build check in `.github/workflows/android-build.yml` runs on
+Ubuntu 24.04 with Flutter 3.47.8 and Temurin Java 17. It resolves the locked
+Flutter packages, compiles `app-debug.apk`, and checks that the APK is nonempty.
+It requests read-only repository permissions and has a 60-minute deadline.
+It neither signs a release package nor uploads the APK. The generated project
+pins Android Gradle plugin 9.1.0 and Gradle 9.3.1; Flutter supplies missing
+wrapper scripts/JAR during the build without replacing the checked-in wrapper
+properties. A passing hosted run will establish compilation and debug APK
+packaging for its exact source SHA, including Kotlin bridge compilation. The
+check must run before that result can be claimed.
+
 The Dart channel contract can be tested with
 `cd app && ../.tooling/flutter/bin/flutter test test/android_credentials_test.dart`.
 This uses mock channel responses and does not establish device support.
