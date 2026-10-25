@@ -1,0 +1,142 @@
+# Legacy Wake-up Channel compatibility
+
+The application currently blocks dataset TLV 74 in its write path. This patch is
+a bounded dependency extension for preserving that optional observed field
+through the existing public `SetPendingDataset` API. It adds no application
+command, raw setter, or household network operation. The root integration and
+adapter rejection checks must pass before enabling this compatibility profile.
+
+Do not describe this as finalized Thread 1.4 or Thread Direct compliance.
+[OpenThread PR 13614](https://github.com/openthread/openthread/pull/13614)
+removed the legacy experimental Wake-up Channel from Operational Dataset APIs
+on 22 September 2026. Its inclusion in older vendor-shaped datasets remains a
+compatibility concern, without establishing any vendor's current behavior.
+
+The Commissioner public main SHA checked on 25 October 2026 was already the
+pinned `448f807e3246c46e5b82e4cdc12a9b0fb2a646ae`; no newer public pin was
+available to solve the missing typed field. The historical OpenThread source at
+`c71f802c39611af67d78a957d27199a81d989b24` defines type 74 as the ordinary
+Channel value: one page byte followed by a big-endian uint16 channel. Its
+[validation](https://github.com/openthread/openthread/blob/c71f802c39611af67d78a957d27199a81d989b24/src/core/thread/mle_tlvs.cpp#L279)
+requires a supported page and an in-range radio channel; it does not use the
+CSL subclass's zero-channel sentinel. This application's deliberately narrower
+profile permits only page 0 and channels 11–26.
+
+## Typed extension and boundaries
+
+`ActiveOperationalDataset` gains `Channel mLegacyWakeupChannel` and
+`kLegacyWakeupChannelBit = (1 << 3)`. `PendingOperationalDataset` inherits both;
+its existing bits 5 and 4 are unchanged. Storage initializes to zero while
+presence stays clear. The field is included only when its flag is set.
+
+The patch recognizes the legacy type in Active/Pending dataset membership,
+GET selection, typed decode and typed encode. Active SET explicitly rejects it;
+Pending SET retains the existing mandatory timestamps, delay, active-state and
+session checks. No setter or private interface is added. Both the application
+and every linked native object must be rebuilt against the changed struct.
+
+The upstream generic parser drops invalid/unknown TLVs and overwrites duplicate
+types. A narrow raw prevalidation pass makes malformed or duplicate TLV 74 an
+error before the typed dataset decoder calls that parser. Encoding checks the
+legacy value before appending any dataset bytes.
+
+The application adapter still owns stricter whole-dataset validation: reject all
+unsupported types, all duplicate types, malformed lengths, invalid values, and
+incomplete/oversized datasets before projecting into the typed structure.
+Compare the full supported type/value multiset before and after projection.
+Unknown types must never be silently discarded because the library offers a
+typed setter. The native tests explicitly check that an unknown type is outside
+the Operational Dataset membership set; they do not claim the generic upstream
+GET parser rejects every unknown type. The root-owned adapter tests must prove
+that rejection happens before dispatch. This dependency patch alone cannot
+establish the application's complete write path or vendor compatibility.
+
+## Reproduce without changing dependency caches
+
+Use Python 3.12+ and a clean local checkout at the exact pin, with fmtlib,
+libevent, Mbed TLS and Mbed TLS's recursive framework submodule initialized at
+the revisions in `patches/commissioner/manifest.json`:
+
+```sh
+python3 tools/prepare_commissioner_source.py \
+  --source /absolute/path/to/clean/ot-commissioner \
+  --output /absolute/path/to/fresh/generated-source
+python3 tools/prepare_commissioner_source.py \
+  --verify-only --output /absolute/path/to/fresh/generated-source
+```
+
+Preparation checks the parent and recursive Git pins, dirty/untracked source,
+and patch hash. It archives only tracked files at the explicit revisions,
+applies the reviewed patch into a new source copy and writes
+`tnt-source-provenance.json`. It performs no fetch, checkout or source-cache
+mutation. It refuses an existing output or a nested input/output relationship.
+The generated source has no `.git`; build integration must use provenance
+verification instead of asking it for a Git HEAD. Verify again before each
+configure/build and retain the source/provenance alongside build evidence.
+
+The manifest records the source SHA, recursive revisions, patch SHA-256,
+compatibility profile and required build options. The prepared-tree hash covers
+all copied files, their executable modes and symlink targets, excluding only
+the provenance file itself. Preparation twice must produce identical identity.
+Set `PYTHONDONTWRITEBYTECODE=1` for configure/build, as the focused CMake test
+project does; otherwise Mbed TLS's script imports add Python cache files to the
+generated tree and verification correctly rejects the changed tree. Keep build
+outputs outside generated sources. Do not relax tree verification to hide new
+files.
+
+The root CMake, adapter and packaging integration are outside this slice.
+Disable the unused upstream app, tests, Java bindings and commercial
+commissioning as specified by the manifest; enabling other features requires a
+fresh dependency inventory. Existing AppleClang/fmt build compatibility options
+remain necessary and are shown in the standalone test CMake project.
+
+## Synthetic verification
+
+```sh
+TNT_COMMISSIONER_TEST_SOURCE=/absolute/path/to/clean/ot-commissioner \
+  python3 -m unittest discover -s tests/tools \
+  -p test_prepare_commissioner_source.py -v
+cmake -S patches/commissioner/tests -B /absolute/path/to/fresh/test-build \
+  -DTNT_COMMISSIONER_SOURCE=/absolute/path/to/fresh/generated-source \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build /absolute/path/to/fresh/test-build --parallel
+ctest --test-dir /absolute/path/to/fresh/test-build --output-on-failure
+```
+
+The C++ executable uses the existing upstream friend `CommissionerTestPeer`
+only in the test translation unit. It exercises the actual patched Active and
+Pending decoder and Pending encoder, without exporting a raw production API.
+Three full-field fixtures cover absent TLV 74 and both channel boundaries;
+semantic equality compares every encoded type/value. Negative fixtures cover
+short/truncated/oversized values, unsupported page, zero/out-of-range channels,
+duplicate 74 and invalid typed inputs. GET type selection and membership are
+checked separately. No test opens a network session or sends a packet.
+
+Source preparation tests cover patch tampering, dirty/wrong parent pins,
+uninitialized repositories, recursive submodule mismatch/dirty state, refusing
+overwrite, directory alias containment, hash changes, actual clean-source
+reproducibility and generated-tree tampering. The actual-source integration is
+explicitly skipped unless `TNT_COMMISSIONER_TEST_SOURCE` is supplied; skipped
+integration is not reproducibility evidence.
+
+Local evidence from this slice: the unmodified public header rejects both new
+member names at compile time. The prepared source builds in Release, and the
+actual codec executable passes 283 checks covering three complete round trips
+and 17 negative fixtures. The focused CTest passes 1/1. All 11 preparation tests
+pass with the real pinned source integration enabled. The generated source
+passes its full tree verification again after configure/build; its tree hash is
+`41975e0bf6c3aaa68a50075c9c00b82007b3f357a879e2b6cde4f71cbb97b1d5`.
+These checks do not dispatch `SetPendingDataset`, establish eventual adoption,
+or test Apple/Eero hardware.
+
+## Notices and provenance
+
+The patch retains upstream copyright headers and BSD-3-Clause terms. Source
+archives preserve upstream and transitive licence files. The generated
+provenance identifies the modification instead of describing it as unmodified
+upstream. Binary notices must reproduce the upstream copyright, conditions and
+disclaimer, plus the required transitive notices. Update `docs/THIRD-PARTY.md`'s
+claim that no upstream source edits are required when root integrates this
+profile, and feed the generated tree/provenance into the notice collection.
+This work does not select an application licence, select among dependency
+licence alternatives, approve distribution, or claim a security review.
