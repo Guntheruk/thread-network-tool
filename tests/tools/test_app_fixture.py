@@ -19,6 +19,33 @@ spec.loader.exec_module(fixture)
 
 
 class AppFixtureTests(unittest.TestCase):
+    def test_setup_uses_valid_distinct_simulator_node_ids(self):
+        # The pinned simulation platform rejects IDs outside 1..33 before
+        # starting its CLI. Enforce that boundary at the real setup call site.
+        created = []
+
+        class SimulatorNode:
+            def __init__(self, number):
+                if not 1 <= number <= 33:
+                    raise ValueError("invalid simulator node ID")
+                created.append(number)
+
+            def cmd(self, command):
+                raise RuntimeError("dataset setup reached")
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            item = fixture.Fixture("key-change-older-target",
+                                   root=Path(temporary) / "fixture-root")
+            with mock.patch.object(fixture.move, "OracleNode", SimulatorNode), \
+                    mock.patch.object(fixture.os, "makedirs"):
+                with self.assertRaisesRegex(RuntimeError, "dataset setup reached"):
+                    item.setup()
+        self.assertEqual(len(created), 3)
+        self.assertEqual(len(set(created)), 3)
+
     def require_unix_socket(self):
         with tempfile.TemporaryDirectory() as temporary:
             candidate = socket.socket(socket.AF_UNIX)

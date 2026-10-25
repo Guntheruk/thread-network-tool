@@ -109,10 +109,10 @@ class Fixture:
         private_root(self.root)
         for name in ("lifecycle", "journal"):
             private_root(self.root / name)
-        # Random simulator indexes keep concurrent disposable runs distinct.
-        base = 100000 + secrets.randbelow(800000)
+        # The pinned simulator accepts only IDs 1..33. Concurrent fixtures have
+        # separate network namespaces, so their numeric node IDs cannot collide.
         try:
-            for number in (base, base + 1, base + 2):
+            for number in (1, 2, 3):
                 os.makedirs("/tmp/node" + str(number), mode=0o700, exist_ok=True)
                 self.nodes.append(move.OracleNode(number))
             source, peer, target = self.nodes
