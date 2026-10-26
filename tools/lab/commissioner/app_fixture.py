@@ -24,6 +24,14 @@ ROOT = Path("/tmp/app-fixture")
 MANIFEST = ROOT / "fixture"
 CONTROL = ROOT / "control"
 MAX_REQUEST = 1024
+PING_REPLY_TIMEOUT = 3
+TRANSIENT_PING_ERRORS = frozenset((4, 28))  # Pinned OpenThread NoRoute, ResponseTimeout.
+REFRESH_STAGES = frozenset(("process", "ports", "datasets", "states", "partitions",
+                            "pending", "connectivity", "manifest"))
+FIXTURE_ERROR_CODES = frozenset(("fixture_setup", "fixture_ports", "fixture_process_changed",
+                                 "fixture_not_ready", "unsafe_fixture_path", "simulator_command",
+                                 "simulator_exit", "missing_value", "pending_read_unknown",
+                                 "output_limit", "invalid_dataset", "oracle_write_blocked"))
 EVENT_PATTERN = re.compile(rb"TNT_APP_EVENT (opened|import_target|target_read|import_source|source_read|review|native_prepare|native_confirm|dispatch_complete|stopped|restored|observing|verified|redaction|execution_guard_blocked)(?![A-Za-z0-9_])")
 PREPARATION_PATTERN = re.compile(rb"TNT_APP_PREPARE_FAILURE ([a-z_]+) ([a-z_]+)(?![A-Za-z0-9_])")
 PREPARATION_STAGES = {"journal", "recovery", "fixture_refresh", "native_process", "native_result", "evidence", "plan"}
@@ -89,6 +97,68 @@ def process_startticks(pid):
     return int(stat[stat.rfind(")") + 2:].split()[19])
 
 
+def ping_once(node, address):
+    """A single read-only connectivity check; transient absence is false."""
+    try:
+        output = node.cmd("ping " + address + " 8 1")
+        if re.search(r"\bbytes from " + re.escape(address) + r"\b", output):
+            return True
+        # The pinned CLI reports ping replies asynchronously after command Done.
+        output = node.read(re.compile(r"(?:\d+ bytes from [0-9a-f:]+|1 packets received|Error \d+:)"),
+                           PING_REPLY_TIMEOUT)
+        error = re.search(r"Error (\d+):", output)
+        if error:
+            code = int(error.group(1))
+            if code in TRANSIENT_PING_ERRORS:
+                return False
+            raise reads.LabError("simulator_command", "ping", code)
+        return bool(re.search(r"\bbytes from " + re.escape(address) + r"\b", output))
+    except reads.LabError as error:
+        if str(error) == "simulator_command" and error.cli_error in TRANSIENT_PING_ERRORS:
+            return False
+        raise
+    except TimeoutError:
+        return False
+
+
+def failure_report(fixture, stage, error):
+    code = str(error) if isinstance(error, reads.LabError) else "fixture_error"
+    if isinstance(error, TimeoutError):
+        code = "deadline"
+    elif code not in FIXTURE_ERROR_CODES:
+        code = "fixture_error"
+    result = {"lab": "app-execution-bridge", "scenario": fixture.scenario,
+              "stage": stage if stage in {"setup", "app"} else "unknown",
+              "status": "failed", "error_code": code}
+    if fixture.refresh_stage in REFRESH_STAGES:
+        result["refresh_stage"] = fixture.refresh_stage
+    if (isinstance(error, reads.LabError) and type(error.cli_error) is int and
+            0 <= error.cli_error <= 65535):
+        result["cli_error_code"] = error.cli_error
+    return result
+
+
+def handle_connection(connection, fixture):
+    try:
+        data = connection.recv(MAX_REQUEST + 1)
+    except (BrokenPipeError, ConnectionResetError, socket.timeout):
+        return
+    try:
+        if len(data) > MAX_REQUEST or not data.endswith(b"\n"):
+            raise ValueError()
+        request = json.loads(data)
+        if type(request) is not dict or type(request.get("action")) is not str:
+            raise ValueError()
+        result = fixture.response(request["action"])
+    except (ValueError, UnicodeError):
+        result = {"ok": False, "error": "invalid_request"}
+    try:
+        connection.sendall((json.dumps(result, separators=(",", ":")) + "\n").encode())
+    except (BrokenPipeError, ConnectionResetError, socket.timeout):
+        # A caller that left while a read was in progress cannot stop the fixture.
+        return
+
+
 def private_root(root=ROOT):
     if root.is_symlink():
         raise reads.LabError("unsafe_fixture_path")
@@ -126,6 +196,7 @@ class Fixture:
         self.refresh_count = 0
         self.read_count = 0
         self.last = None
+        self.refresh_stage = None
 
     def setup(self):
         private_root(self.root)
@@ -176,18 +247,28 @@ class Fixture:
     def refresh(self):
         if len(self.nodes) != 3 or not all(node.read_only for node in self.nodes):
             raise reads.LabError("fixture_not_ready")
+        self.refresh_stage = "process"
         for node, birth in zip(self.nodes, self.births):
-            if node.process.poll() is not None or process_startticks(node.process.pid) != birth:
+            try:
+                changed = node.process.poll() is not None or process_startticks(node.process.pid) != birth
+            except (OSError, ValueError):
+                changed = True
+            if changed:
                 raise reads.LabError("fixture_process_changed")
         source, peer, target = self.nodes
+        self.refresh_stage = "ports"
         ports = [int(reads.value(self._read(node, "ba port"), r"^(\d+)$")) for node in self.nodes]
         if len(set(ports)) != 3 or not all(1 <= p <= 65535 for p in ports):
             raise reads.LabError("fixture_ports")
+        self.refresh_stage = "datasets"
         datasets = [reads.value(self._read(node, "dataset active -x"), r"^([0-9a-fA-F]{80,})$").lower()
                     for node in self.nodes]
+        self.refresh_stage = "states"
         states = [reads.value(self._read(node, "state"), r"^(leader|router|child|detached|disabled)$")
                   for node in self.nodes]
+        self.refresh_stage = "partitions"
         partitions = [reads.value(self._read(node, "partitionid"), r"^(\d+)$") for node in self.nodes]
+        self.refresh_stage = "pending"
         pending = [not move.pending_empty(node) for node in self.nodes]
         target_unchanged = move.fields(datasets[2]) == move.fields(self.target_dataset) and not pending[2]
         source_full_match = all(move.fields(item) == move.fields(self.target_dataset) for item in datasets[:2])
@@ -196,9 +277,11 @@ class Fixture:
         # Before activation the source peer is the meaningful connectivity pair.
         destination = target if source_full_match and same_partition else source
         origin = peer
+        self.refresh_stage = "connectivity"
         address = reads.value(self._read(destination, "ipaddr mleid"), r"^([0-9a-f:]+)$")
-        connectivity = move.ping(origin, address)
+        connectivity = ping_once(origin, address)
         checked_at = int(time.time() * 1000)
+        self.refresh_stage = "manifest"
         lines = ["TNT-FIXTURE/1", f"fixture_id {self.fixture_id}", "source_count 2"]
         for index in (0, 1):
             lines.append(f"source_node {self.node_ids[index]} {self.nodes[index].process.pid} {self.births[index]} {ports[index]}")
@@ -216,6 +299,7 @@ class Fixture:
                      "ports": ports, "states": states, "partitions": partitions,
                      "source_active_matches_original": [move.fields(item) == move.fields(self.source_dataset)
                                                         for item in datasets[:2]]}
+        self.refresh_stage = None
         return self.last
 
     def response(self, action):
@@ -292,17 +376,7 @@ def serve(fixture, runner):
                         connection, _ = server.accept()
                         with connection:
                             connection.settimeout(2)
-                            data = connection.recv(MAX_REQUEST + 1)
-                            try:
-                                if len(data) > MAX_REQUEST or not data.endswith(b"\n"):
-                                    raise ValueError()
-                                request = json.loads(data)
-                                if type(request) is not dict or type(request.get("action")) is not str:
-                                    raise ValueError()
-                                result = fixture.response(request["action"])
-                            except (ValueError, UnicodeError):
-                                result = {"ok": False, "error": "invalid_request"}
-                            connection.sendall((json.dumps(result, separators=(",", ":")) + "\n").encode())
+                            handle_connection(connection, fixture)
                 if time.monotonic() >= next_refresh:
                     fixture.refresh()
                     next_refresh = time.monotonic() + 5
@@ -359,12 +433,7 @@ def main(argv=None):
         print(json.dumps(result, sort_keys=True))
         return 0 if code == 0 else 1
     except Exception as error:
-        print(json.dumps({"lab": "app-execution-bridge", "scenario": args.scenario,
-                          "stage": stage, "status": "failed", "error_code":
-                          "deadline" if isinstance(error, TimeoutError) else
-                          str(error) if str(error) in {"fixture_setup", "fixture_ports", "fixture_process_changed",
-                                                   "fixture_not_ready", "unsafe_fixture_path"} else "fixture_error"},
-                         sort_keys=True))
+        print(json.dumps(failure_report(fixture, stage, error), sort_keys=True))
         return 1
     finally:
         signal.alarm(0)

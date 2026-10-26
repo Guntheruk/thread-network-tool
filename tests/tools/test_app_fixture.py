@@ -195,6 +195,112 @@ class AppFixtureTests(unittest.TestCase):
             script = "import os,sys; sys.exit(7 if os.environ['TNT_APP_PHASE']=='dispatch' else 0)"
             self.assertEqual(fixture.serve(item, [sys.executable, "-c", script]), (7, 1, "dispatch", None))
 
+    def test_one_shot_ping_treats_only_pinned_transient_failure_as_false(self):
+        class Node:
+            def __init__(self, error=None):
+                self.error = error
+                self.calls = []
+
+            def cmd(self, command):
+                self.calls.append(command)
+                if self.error:
+                    raise self.error
+                return "ping response\nDone\n"
+
+            def read(self, pattern, timeout):
+                self.calls.append(timeout)
+                raise TimeoutError()
+
+        address = "fd00::1"
+        no_route = Node(fixture.reads.LabError("simulator_command", "unknown", 4))
+        self.assertFalse(fixture.ping_once(no_route, address))
+        self.assertEqual(len(no_route.calls), 1)
+        timed_out = Node()
+        self.assertFalse(fixture.ping_once(timed_out, address))
+        self.assertLessEqual(timed_out.calls[-1], 3)
+        unexpected = Node(fixture.reads.LabError("simulator_command", "unknown", 5))
+        with self.assertRaises(fixture.reads.LabError):
+            fixture.ping_once(unexpected, address)
+        async_error = Node()
+        async_error.read = lambda pattern, timeout: "Error 4: NoRoute\n"
+        self.assertFalse(fixture.ping_once(async_error, address))
+        async_unexpected = Node()
+        async_unexpected.read = lambda pattern, timeout: "Error 5: Busy\n"
+        with self.assertRaises(fixture.reads.LabError):
+            fixture.ping_once(async_unexpected, address)
+        verified = Node()
+        verified.read = lambda pattern, timeout: "8 bytes from fd00::1: icmp_seq=1\n"
+        self.assertTrue(fixture.ping_once(verified, address))
+        wrong_peer = Node()
+        wrong_peer.read = lambda pattern, timeout: "8 bytes from fd00::2: icmp_seq=1\n"
+        self.assertFalse(fixture.ping_once(wrong_peer, address))
+
+    def test_disconnected_client_does_not_stop_control_handler(self):
+        class Connection:
+            def __init__(self):
+                self.sent = 0
+
+            def recv(self, size):
+                return b'{"action":"metrics"}\n'
+
+            def sendall(self, response):
+                self.sent += 1
+                raise BrokenPipeError()
+
+        class Service:
+            def response(self, action):
+                return {"ok": True, "action": action}
+
+        connection = Connection()
+        fixture.handle_connection(connection, Service())
+        self.assertEqual(connection.sent, 1)
+        # A later request still reaches the same coordinator object.
+        next_connection = Connection()
+        fixture.handle_connection(next_connection, Service())
+        self.assertEqual(next_connection.sent, 1)
+
+    def test_real_unix_client_close_survives_and_later_request_works(self):
+        class Service:
+            calls = 0
+
+            def response(self, action):
+                self.calls += 1
+                return {"ok": True}
+
+        service = Service()
+        server, client = socket.socketpair(socket.AF_UNIX)
+        try:
+            client.sendall(b'{"action":"refresh"}\n')
+            client.close()
+            fixture.handle_connection(server, service)
+        finally:
+            server.close()
+            client.close()
+        server, client = socket.socketpair(socket.AF_UNIX)
+        try:
+            client.sendall(b'{"action":"metrics"}\n')
+            fixture.handle_connection(server, service)
+            self.assertEqual(client.recv(128), b'{"ok":true}\n')
+        finally:
+            server.close()
+            client.close()
+        self.assertEqual(service.calls, 2)
+
+    def test_failure_report_redacts_context_and_bounds_cli_code(self):
+        item = fixture.Fixture("key-change-older-target")
+        item.refresh_stage = "connectivity"
+        error = fixture.reads.LabError("simulator_command", "secret dataset", 4)
+        report = fixture.failure_report(item, "app", error)
+        self.assertEqual(report["error_code"], "simulator_command")
+        self.assertEqual(report["refresh_stage"], "connectivity")
+        self.assertEqual(report["cli_error_code"], 4)
+        self.assertNotIn("secret", __import__("json").dumps(report))
+        error = fixture.reads.LabError("secret dataset", "secret dataset", 999999)
+        report = fixture.failure_report(item, "app", error)
+        self.assertEqual(report["error_code"], "fixture_error")
+        self.assertNotIn("cli_error_code", report)
+        self.assertNotIn("secret", __import__("json").dumps(report))
+
 
 if __name__ == "__main__":
     unittest.main()
