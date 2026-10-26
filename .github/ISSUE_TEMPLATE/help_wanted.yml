@@ -1,0 +1,19 @@
+name: Offer help or propose work
+description: Suggest a contribution or offer relevant test equipment or expertise
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include operational datasets, keys, tokens, addresses, household or network names, device identities, private recovery files, or raw household logs. Real equipment tests need an isolated setup and a coordinated test plan; do not test on a working household network.
+  - type: textarea
+    id: contribution
+    attributes:
+      label: How would you like to help?
+      description: For example, Mac installation, Apple credentials, platform networking, simulator coverage, or controlled testing with a spare Eero model and firmware.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context
+      description: Describe the proposed work or isolated equipment and its model and firmware, where applicable. Please keep identifying and household details private.
