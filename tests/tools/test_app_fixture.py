@@ -301,6 +301,64 @@ class AppFixtureTests(unittest.TestCase):
         self.assertNotIn("cli_error_code", report)
         self.assertNotIn("secret", __import__("json").dumps(report))
 
+    def test_terminal_oracle_projection_keeps_only_seven_booleans_and_freshness(self):
+        item = fixture.Fixture("key-change-older-target")
+        item.refresh_count = 31
+        item.last = {"source_full_match_target": True, "target_unchanged": True,
+                     "source_no_pending": False, "target_no_pending": True,
+                     "same_partition": True, "source_router_roles": True,
+                     "connectivity_verified": False, "connectivity_checked_at_ms": 1000,
+                     "ports": [1111, 2222, 3333], "secret": "private dataset"}
+        projection = fixture.oracle_summary(item, now_ms=2000)
+        self.assertEqual(projection["sample_count"], 31)
+        self.assertEqual(projection["sample_age_ms"], 1000)
+        self.assertFalse(projection["source_no_pending"])
+        self.assertFalse(projection["connectivity_verified"])
+        self.assertEqual(set(projection), {"sample_count", "sample_age_ms", "sample_fresh",
+                                          "source_full_match_target", "target_unchanged",
+                                          "source_no_pending", "target_no_pending",
+                                          "same_partition", "source_router_roles",
+                                          "connectivity_verified"})
+        self.assertNotIn("private", __import__("json").dumps(projection))
+        item.last["source_full_match_target"] = "true"
+        self.assertIsNone(fixture.oracle_summary(item, now_ms=2000)["source_full_match_target"])
+
+    def test_fixed_app_outcome_marker_drops_unknown_fields(self):
+        output = io.StringIO()
+        events, outcomes = {}, {}
+        with contextlib.redirect_stdout(output):
+            fixture.emit_fixed_line(
+                b"TNT_APP_OUTCOME needs_attention verification_failed observer_or_evidence_failure",
+                "recover", events, outcomes)
+            fixture.emit_fixed_line(
+                b"TNT_APP_OUTCOME private_stage verification_failed observer_or_evidence_failure",
+                "recover", events, outcomes)
+            fixture.emit_fixed_line(
+                b"TNT_APP_OUTCOME needs_attention private_reason observer_or_evidence_failure",
+                "recover", events, outcomes)
+        self.assertEqual(outcomes, {"recover": {"stage": "needs_attention",
+                                                "reason": "verification_failed",
+                                                "category": "observer_or_evidence_failure"}})
+        self.assertEqual(len(output.getvalue().splitlines()), 1)
+        self.assertNotIn("private", output.getvalue())
+
+    def test_failed_app_terminal_report_keeps_nonzero_exit_and_sanitized_evidence(self):
+        item = fixture.Fixture("key-change-older-target")
+        item.refresh_count = 4
+        item.last = {"source_full_match_target": False, "private": "raw address"}
+        item.app_outcomes["recover"] = {"stage": "observing",
+                                        "reason": "verification_pending",
+                                        "category": "oracle_incomplete", "private": "raw address"}
+        report = fixture.app_result(item, 1, 2, "recover", "observing", now_ms=1000)
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["app_exit_code"], 1)
+        self.assertEqual(report["last_app_outcome"]["category"], "oracle_incomplete")
+        self.assertEqual(set(report["last_app_outcome"]), {"stage", "reason", "category"})
+        self.assertFalse(report["oracle"]["source_full_match_target"])
+        self.assertNotIn("raw address", __import__("json").dumps(report))
+        item.app_outcomes["recover"]["category"] = "raw address"
+        self.assertIsNone(fixture.app_result(item, 1, 2, "recover", "observing")["last_app_outcome"])
+
 
 if __name__ == "__main__":
     unittest.main()

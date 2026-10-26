@@ -34,6 +34,20 @@ FIXTURE_ERROR_CODES = frozenset(("fixture_setup", "fixture_ports", "fixture_proc
                                  "output_limit", "invalid_dataset", "oracle_write_blocked"))
 EVENT_PATTERN = re.compile(rb"TNT_APP_EVENT (opened|import_target|target_read|import_source|source_read|review|native_prepare|native_confirm|dispatch_complete|stopped|restored|observing|verified|redaction|execution_guard_blocked)(?![A-Za-z0-9_])")
 PREPARATION_PATTERN = re.compile(rb"TNT_APP_PREPARE_FAILURE ([a-z_]+) ([a-z_]+)(?![A-Za-z0-9_])")
+OUTCOME_PATTERN = re.compile(rb"TNT_APP_OUTCOME ([a-z_]+) ([a-z_]+) ([a-z_]+)(?![A-Za-z0-9_])")
+OUTCOME_STAGES = frozenset(("missing", "dispatch_fenced", "observing", "needs_attention",
+                            "observation_stopped", "verified_complete", "verified_unchanged",
+                            "proven_not_sent"))
+OUTCOME_REASONS = frozenset(("missing", "none", "worker_accepted", "worker_rejected",
+                             "worker_not_sent", "worker_uncertain", "worker_failure",
+                             "journal_failure", "restart_requires_reads", "credentials_required",
+                             "recovery_binding_mismatch", "verification_pending", "verification_failed",
+                             "verification_complete", "verification_unchanged", "observation_stopped"))
+OUTCOME_CATEGORIES = frozenset(("verified", "oracle_incomplete", "oracle_unavailable",
+                                "observer_or_evidence_failure", "observation_timeout",
+                                "status_unavailable", "check_exception"))
+ORACLE_FLAGS = ("source_full_match_target", "target_unchanged", "source_no_pending",
+                "target_no_pending", "same_partition", "source_router_roles", "connectivity_verified")
 PREPARATION_STAGES = {"journal", "recovery", "fixture_refresh", "native_process", "native_result", "evidence", "plan"}
 PREPARATION_REASONS = {
     "journal_failure", "unresolved_operation", "fixture_unavailable", "worker_failure",
@@ -51,7 +65,7 @@ PREPARATION_REASONS = {
 }
 
 
-def emit_fixed_line(line, phase, last_event):
+def emit_fixed_line(line, phase, last_event, outcomes=None):
     match = EVENT_PATTERN.search(line)
     if match:
         event = match.group(1).decode("ascii")
@@ -65,9 +79,18 @@ def emit_fixed_line(line, phase, last_event):
             print(json.dumps({"lab": "app-execution-bridge", "app_phase": phase,
                               "preparation_failure_stage": stage,
                               "preparation_failure_reason": reason}, sort_keys=True), flush=True)
+    outcome = OUTCOME_PATTERN.search(line)
+    if outcome:
+        stage, reason, category = (part.decode("ascii") for part in outcome.groups())
+        if stage in OUTCOME_STAGES and reason in OUTCOME_REASONS and category in OUTCOME_CATEGORIES:
+            fixed = {"stage": stage, "reason": reason, "category": category}
+            if outcomes is not None:
+                outcomes[phase] = fixed
+            print(json.dumps({"lab": "app-execution-bridge", "app_phase": phase,
+                              "app_outcome": fixed}, sort_keys=True), flush=True)
 
 
-def drain_events(stream, phase, last_event):
+def drain_events(stream, phase, last_event, outcomes=None):
     """Discard all runner output except bounded fixed-vocabulary progress marks."""
     pending = b""
     dropping = False
@@ -78,7 +101,7 @@ def drain_events(stream, phase, last_event):
         for byte in block:
             if byte == 10:
                 if not dropping:
-                    emit_fixed_line(pending, phase, last_event)
+                    emit_fixed_line(pending, phase, last_event, outcomes)
                 pending = b""
                 dropping = False
             elif not dropping:
@@ -88,7 +111,7 @@ def drain_events(stream, phase, last_event):
                 else:
                     pending += bytes((byte,))
     if pending and not dropping:
-        emit_fixed_line(pending, phase, last_event)
+        emit_fixed_line(pending, phase, last_event, outcomes)
 
 
 def process_startticks(pid):
@@ -121,6 +144,49 @@ def ping_once(node, address):
         return False
 
 
+def oracle_summary(fixture, now_ms=None):
+    """Public bounded projection of the latest independent read-only sample."""
+    now_ms = int(time.time() * 1000) if now_ms is None else now_ms
+    sample = fixture.last if isinstance(fixture.last, dict) else {}
+    checked_at = sample.get("connectivity_checked_at_ms")
+    age = (now_ms - checked_at if type(checked_at) is int and
+           0 <= checked_at <= now_ms and now_ms - checked_at <= 1000000000 else None)
+    count = fixture.refresh_count if type(fixture.refresh_count) is int and 0 <= fixture.refresh_count <= 1000000 else None
+    result = {"sample_count": count, "sample_age_ms": age,
+              "sample_fresh": age is not None and age <= 30000}
+    for key in ORACLE_FLAGS:
+        value = sample.get(key)
+        result[key] = value if type(value) is bool else None
+    return result
+
+
+def outcome_summary(fixture, phase):
+    raw = fixture.app_outcomes.get(phase)
+    if not isinstance(raw, dict):
+        return None
+    stage, reason, category = raw.get("stage"), raw.get("reason"), raw.get("category")
+    if stage not in OUTCOME_STAGES or reason not in OUTCOME_REASONS or category not in OUTCOME_CATEGORIES:
+        return None
+    return {"stage": stage, "reason": reason, "category": category}
+
+
+def app_result(fixture, code, runs, phase, last_event, now_ms=None):
+    return {"lab": "app-execution-bridge", "scenario": fixture.scenario,
+            "stage": "complete" if code == 0 else phase if phase in {"dispatch", "recover"} else "unknown",
+            "status": "passed" if code == 0 else "failed",
+            "app_exit_code": code if type(code) is int and 0 <= code <= 255 else None,
+            "app_process_runs": runs if type(runs) is int and 0 <= runs <= 2 else None,
+            "last_app_phase": phase if phase in {"dispatch", "recover"} else "unknown",
+            "last_app_event": last_event if last_event in {"opened", "import_target", "target_read",
+                "import_source", "source_read", "review", "native_prepare", "native_confirm",
+                "dispatch_complete", "stopped", "restored", "observing", "verified", "redaction",
+                "execution_guard_blocked"} else None,
+            "last_app_outcome": outcome_summary(fixture, phase),
+            "fixture_refreshes": fixture.refresh_count if type(fixture.refresh_count) is int and
+                0 <= fixture.refresh_count <= 1000000 else None,
+            "oracle": oracle_summary(fixture, now_ms=now_ms)}
+
+
 def failure_report(fixture, stage, error):
     code = str(error) if isinstance(error, reads.LabError) else "fixture_error"
     if isinstance(error, TimeoutError):
@@ -135,6 +201,8 @@ def failure_report(fixture, stage, error):
     if (isinstance(error, reads.LabError) and type(error.cli_error) is int and
             0 <= error.cli_error <= 65535):
         result["cli_error_code"] = error.cli_error
+    result["last_app_outcome"] = outcome_summary(fixture, "recover")
+    result["oracle"] = oracle_summary(fixture)
     return result
 
 
@@ -197,6 +265,7 @@ class Fixture:
         self.read_count = 0
         self.last = None
         self.refresh_stage = None
+        self.app_outcomes = {}
 
     def setup(self):
         private_root(self.root)
@@ -365,7 +434,8 @@ def serve(fixture, runner):
             child = subprocess.Popen(runner, env=env, stdin=subprocess.DEVNULL,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      start_new_session=True)
-            drains = [threading.Thread(target=drain_events, args=(stream, phase, last_event), daemon=True)
+            drains = [threading.Thread(target=drain_events,
+                                       args=(stream, phase, last_event, fixture.app_outcomes), daemon=True)
                       for stream in (child.stdout, child.stderr)]
             for drain in drains:
                 drain.start()
@@ -424,12 +494,7 @@ def main(argv=None):
         fixture.setup()
         stage = "app"
         code, app_runs, phase, last_event = serve(fixture, args.runner)
-        result = {"lab": "app-execution-bridge", "scenario": args.scenario,
-                  "stage": "complete" if code == 0 else phase,
-                  "status": "passed" if code == 0 else "failed",
-                  "app_exit_code": code, "app_process_runs": app_runs,
-                  "last_app_phase": phase, "last_app_event": last_event,
-                  "fixture_refreshes": fixture.refresh_count}
+        result = app_result(fixture, code, app_runs, phase, last_event)
         print(json.dumps(result, sort_keys=True))
         return 0 if code == 0 else 1
     except Exception as error:

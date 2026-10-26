@@ -151,6 +151,17 @@ void main() {
       return;
     }
     expect(phase, 'recover');
+    NetworkMoveExecutionStatus? outcome;
+    var outcomeEmitted = false;
+    void emitOutcome(String category) {
+      if (outcomeEmitted) return;
+      outcomeEmitted = true;
+      stdout.writeln(
+          'TNT_APP_OUTCOME ${outcome?.stage ?? 'missing'} ${outcome?.reason ?? 'missing'} $category');
+    }
+    addTearDown(() {
+      if (!outcomeEmitted) emitOutcome('check_exception');
+    });
     final recovered = await tester.runAsync(api.currentExecution);
     expect(recovered, isNotNull);
     expect(recovered?.stage, 'observation_stopped');
@@ -175,21 +186,21 @@ void main() {
     // Continuous fresh real samples, never wall-clock acceleration. The native
     // stack keeps its normal 300-second key-change delay.
     final end = DateTime.now().add(const Duration(seconds: 480));
-    NetworkMoveExecutionStatus? outcome;
-    while (DateTime.now().isBefore(end)) {
-      await tap('move-execution-check');
-      outcome = await tester
-          .runAsync<NetworkMoveExecutionStatus?>(api.currentExecution);
-      if (outcome?.stage == 'verified_complete') break;
-      await tester
-          .runAsync(() => Future<void>.delayed(const Duration(seconds: 5)));
-      await tester.pump();
+    try {
+      while (DateTime.now().isBefore(end)) {
+        await tap('move-execution-check');
+        outcome = await tester
+            .runAsync<NetworkMoveExecutionStatus?>(api.currentExecution);
+        if (outcome?.stage == 'verified_complete') break;
+        await tester
+            .runAsync(() => Future<void>.delayed(const Duration(seconds: 5)));
+        await tester.pump();
+      }
+    } catch (_) {
+      emitOutcome('check_exception');
+      rethrow;
     }
-    expect(outcome?.stage, 'verified_complete');
-    event('verified');
-    expect(move.dispatchLaunches, 0);
-    final metrics = await tester.runAsync(() => fixture.call('metrics'));
-    for (final key in [
+    const oracleKeys = [
       'source_full_match_target',
       'target_unchanged',
       'source_no_pending',
@@ -197,7 +208,29 @@ void main() {
       'same_partition',
       'source_router_roles',
       'connectivity_verified'
-    ]) {
+    ];
+    Map<String, dynamic>? metrics;
+    try {
+      metrics = await tester.runAsync(() => fixture.call('metrics'));
+    } catch (_) {
+      // The fixed marker below records oracle unavailability without raw output.
+    }
+    final category = outcome == null
+        ? 'status_unavailable'
+        : metrics == null
+            ? 'oracle_unavailable'
+            : oracleKeys.any((key) => metrics?[key] != true)
+                ? 'oracle_incomplete'
+                : outcome.stage == 'verified_complete'
+                    ? 'verified'
+                    : outcome.stage == 'needs_attention'
+                        ? 'observer_or_evidence_failure'
+                        : 'observation_timeout';
+    emitOutcome(category);
+    expect(outcome?.stage, 'verified_complete');
+    event('verified');
+    expect(move.dispatchLaunches, 0);
+    for (final key in oracleKeys) {
       expect(metrics?[key], isTrue, reason: 'independent oracle $key');
     }
     // Every persistent private recovery file must omit dataset/secret material.
