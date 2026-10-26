@@ -13,13 +13,28 @@ explicit whole-source review, pinned-endpoint recovery and a separate
 Default packages remain read-only; `TNT_MAC_ALPHA=1` includes the signed worker
 and journal. All changes remain local under the existing push/cloud-cost hold.
 
-New verification so far: 14 real native journal process tests, 51 standalone
-controller checks, 20 move-screen widget tests, and two Mac session integration
-tests with a real journal and synthetic worker. Tooling suite: 110 tests run,
-one explicitly skipped fresh-source regeneration case. Independent app and
-native-worker reviews of `fb68f74` found no unresolved P1/P2 after repairing
-terminal no-change display. Signed-package and final-candidate evidence is
-recorded below as it completes; no retail app mutation is claimed.
+The production app at `7422ddc8a3b14dec75acb2a005c59198b39d3bc9` is built at
+`build/mac-alpha-7422ddc/Thread Network Tool.app`, with a local ZIP beside it.
+It includes the real join worker, guided/manual/HA credentials, automatic
+bounded checks after explicit confirmation, and durable no-replay recovery.
+The actual window accepted a synthetic source dataset; quitting and reopening
+cleared credentials. No household discovery, read or change was invoked.
+See `docs/MAC-ALPHA-ACCEPTANCE.md` for exact evidence and remaining release gates.
+
+Final Flutter analysis is clean; 178 tests passed with one Linux-only skip.
+Other verification: 14 native journal process tests, 51 standalone controller
+checks, 110 Python tooling tests (one fresh-source regeneration skip), six scoped
+native CTests and five signed-parent loopback wire scenarios. The final worker
+and journal are byte-identical to those in the signed wire test package.
+Independent native and app reviews found no unresolved P1/P2, including the
+automatic-check code at `4437c01`. Later changes clarify copy/manual credentials.
+All 44 notice inputs were collected. Local recursive ad hoc signing checks pass;
+no Developer ID identity is installed and notarization remains unfinished.
+
+The owner has no spare Eero. An existing household Eero is not an isolated
+source for a whole-network change. Retail model/firmware acceptance remains
+unverified; working devices stay excluded. This local functional package is
+not a claim that the broader release or original multi-platform goal is done.
 
 The frozen Linux scenario `787ace4` still ended `needs_attention` with its
 connectivity check false. All other convergence checks were true. A separate,

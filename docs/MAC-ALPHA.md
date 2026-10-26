@@ -40,6 +40,12 @@ Pending Dataset SET through that source. Transport retransmissions can occur;
 one invocation does not mean one UDP packet. A lost response remains uncertain.
 No retry, reset, credential regeneration or automatic rollback is implemented.
 
+After explicit confirmation, the foreground Mac screen waits for the propagation
+delay and automatically runs serialized read-only checks. Checks stop at a final
+result, after a bounded two-minute window, or when the user stops, leaves the
+screen or backgrounds the app. An in-flight bounded read can finish, but cannot
+dispatch another change. Reopening the app leaves recovery checks manual.
+
 The journal and lifecycle lease live inside the app's private Application Support
 directory. Restart restores the unresolved operation and cannot reconstruct a
 send authorization. Credentials are not persisted; recovery needs the same
@@ -95,8 +101,14 @@ change is part of the build.
   that the CLI ping reply arrives before `Done`; framing is not an established
   explanation for that failure. The lab check has not been weakened.
 
-Before a broader alpha release: finish the exact production package/window
-acceptance, controlled Eero model/firmware acceptance, trusted distribution and
-clean-Mac installation, and the owner's license/distribution decision. Do not
+The production package at `7422ddc8a3b14dec75acb2a005c59198b39d3bc9` passed its
+local window acceptance and includes the same worker/journal bytes tested in the
+signed loopback suite. See [the exact acceptance record](MAC-ALPHA-ACCEPTANCE.md).
+
+Before a broader alpha release: controlled Eero model/firmware acceptance,
+trusted distribution and clean-Mac installation, and the owner's
+license/distribution decision remain. The owner has no spare Eero available;
+an existing Eero is not an isolated source because this operation applies to its
+whole Thread network. No household move is authorized to fill that evidence gap. Do not
 present synthetic peers as retail Eero support or a locally signed build as a
 notarized release.

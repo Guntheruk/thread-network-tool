@@ -18,8 +18,12 @@ reproduced and repaired in `c92b4a9`. Native/helper fixtures never address the
 household. No router/account changes or paid/cloud jobs are authorized here.
 
 Push/cloud-review hold remains. All commits are local. Packaging and controlled
-wire tests are not retail compatibility or publication. Current signed-parent
-build/runtime acceptance is being completed before the production app package.
+wire tests are not retail compatibility or publication. Production package
+`build/mac-alpha-7422ddc/Thread Network Tool.app` has passed local window
+acceptance; its worker/journal bytes match the passing signed-parent wire tests.
+Read `MAC-ALPHA-ACCEPTANCE.md` for exact source, tests, artifacts and remaining
+controlled retail/distribution gates. The owner has no spare Eero; do not test
+a network-wide change on working household Eeros.
 
 ---
 
