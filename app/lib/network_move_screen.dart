@@ -29,6 +29,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
   String? _notice;
   bool _busy = false;
   bool _attested = false;
+  bool _eeroConfirmed = false;
+  bool _groupConfirmed = false;
   int _delaySeconds = 300;
   Timer? _reviewExpiryTimer;
   Timer? _reviewCheckTimer;
@@ -59,6 +61,11 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
               (widget.api as NetworkMoveExecutionApi).executionRecoveryAvailable
           ? widget.api as NetworkMoveExecutionApi
           : null;
+
+  bool get _macExecution =>
+      widget.api is ExecutionProfileInfo &&
+      (widget.api as ExecutionProfileInfo).executionProfileId ==
+          'eero-source-network-alpha-v1';
 
   Future<void> _restoreExecution() async {
     final api = _executionApi;
@@ -102,7 +109,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
         !_reviewVerified ||
         _reviewExpired ||
         _reviewIssue != null ||
-        !plan.readyForLabReview) {
+        !plan.readyForExecutionReview) {
       return;
     }
     setState(() {
@@ -123,8 +130,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
     } catch (_) {
       if (mounted) {
         setState(
-          () => _executionNotice =
-              'Execution could not be prepared. Check the isolated profile and evidence.',
+          () => _executionNotice = _macExecution
+              ? 'The join could not be prepared. Check the routers and try the review again.'
+              : 'Execution could not be prepared. Check the isolated profile and evidence.',
         );
       }
     } finally {
@@ -338,6 +346,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
       _notice = null;
       _clearReview();
       _attested = false;
+      _eeroConfirmed = false;
+      _groupConfirmed = false;
     });
     try {
       final next = await action().timeout(const Duration(seconds: 38));
@@ -374,6 +384,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
         _state = next;
         _clearReview();
         _attested = false;
+        _eeroConfirmed = false;
+        _groupConfirmed = false;
       });
     }
   }
@@ -392,6 +404,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
             targetRouterId: target,
             attestation: EmptySourceAttestationInput(
               attestedAt: DateTime.now().toUtc(),
+              operatorEeroSource: _macExecution && _eeroConfirmed,
+              allSourceEerosRepresented: _macExecution && _groupConfirmed,
             ),
             delaySeconds: _delaySeconds,
           )
@@ -418,8 +432,14 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
     if (probe.probeStatus != 'completed' || !probe.verified) {
       return 'Check incomplete';
     }
-    if (probe.pendingStatus == 'present') return 'Pending change present';
-    return 'Authenticated read matches · pending empty';
+    if (probe.pendingStatus == 'present') {
+      return _macExecution
+          ? 'Another change is already scheduled'
+          : 'Pending change present';
+    }
+    return _macExecution
+        ? 'Settings match'
+        : 'Authenticated read matches · pending empty';
   }
 
   String _blocker(String code) {
@@ -428,7 +448,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
       'target_credentials_required': 'Set up access to Network to keep.',
       'same_network': 'Network to move and Network to keep must be different.',
       'discovery_incomplete': 'Refresh router discovery.',
-      'source_routers_unverified': 'No border routers to move have been identified.',
+      'source_routers_unverified':
+          'No border routers to move have been identified.',
       'target_is_source':
           'The selected router also appears on Network to move.',
       'empty_source_attestation_required':
@@ -442,21 +463,30 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
           'A router being moved did not match access to Network to move.',
       'source_pending_not_empty':
           'A router being moved has a pending change or unknown pending state.',
-      'source_timestamp_unknown': 'A router being moved has an unknown active timestamp.',
+      'source_timestamp_unknown':
+          'A router being moved has an unknown active timestamp.',
       'source_timestamp_inconsistent':
           'Active timestamps differ among routers being moved.',
       'source_timestamp_mismatch':
           'A router being moved changed its active timestamp after the check.',
-      'target_read_missing_or_stale': 'Check the router on Network to keep again.',
+      'target_read_missing_or_stale':
+          'Check the router on Network to keep again.',
       'target_identity_unverified':
           'The router did not match access to Network to keep.',
       'target_pending_not_empty':
           'The router on Network to keep has a pending change or unknown pending state.',
-      'target_timestamp_unknown': 'The router on Network to keep has an unknown active timestamp.',
+      'target_timestamp_unknown':
+          'The router on Network to keep has an unknown active timestamp.',
       'target_timestamp_mismatch':
           'The router on Network to keep changed its active timestamp after the check.',
       'source_advertisement_conflict':
           'An advertisement for a router being moved conflicts with its authenticated identity.',
+      'operator_eero_source_required':
+          'Confirm that Network to move is the eero Thread network in the eero app.',
+      'source_group_attestation_required':
+          'Confirm that every source eero border router is represented in this review.',
+      'pinned_endpoint_unavailable':
+          'A reviewed router has no supported pinned local endpoint.',
     };
     return messages[code] ?? 'Additional evidence is required ($code).';
   }
@@ -469,7 +499,10 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
     final target =
         _state.routers.where((r) => r.id == _targetRouterId).firstOrNull;
     return Scaffold(
-      appBar: AppBar(title: const Text('Prepare a network move')),
+      appBar: AppBar(
+        title: Text(
+            _macExecution ? 'Join Eero network' : 'Prepare a network move'),
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -478,7 +511,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               children: [
                 Text(
-                  'Network move review',
+                  _macExecution ? 'Join Eero network' : 'Network move review',
                   style: theme.textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 6),
@@ -486,17 +519,22 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   _executionApi == null
                       ? 'Read only · No network changes'
                       : canExecute
-                          ? 'Review first · Isolated lab execution available'
+                          ? _macExecution
+                              ? 'Review before joining'
+                              : 'Review first · Isolated lab execution available'
                           : 'Saved operation recovery · Execution unavailable',
                 ),
                 const SizedBox(height: 12),
                 Text(
                   _executionApi == null
                       ? 'A move would change the border routers on Network to move so they join Network to keep. Other devices may lose connectivity. Accessories need a separate supported move. This page only prepares a review.'
-                      : 'A move changes the border routers on Network to move so they join Network to keep. Other devices may lose connectivity; accessories need a separate supported move. The isolated lab route requires separate preparation and confirmation.',
+                      : _macExecution
+                          ? 'This moves every Eero on ${_state.sourceCredentialNetworkName ?? 'Network to move'} to ${_state.targetCredentialNetworkName ?? 'Network to keep'}. Only continue if the source network has no accessories. The network you keep stays unchanged.'
+                          : 'A move changes the border routers on Network to move so they join Network to keep. Other devices may lose connectivity; accessories need a separate supported move. The isolated lab route requires separate preparation and confirmation.',
                 ),
                 if (_executionApi != null &&
-                    (_executionStatus != null || !_executionStatusVerified)) ...[
+                    (_executionStatus != null ||
+                        !_executionStatusVerified)) ...[
                   const SizedBox(height: 12),
                   _executionSection(),
                 ],
@@ -513,11 +551,13 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   ),
                 ],
                 const SizedBox(height: 20),
-                Text('1. Network to keep', style: theme.textTheme.titleLarge),
+                Text(
+                    _macExecution ? '1. Network to join' : '1. Network to keep',
+                    style: theme.textTheme.titleLarge),
                 const SizedBox(height: 6),
-                const Text(
-                  'Set up access to the network you want to keep, choose its border router, then check it. An advertised name alone does not confirm the network.',
-                ),
+                Text(_macExecution
+                    ? 'Choose the network your Eeros will join, then check its settings.'
+                    : 'Set up access to the network you want to keep, choose its border router, then check it. An advertised name alone does not confirm the network.'),
                 const SizedBox(height: 8),
                 Text(
                   _state.targetCredentialAvailable
@@ -530,11 +570,14 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   key: const Key('move-target-access'),
                   onPressed: _busy ? null : () => _setUpAccess('target'),
                   icon: const Icon(Icons.key_outlined),
-                  label: const Text('Set up Network to keep access'),
+                  label: Text(_macExecution
+                      ? 'Set up network to join'
+                      : 'Set up Network to keep access'),
                 ),
                 const SizedBox(height: 8),
                 if (_state.routers.isEmpty)
-                  const Text('Find routers before choosing one on Network to keep.')
+                  const Text(
+                      'Find routers before choosing one on Network to keep.')
                 else
                   for (final router in _state.routers)
                     ListTile(
@@ -573,14 +616,20 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                               () =>
                                   widget.api.probeForRole('target', target.id),
                             ),
-                    child: const Text('Check router on Network to keep'),
+                    child: Text(_macExecution
+                        ? 'Check network to join'
+                        : 'Check router on Network to keep'),
                   ),
                 const SizedBox(height: 18),
-                Text('2. Network to move', style: theme.textTheme.titleLarge),
+                Text(
+                    _macExecution
+                        ? '2. Eero network to move'
+                        : '2. Network to move',
+                    style: theme.textTheme.titleLarge),
                 const SizedBox(height: 6),
-                const Text(
-                  'Set up access to the network whose border routers you want to move. Check each observed router that may belong to it. The review lists those routers together.',
-                ),
+                Text(_macExecution
+                    ? 'Check each Eero on the network you are moving.'
+                    : 'Set up access to the network whose border routers you want to move. Check each observed router that may belong to it. The review lists those routers together.'),
                 const SizedBox(height: 8),
                 Text(
                   _state.sourceCredentialAvailable
@@ -593,7 +642,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   key: const Key('move-source-access'),
                   onPressed: _busy ? null : () => _setUpAccess('source'),
                   icon: const Icon(Icons.key_outlined),
-                  label: const Text('Set up Network to move access'),
+                  label: Text(_macExecution
+                      ? 'Set up Eero network'
+                      : 'Set up Network to move access'),
                 ),
                 const SizedBox(height: 8),
                 for (final router in _state.routers.where(
@@ -625,7 +676,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                                         router.id,
                                       ),
                                     ),
-                            child: const Text('Check for Network to move'),
+                            child: Text(_macExecution
+                                ? 'Check Eero'
+                                : 'Check for Network to move'),
                           ),
                         ],
                       ),
@@ -638,21 +691,26 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                       ? null
                       : () => _update(widget.api.discover),
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh router discovery'),
+                  label: Text(_macExecution
+                      ? 'Find routers again'
+                      : 'Refresh router discovery'),
                 ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Offline or unobserved devices remain unknown. Discovery is not a complete inventory.',
-                ),
+                if (!_macExecution) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                      'Offline or unobserved devices remain unknown. Discovery is not a complete inventory.'),
+                ],
                 const SizedBox(height: 20),
                 Text(
-                  '3. Confirm Network to move is empty',
+                  _macExecution
+                      ? '3. Confirm the Eero network is empty'
+                      : '3. Confirm Network to move is empty',
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'This first supported case requires a controlled inventory showing no attached devices on Network to move. Its border routers remain present. Missing advertisements or an empty child table do not prove this.',
-                ),
+                Text(_macExecution
+                    ? 'Check your home setup to make sure the Eero network you are moving has no accessories.'
+                    : 'This first supported case requires a controlled inventory showing no attached devices on Network to move. Its border routers remain present. Missing advertisements or an empty child table do not prove this.'),
                 CheckboxListTile(
                   key: const Key('move-empty-source-attestation'),
                   contentPadding: EdgeInsets.zero,
@@ -663,44 +721,89 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                             _attested = value ?? false;
                             _clearReview();
                           }),
-                  title: const Text(
-                    'I established a controlled inventory and confirm Network to move has no attached devices.',
-                  ),
+                  title: Text(_macExecution
+                      ? 'I checked every device and confirm this Eero network has no accessories.'
+                      : 'I established a controlled inventory and confirm Network to move has no attached devices.'),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
-                const SizedBox(height: 12),
-                Text('4. Prepare review', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 6),
-                const Text(
-                  'Choose the proposed propagation delay. Preparation checks evidence only and does not send a network command.',
-                ),
-                DropdownButtonFormField<int>(
-                  key: const Key('move-delay'),
-                  initialValue: _delaySeconds,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Propagation delay',
+                if (_macExecution) ...[
+                  CheckboxListTile(
+                    key: const Key('move-eero-source-attestation'),
+                    contentPadding: EdgeInsets.zero,
+                    value: _eeroConfirmed,
+                    onChanged: _busy
+                        ? null
+                        : (value) => setState(() {
+                              _eeroConfirmed = value ?? false;
+                              _clearReview();
+                            }),
+                    title: const Text(
+                        'I checked in eero that this is my Eero network.'),
+                    controlAffinity: ListTileControlAffinity.leading,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 300, child: Text('5 minutes')),
-                    DropdownMenuItem(value: 900, child: Text('15 minutes')),
-                    DropdownMenuItem(value: 1800, child: Text('30 minutes')),
-                  ],
-                  onChanged: _busy
-                      ? null
-                      : (value) => setState(() {
-                            _delaySeconds = value ?? 300;
-                            _clearReview();
-                            _attested = false;
-                          }),
-                ),
+                  CheckboxListTile(
+                    key: const Key('move-whole-eero-group-attestation'),
+                    contentPadding: EdgeInsets.zero,
+                    value: _groupConfirmed,
+                    onChanged: _busy
+                        ? null
+                        : (value) => setState(() {
+                              _groupConfirmed = value ?? false;
+                              _clearReview();
+                            }),
+                    title: const Text(
+                        'I checked that every Eero on this network is listed.'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  const ExpansionTile(
+                    title: Text('Details'),
+                    children: [
+                      Text(
+                          'Router advertisements do not prove the manufacturer or reveal offline devices. If a router endpoint changes, the app requires manual review and will not resend the command.'),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Text(_macExecution ? '4. Review join' : '4. Prepare review',
+                    style: theme.textTheme.titleLarge),
+                const SizedBox(height: 6),
+                Text(_macExecution
+                    ? 'This review checks settings only. After joining, allow at least 5 minutes for settings to update.'
+                    : 'Choose the proposed propagation delay. Preparation checks evidence only and does not send a network command.'),
+                if (!_macExecution)
+                  DropdownButtonFormField<int>(
+                    key: const Key('move-delay'),
+                    initialValue: _delaySeconds,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Propagation delay',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 300, child: Text('5 minutes')),
+                      DropdownMenuItem(value: 900, child: Text('15 minutes')),
+                      DropdownMenuItem(value: 1800, child: Text('30 minutes')),
+                    ],
+                    onChanged: _busy
+                        ? null
+                        : (value) => setState(() {
+                              _delaySeconds = value ?? 300;
+                              _clearReview();
+                              _attested = false;
+                            }),
+                  ),
                 const SizedBox(height: 12),
                 FilledButton(
                   key: const Key('move-prepare'),
-                  onPressed: _busy || !_attested || _targetRouterId == null
+                  onPressed: _busy ||
+                          !_attested ||
+                          (_macExecution &&
+                              (!_eeroConfirmed || !_groupConfirmed)) ||
+                          _targetRouterId == null
                       ? null
                       : _prepare,
-                  child: const Text('Prepare read-only review'),
+                  child: Text(_macExecution
+                      ? 'Review join'
+                      : 'Prepare read-only review'),
                 ),
                 if (_plan != null) _review(_plan!),
                 const SizedBox(height: 16),
@@ -714,9 +817,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 else if (_executionStatus == null && _executionStatusVerified)
                   _executionSection(),
                 const SizedBox(height: 8),
-                const Text(
-                  'The actual adapter and device/firmware route need separate lab and vendor verification. No rollback is guaranteed.',
-                ),
+                if (!_macExecution)
+                  const Text(
+                      'The actual adapter and device/firmware route need separate lab and vendor verification. No rollback is guaranteed.'),
               ],
             ),
           ),
@@ -735,7 +838,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Network to move review', style: theme.textTheme.titleLarge),
+            Text(_macExecution ? 'Review join' : 'Network to move review',
+                style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
               _reviewExpired
@@ -744,20 +848,24 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                       ? _reviewIssue!
                       : !_reviewVerified
                           ? 'Checking whether this review is still current.'
-                          : plan.readyForLabReview
-                              ? 'Evidence ready for separate lab review.'
+                          : plan.readyForExecutionReview
+                              ? _macExecution
+                                  ? 'Settings checked. Review the join before continuing.'
+                                  : 'Evidence ready for separate lab review.'
                               : 'More evidence is needed.',
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Proposed change: move the border routers on Network to move to Network to keep. Other devices may lose connectivity; accessories are not moved by this action.',
-            ),
-            const Text(
-              'Offline or unobserved devices remain unknown. This is not a complete inventory.',
-            ),
+            if (!_macExecution) ...[
+              const Text(
+                  'Proposed change: move the border routers on Network to move to Network to keep. Other devices may lose connectivity; accessories are not moved by this action.'),
+              const Text(
+                  'Offline or unobserved devices remain unknown. This is not a complete inventory.'),
+            ],
             const SizedBox(height: 10),
             Text(
-              'Observed border routers to move (${plan.sourceRouters.length})',
+              _macExecution
+                  ? 'Eeros to move (${plan.sourceRouters.length})'
+                  : 'Observed border routers to move (${plan.sourceRouters.length})',
               style: theme.textTheme.titleMedium,
             ),
             if (plan.sourceRouters.isEmpty)
@@ -782,16 +890,23 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   ? 'Propagation delay: ${plan.delaySeconds ~/ 60} minutes'
                   : 'Propagation delay: ${plan.delaySeconds} seconds',
             ),
-            const Text(
-              'A move could interrupt Network to move during propagation.',
-            ),
-            Text(
-              'After the propagation delay, recheck the routers being moved and the network being kept.',
-            ),
-            Text('Recovery: ${plan.recovery}'),
-            const Text(
-              'Manual recovery may be required. Rollback is not guaranteed.',
-            ),
+            if (!_macExecution) ...[
+              const Text(
+                  'A move could interrupt Network to move during propagation.'),
+              const Text(
+                  'After the propagation delay, recheck the routers being moved and the network being kept.'),
+              Text('Recovery: ${plan.recovery}'),
+              const Text(
+                  'Manual recovery may be required. Rollback is not guaranteed.'),
+            ],
+            if (_macExecution)
+              const ExpansionTile(
+                title: Text('Details'),
+                children: [
+                  Text(
+                      'Offline devices remain unknown. The join can interrupt the source network. Manual recovery may be required; rollback is not guaranteed.'),
+                ],
+              ),
             Text('Review expires: ${plan.reviewValidUntil.toLocal()}'),
           ],
         ),
@@ -811,12 +926,12 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Isolated lab execution',
+              _macExecution ? 'Join network' : 'Isolated lab execution',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const Text(
-              'Available only for the trusted OpenThread POSIX lab profile.',
-            ),
+            if (!_macExecution)
+              const Text(
+                  'Available only for the trusted OpenThread POSIX lab profile.'),
             if (_executionBusy)
               const LinearProgressIndicator(key: Key('move-execution-busy')),
             if (_executionNotice != null)
@@ -829,13 +944,14 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                         !_executionStatusVerified ||
                         _confirmationAttempted ||
                         plan == null ||
-                        !plan.readyForLabReview ||
+                        !plan.readyForExecutionReview ||
                         !_reviewVerified ||
                         _reviewExpired ||
                         _reviewIssue != null
                     ? null
                     : _prepareExecution,
-                child: const Text('Prepare actual execution'),
+                child: Text(
+                    _macExecution ? 'Check join' : 'Prepare actual execution'),
               ),
               OutlinedButton(
                 key: const Key('move-execution-current'),
@@ -844,21 +960,37 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
               ),
             ],
             if (review != null && status == null) ...[
-              Text('Operation: ${review.operationId}'),
-              Text('Profile: ${review.profileId}'),
-              const Text(
-                'Scope: border routers on Network to move. Offline or unobserved devices may be affected; this does not move accessories.',
-              ),
-              Text(
-                'Observed border routers to move: ${review.sourceRouterIds.join(', ')}',
-              ),
-              Text('Router on Network to keep: ${review.targetRouterId}'),
-              Text(
-                'Propagation delay: ${review.delaySeconds} seconds; observation: ${review.observationSeconds} seconds.',
-              ),
-              const Text(
-                'Network to move must have no attached devices in this isolated lab profile. The move may interrupt it. Manual recovery may be required; rollback is not guaranteed.',
-              ),
+              if (_macExecution) ...[
+                Text('Eeros selected: ${review.sourceRouterIds.length}'),
+                Text(
+                    'Join: ${_state.targetCredentialNetworkName ?? 'Network to keep'}'),
+                const Text(
+                    'The checked settings are ready. This action starts the join once.'),
+                ExpansionTile(
+                  title: const Text('Details'),
+                  children: [
+                    Text('Operation: ${review.operationId}'),
+                    Text('Profile: ${review.profileId}'),
+                    Text(
+                        'Source router IDs: ${review.sourceRouterIds.join(', ')}'),
+                    Text('Target router ID: ${review.targetRouterId}'),
+                    Text(
+                        'Delay: ${review.delaySeconds} seconds; observation: ${review.observationSeconds} seconds.'),
+                  ],
+                ),
+              ] else ...[
+                Text('Operation: ${review.operationId}'),
+                Text('Profile: ${review.profileId}'),
+                const Text(
+                    'Scope: border routers on Network to move. Offline or unobserved devices may be affected; this does not move accessories.'),
+                Text(
+                    'Observed border routers to move: ${review.sourceRouterIds.join(', ')}'),
+                Text('Router on Network to keep: ${review.targetRouterId}'),
+                Text(
+                    'Propagation delay: ${review.delaySeconds} seconds; observation: ${review.observationSeconds} seconds.'),
+                const Text(
+                    'Network to move must have no attached devices in this isolated lab profile. The move may interrupt it. Manual recovery may be required; rollback is not guaranteed.'),
+              ],
               Text('Confirmation expires: ${review.expiresAt.toLocal()}'),
               FilledButton(
                 key: const Key('move-execution-confirm'),
@@ -870,7 +1002,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                         !review.expiresAt.isAfter(DateTime.now().toUtc())
                     ? null
                     : _confirmExecution,
-                child: const Text('Confirm and start this operation once'),
+                child: Text(_macExecution
+                    ? 'Join network'
+                    : 'Confirm and start this operation once'),
               ),
               if (_confirmationAttempted)
                 OutlinedButton(
@@ -880,24 +1014,43 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 ),
             ],
             if (status != null) ...[
-              Text(
-                'Operation: ${status.operationId}',
-                key: const Key('move-execution-operation'),
-              ),
-              Text(
-                'Stage: ${status.stage.replaceAll('_', ' ')}',
-                key: const Key('move-execution-stage'),
-              ),
-              Text('Disposition: ${status.disposition.replaceAll('_', ' ')}'),
-              Text('Reason: ${status.reason.replaceAll('_', ' ')}'),
-              const Text(
-                'Command acceptance is separate from observed network convergence. Do not submit another move while the outcome is unresolved.',
-              ),
+              if (_macExecution) ...[
+                Text(
+                  status.stage == 'verified_configuration'
+                      ? 'Network settings verified'
+                      : status.stage == 'needs_attention'
+                          ? 'Join needs attention'
+                          : 'Checking network settings',
+                  key: const Key('move-execution-stage'),
+                ),
+                Text(status.stage == 'verified_configuration'
+                    ? 'All selected routers report the chosen settings. Accessory connectivity has not been tested.'
+                    : 'Do not start another join while this outcome is unresolved.'),
+                ExpansionTile(
+                  title: const Text('Details'),
+                  children: [
+                    Text('Operation: ${status.operationId}',
+                        key: const Key('move-execution-operation')),
+                    Text('Stage: ${status.stage}'),
+                    Text('Disposition: ${status.disposition}'),
+                    Text('Reason: ${status.reason}'),
+                  ],
+                ),
+              ] else ...[
+                Text('Operation: ${status.operationId}',
+                    key: const Key('move-execution-operation')),
+                Text('Stage: ${status.stage.replaceAll('_', ' ')}',
+                    key: const Key('move-execution-stage')),
+                Text('Disposition: ${status.disposition.replaceAll('_', ' ')}'),
+                Text('Reason: ${status.reason.replaceAll('_', ' ')}'),
+                const Text(
+                    'Command acceptance is separate from observed network convergence. Do not submit another move while the outcome is unresolved.'),
+              ],
               OutlinedButton(
                 key: const Key('move-execution-check'),
                 onPressed:
                     _executionBusy ? null : () => _executionAction('check'),
-                child: const Text('Check outcome'),
+                child: Text(_macExecution ? 'Check settings' : 'Check outcome'),
               ),
               if (status.stage == 'observation_stopped')
                 OutlinedButton(

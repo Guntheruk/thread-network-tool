@@ -5,4 +5,4 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 /// instead of letting Flutter's default hash routing consume and rewrite it.
 void configureRouting() => setUrlStrategy(null);
 
-LiveApi? platformLiveApi() => null;
+Future<LiveApi?> platformLiveApi() async => null;

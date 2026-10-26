@@ -3,9 +3,9 @@ import 'native/session.dart';
 
 /// Direct in-process adapter for desktop Flutter. It uses the same bounded
 /// native calls and state transitions as the loopback helper, without HTTP.
-class NativeLiveApi implements NetworkMoveExecutionApi {
+class NativeLiveApi implements NetworkMoveExecutionApi, ExecutionProfileInfo {
   NativeLiveApi({required NativeCall native, LiveSession? session})
-    : _session = session ?? LiveSession(native);
+      : _session = session ?? LiveSession(native);
 
   final LiveSession _session;
 
@@ -14,6 +14,9 @@ class NativeLiveApi implements NetworkMoveExecutionApi {
 
   @override
   bool get executionRecoveryAvailable => _session.executionRecoveryAvailable;
+
+  @override
+  String get executionProfileId => _session.executionProfileId;
 
   Future<Object?> _execution(String action, Map<String, dynamic> body) async {
     try {
@@ -54,12 +57,13 @@ class NativeLiveApi implements NetworkMoveExecutionApi {
   Future<NetworkMoveExecutionStatus> checkExecution(
     String operationId, {
     bool resume = false,
-  }) async => NetworkMoveExecutionStatus.fromJson(
-    await _execution('network-move/execution/check', {
-      'operation_id': operationId,
-      'resume': resume,
-    }),
-  );
+  }) async =>
+      NetworkMoveExecutionStatus.fromJson(
+        await _execution('network-move/execution/check', {
+          'operation_id': operationId,
+          'resume': resume,
+        }),
+      );
 
   @override
   Future<NetworkMoveExecutionStatus> stopExecution(String operationId) async =>

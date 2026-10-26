@@ -17,7 +17,7 @@ String liveReport(LiveState state) {
   int roleMatches(String role) =>
       state.routers.where((r) => r.roleProbes[role]?.verified == true).length;
   return [
-    'Thread Network Tool — read-only live assessment',
+    'Thread Network Tool — live assessment',
     'Discovery status: ${state.discoveryStatus}',
     'Advertised routers: ${state.routers.length} (unverified advertisements)',
     'Inspection credentials available: ${state.credentialAvailable ? 'yes' : 'no'}',
@@ -31,7 +31,7 @@ String liveReport(LiveState state) {
     'Network to keep access available: ${state.targetCredentialAvailable ? 'yes' : 'no'}',
     'Border router reads for Network to keep: ${roleAttempts('target')}',
     'Authenticated matches for Network to keep: ${roleMatches('target')}',
-    'Joining: disabled pending compatible router and lab validation',
+    'Network move result: no execution claim in this assessment report',
     'Network names, device IDs, endpoints and credentials: excluded',
   ].join('\n');
 }
@@ -181,6 +181,11 @@ class _LiveScreenState extends State<LiveScreen> {
   Widget build(BuildContext context) {
     final state = _state;
     final colors = Theme.of(context).colorScheme;
+    final macJoin = _api is NetworkMoveExecutionApi &&
+        _api.executionAvailable &&
+        _api is ExecutionProfileInfo &&
+        (_api as ExecutionProfileInfo).executionProfileId ==
+            'eero-source-network-alpha-v1';
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -219,7 +224,9 @@ class _LiveScreenState extends State<LiveScreen> {
                     ),
                     Text(
                       _api is NetworkMoveExecutionApi && _api.executionAvailable
-                          ? 'Live · Isolated lab execution available'
+                          ? macJoin
+                              ? 'Live · Eero join available after review'
+                              : 'Live · Isolated lab execution available'
                           : 'Live · Read only',
                     ),
                     if (_api is! NetworkMoveExecutionApi ||
@@ -311,7 +318,7 @@ class _LiveScreenState extends State<LiveScreen> {
                     title: const Text('How this works'),
                     children: [
                       const Text(
-                        'Router advertisements only suggest a network name. A router is verified only after an authenticated read completes and its identity matches imported credentials. This screen cannot change your network.',
+                        'Router advertisements only suggest a network name. A router is verified only after an authenticated read completes and its identity matches imported credentials. A separate move review is required before any network change.',
                       ),
                       Text(
                         'Discovery observed: ${_localTime(state.observedAt)}',
@@ -331,7 +338,9 @@ class _LiveScreenState extends State<LiveScreen> {
                           ? null
                           : _openNetworkMove,
                       icon: const Icon(Icons.account_tree_outlined),
-                      label: const Text('Prepare a network move'),
+                      label: Text(macJoin
+                          ? 'Join Eero network'
+                          : 'Prepare a network move'),
                     ),
                     const SizedBox(height: 10),
                   ],

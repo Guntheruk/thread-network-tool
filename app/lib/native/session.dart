@@ -6,6 +6,8 @@ import 'dart:math';
 import '../move/network_move_plan.dart';
 import '../move/move_execution.dart';
 import 'native_move_adapter.dart';
+import 'mac_move_adapter.dart';
+import 'move_adapter.dart';
 
 typedef NativeCall = Future<NativeReply> Function(List<String>, String?);
 
@@ -124,12 +126,16 @@ class LiveSession {
       : now = now ?? DateTime.now;
   final NativeCall native;
   final DateTime Function() now;
-  final NativeMoveAdapter? execution;
+  final MoveAdapter? execution;
   bool get executionAvailable => execution?.available ?? false;
   bool get executionRecoveryAvailable => execution != null;
+  String get executionProfileId =>
+      execution is MacMoveAdapter ? macMoveProfile : isolatedMoveProfile;
   final String _sessionId = randomToken();
   String _discoveryRevision = randomToken();
   final Map<String, String> _fixtureNodes = {};
+  final Map<String, MacMoveRouter> _macRouters = {};
+  bool _macOperatorAttested = false;
   String? _credential;
   String? _credentialName;
   final Map<String, _RoleCredential> _roleCredentials = {};
@@ -275,6 +281,8 @@ class LiveSession {
     _advertisedXpans.clear();
     _knownSourceCandidates.clear();
     _fixtureNodes.clear();
+    _macRouters.clear();
+    if (execution case final MacMoveAdapter mac) mac.endpointsChanged(const []);
     _discoveryRevision = randomToken();
     _observed = null;
     _discoveryStatus = 'error';
@@ -339,12 +347,22 @@ class LiveSession {
           ? advertisedXpan
           : null;
       if (usable) _endpoints[id] = (address, port);
+      if (usable && execution is MacMoveAdapter) {
+        try {
+          _macRouters[id] = MacMoveRouter(address, port);
+        } catch (_) {
+          // Provisional advertisement cannot establish a usable move endpoint.
+        }
+      }
       final fixtureNode = item['fixture_node_id'];
       if (executionAvailable &&
           fixtureNode is String &&
           moveCommitmentValid(fixtureNode)) {
         _fixtureNodes[id] = fixtureNode;
       }
+    }
+    if (execution case final MacMoveAdapter mac) {
+      mac.endpointsChanged(_macRouters.values);
     }
     _refreshRecoveryCredentials();
   }
@@ -460,20 +478,25 @@ class LiveSession {
     _endpoints.clear();
     _advertisedXpans.clear();
     _knownSourceCandidates.clear();
+    _macRouters.clear();
+    if (execution case final MacMoveAdapter mac) mac.endpointsChanged(const []);
   }
 
   void _invalidateReview() {
     _review = null;
     _reviewExpires = null;
+    _macOperatorAttested = false;
     execution?.invalidateReviews();
     _refreshRecoveryCredentials();
   }
 
   bool _usableEndpoint(String address) =>
       localEndpoint(address) ||
-      (executionAvailable && (address == '::1' || address == '127.0.0.1'));
+      (execution is NativeMoveAdapter &&
+          executionAvailable &&
+          (address == '::1' || address == '127.0.0.1'));
 
-  NativeMoveAdapter _execution({bool requireAvailable = true}) {
+  MoveAdapter _execution({bool requireAvailable = true}) {
     if (!executionRecoveryAvailable ||
         (requireAvailable && !executionAvailable)) {
       throw const ApiFailure('not_found', 404);
@@ -502,10 +525,13 @@ class LiveSession {
       Map<String, dynamic> body) async {
     final adapter = _execution();
     final review = currentReview;
+    final mac = adapter is MacMoveAdapter;
     if (review == null ||
         body.length != 1 ||
         body['review_id'] != review['review_id'] ||
-        review['decision'] != 'ready_for_lab_review' ||
+        review['decision'] !=
+            (mac ? 'ready_for_execution_review' : 'ready_for_lab_review') ||
+        (mac && !_macOperatorAttested) ||
         review['delay_seconds'] != 300) {
       throw const ApiFailure('review_invalidated', 409);
     }
@@ -516,34 +542,63 @@ class LiveSession {
     final sourceIds = rows
         .map((row) => (row as Map)['router_id'] as String)
         .toList(growable: false);
-    if (source == null ||
-        target == null ||
-        sourceIds.isEmpty ||
-        sourceIds.any((id) => !_fixtureNodes.containsKey(id)) ||
-        !_fixtureNodes.containsKey(targetId)) {
+    if (source == null || target == null || sourceIds.isEmpty) {
       throw const ApiFailure('execution_unavailable', 409);
     }
-    final bootstrap = await adapter.fixture.call('bootstrap');
-    final fixtureId = bootstrap['fixture_id'];
-    if (fixtureId is! String || !moveCommitmentValid(fixtureId)) {
+    final operationId = randomToken();
+    final sourceGeneration =
+        int.parse(source.generation.substring(0, 12), radix: 16);
+    final targetGeneration =
+        int.parse(target.generation.substring(0, 12), radix: 16);
+    late final MoveExecutionPlan plan;
+    if (adapter is MacMoveAdapter) {
+      if (sourceIds.length > 8 ||
+          sourceIds.any((id) => !_macRouters.containsKey(id)) ||
+          !_macRouters.containsKey(targetId)) {
+        throw const ApiFailure('execution_unavailable', 409);
+      }
+      plan = await adapter.prepare(MacMoveRequest(
+        operationId: operationId,
+        reviewId: review['review_id'] as String,
+        sourceDataset: source.dataset,
+        targetDataset: target.dataset,
+        sourceGeneration: sourceGeneration,
+        targetGeneration: targetGeneration,
+        sessionId: _sessionId,
+        discoveryRevision: _discoveryRevision,
+        connectivityRevision: _discoveryRevision,
+        sources: List.unmodifiable(sourceIds.map((id) => _macRouters[id]!)),
+        target: _macRouters[targetId]!,
+        inventoryAttestation: review['review_id'] as String,
+      ));
+    } else if (adapter is NativeMoveAdapter) {
+      if (sourceIds.any((id) => !_fixtureNodes.containsKey(id)) ||
+          !_fixtureNodes.containsKey(targetId)) {
+        throw const ApiFailure('execution_unavailable', 409);
+      }
+      final bootstrap = await adapter.fixture.call('bootstrap');
+      final fixtureId = bootstrap['fixture_id'];
+      if (fixtureId is! String || !moveCommitmentValid(fixtureId)) {
+        throw const ApiFailure('execution_unavailable', 409);
+      }
+      plan = await adapter.prepare(NativeMoveRequest(
+        operationId: operationId,
+        reviewId: review['review_id'] as String,
+        sourceDataset: source.dataset,
+        targetDataset: target.dataset,
+        sourceGeneration: sourceGeneration,
+        targetGeneration: targetGeneration,
+        sessionId: _sessionId,
+        discoveryRevision: _discoveryRevision,
+        connectivityRevision: fixtureId,
+        sourceNodes:
+            List.unmodifiable(sourceIds.map((id) => _fixtureNodes[id]!)),
+        targetNode: _fixtureNodes[targetId]!,
+        inventoryAttestation: review['review_id'] as String,
+      ));
+    } else {
       throw const ApiFailure('execution_unavailable', 409);
     }
-    final plan = await adapter.prepare(NativeMoveRequest(
-      operationId: randomToken(),
-      reviewId: review['review_id'] as String,
-      sourceDataset: source.dataset,
-      targetDataset: target.dataset,
-      sourceGeneration:
-          int.parse(source.generation.substring(0, 12), radix: 16),
-      targetGeneration:
-          int.parse(target.generation.substring(0, 12), radix: 16),
-      sessionId: _sessionId,
-      discoveryRevision: _discoveryRevision,
-      connectivityRevision: fixtureId,
-      sourceNodes: List.unmodifiable(sourceIds.map((id) => _fixtureNodes[id]!)),
-      targetNode: _fixtureNodes[targetId]!,
-      inventoryAttestation: review['review_id'] as String,
-    ));
     // No native request can outlive a superseding session review.
     if (currentReview?['review_id'] != plan.reviewId) {
       adapter.invalidateReviews();
@@ -657,6 +712,21 @@ class LiveSession {
       delaySeconds: delay,
     );
     final blockers = <String>{...assessment.blockers};
+    final macExecution = execution is MacMoveAdapter;
+    if (macExecution) {
+      final operatorEero = attestationInput is Map &&
+          attestationInput['operator_eero_source'] == true;
+      final wholeGroup = attestationInput is Map &&
+          attestationInput['all_source_eeros_represented'] == true;
+      if (!operatorEero) blockers.add('operator_eero_source_required');
+      if (!wholeGroup) blockers.add('source_group_attestation_required');
+      if (candidates.length > 8 ||
+          candidates.any((entry) => !_macRouters.containsKey(entry.key)) ||
+          !_macRouters.containsKey(targetId)) {
+        blockers.add('pinned_endpoint_unavailable');
+      }
+      _macOperatorAttested = operatorEero && wholeGroup;
+    }
     if (attestation != null &&
         ((_observed != null && attestation.attestedAt.isBefore(_observed!)) ||
             (source != null &&
@@ -711,7 +781,11 @@ class LiveSession {
     final review = <String, dynamic>{
       'schema_version': 1,
       'mode': 'network_move_review',
-      'decision': blockers.isEmpty ? 'ready_for_lab_review' : 'needs_evidence',
+      'decision': blockers.isEmpty
+          ? (macExecution
+              ? 'ready_for_execution_review'
+              : 'ready_for_lab_review')
+          : 'needs_evidence',
       'blockers': blockers.toList(growable: false),
       'review_id': randomToken(),
       'review_valid_until': expires.toUtc().toIso8601String(),
@@ -732,8 +806,9 @@ class LiveSession {
       'unknown_offline_devices': true,
       'inventory_complete': false,
       'delay_seconds': delay,
-      'verification':
-          'After the delay, recheck the routers being moved and the network being kept. Accessories require a separate supported step.',
+      'verification': macExecution
+          ? 'After at least five minutes, authenticate complete configurations on every original source endpoint and confirm unchanged target for 30 stable seconds. This does not verify mesh or accessory connectivity.'
+          : 'After the delay, recheck the routers being moved and the network being kept. Accessories require a separate supported step.',
       'recovery': 'Manual recovery; rollback is not guaranteed.',
     };
     _review = review;

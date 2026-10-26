@@ -1,6 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+
 import 'live_api.dart';
+import 'move/native_move_journal.dart';
+import 'native/mac_move_adapter.dart';
 import 'native/session.dart';
 import 'native_live_api.dart';
 
@@ -26,7 +30,7 @@ String? resolveNativeEnginePath({
   return file.path;
 }
 
-LiveApi platformLiveApi() {
+Future<LiveApi> platformLiveApi() async {
   if (!Platform.isMacOS) return const UnsupportedLiveApi();
 
   final engine = resolveNativeEnginePath(
@@ -45,6 +49,29 @@ LiveApi platformLiveApi() {
     }
     discovery = path.path;
   }
-  return NativeLiveApi(
-      native: NativeProcess(engine, discoveryExecutable: discovery).call);
+  final native = NativeProcess(engine, discoveryExecutable: discovery).call;
+  final helpers = File(Platform.resolvedExecutable).parent.parent.path;
+  final worker = File('$helpers/Helpers/tnt-mac-move-worker');
+  final journalHelper = File('$helpers/Helpers/thread-move-journal');
+  if (!journalHelper.existsSync()) return NativeLiveApi(native: native);
+  try {
+    const channel = MethodChannel('thread_network_tool/move_storage');
+    final parent = await channel.invokeMethod<String>('privateDirectory');
+    if (parent == null || !Directory(parent).isAbsolute) {
+      return NativeLiveApi(native: native);
+    }
+    final directory = '$parent/move-journal';
+    final adapter = MacMoveAdapter(
+      workerExecutable: worker.path,
+      lifecycleDirectory: directory,
+      journal: NativeMoveJournal(
+        executable: journalHelper.path,
+        directory: directory,
+      ),
+    );
+    return NativeLiveApi(
+        native: native, session: LiveSession(native, execution: adapter));
+  } catch (_) {
+    return NativeLiveApi(native: native);
+  }
 }

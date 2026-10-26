@@ -222,6 +222,12 @@ class ExecutionMoveFake extends MoveFake implements NetworkMoveExecutionApi {
       });
 }
 
+class MacExecutionMoveFake extends ExecutionMoveFake
+    implements ExecutionProfileInfo {
+  @override
+  String get executionProfileId => 'eero-source-network-alpha-v1';
+}
+
 Future<void> _pump(
   WidgetTester tester,
   MoveFake api, {
@@ -290,7 +296,8 @@ Future<void> _ensureEndKeyVisible(WidgetTester tester, Key key) async {
 }
 
 void main() {
-  testWidgets('runtime helper refuses a current-status-blocked execution action',
+  testWidgets(
+      'runtime helper refuses a current-status-blocked execution action',
       (tester) async {
     final api = ExecutionMoveFake()..failCurrent = true;
     await _pump(tester, api, size: const Size(1200, 2000));
@@ -301,8 +308,10 @@ void main() {
       throwsStateError,
     );
     expect(blocked, 1);
-    expect(api.actions.where((action) => action.startsWith('prepare:')), isEmpty);
-    expect(find.textContaining('Execution status is unavailable'), findsOneWidget);
+    expect(
+        api.actions.where((action) => action.startsWith('prepare:')), isEmpty);
+    expect(
+        find.textContaining('Execution status is unavailable'), findsOneWidget);
   });
   for (final height in [900.0, 2000.0]) {
     testWidgets(
@@ -321,11 +330,14 @@ void main() {
         await _tapVisible(tester, const Key('move-prepare'));
         expect(find.byKey(const Key('move-review')), findsOneWidget);
         expect(find.byKey(const Key('move-execution-prepare')), findsNothing);
-        expect(api.actions.where((action) => action.startsWith('prepare:')), isEmpty);
+        expect(api.actions.where((action) => action.startsWith('prepare:')),
+            isEmpty);
         await ensureIsolatedAction(tester, 'move-execution-prepare');
         await tester.tap(find.byKey(const Key('move-execution-prepare')));
         await tester.pumpAndSettle();
-        expect(api.actions.where((action) => action == 'prepare:review-id').length, 1);
+        expect(
+            api.actions.where((action) => action == 'prepare:review-id').length,
+            1);
         expect(find.byKey(const Key('move-execution-confirm')), findsOneWidget);
       },
     );
@@ -355,8 +367,7 @@ void main() {
       await _tapVisible(tester, const Key('move-execution-prepare'));
       expect(api.actions, ['current', 'prepare:review-id']);
       expect(
-        find.textContaining(
-            'Network to move must have no attached devices'),
+        find.textContaining('Network to move must have no attached devices'),
         findsOneWidget,
       );
       await _tapVisible(tester, const Key('move-execution-confirm'));
@@ -497,6 +508,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.credentialRoles, isEmpty);
     expect(api.planCalls, 0);
+  });
+
+  testWidgets(
+      'Mac move review requires separate eero and whole-group attestations',
+      (tester) async {
+    final api = MacExecutionMoveFake()
+      ..preparedPlan = _plan(
+        decision: 'ready_for_execution_review',
+        validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+      );
+    await _pump(tester, api);
+    await _tapVisible(tester, const Key('move-target-target-id'));
+    await _tapVisible(tester, const Key('move-empty-source-attestation'));
+    await _ensureVisible(tester, const Key('move-prepare'));
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('move-prepare')))
+          .onPressed,
+      isNull,
+    );
+    await _tapVisible(tester, const Key('move-eero-source-attestation'));
+    await _tapVisible(tester, const Key('move-whole-eero-group-attestation'));
+    await _tapVisible(tester, const Key('move-prepare'));
+    expect(api.planCalls, 1);
+    expect(api.attestation!.operatorEeroSource, isTrue);
+    expect(api.attestation!.allSourceEerosRepresented, isTrue);
+    expect(find.textContaining('Settings checked. Review the join'),
+        findsOneWidget);
   });
 
   testWidgets('target and source setup and checks keep explicit roles', (

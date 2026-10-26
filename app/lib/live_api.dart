@@ -171,9 +171,8 @@ class LiveState {
       throw const FormatException('Invalid live state');
     }
     final timestamp = value['observed_at'];
-    final observedAt = timestamp == null
-        ? null
-        : DateTime.tryParse(_safeText(timestamp));
+    final observedAt =
+        timestamp == null ? null : DateTime.tryParse(_safeText(timestamp));
     if (timestamp != null && observedAt == null) {
       throw const FormatException('Invalid live state');
     }
@@ -220,14 +219,22 @@ class LiveState {
 }
 
 class EmptySourceAttestationInput {
-  const EmptySourceAttestationInput({required this.attestedAt});
+  const EmptySourceAttestationInput({
+    required this.attestedAt,
+    this.operatorEeroSource = false,
+    this.allSourceEerosRepresented = false,
+  });
   final DateTime attestedAt;
+  final bool operatorEeroSource;
+  final bool allSourceEerosRepresented;
 
   Map<String, Object> toJson() => {
-    'method': 'operator_controlled_inventory',
-    'scope': 'whole_source_network',
-    'attested_at': attestedAt.toUtc().toIso8601String(),
-  };
+        'method': 'operator_controlled_inventory',
+        'scope': 'whole_source_network',
+        'attested_at': attestedAt.toUtc().toIso8601String(),
+        'operator_eero_source': operatorEeroSource,
+        'all_source_eeros_represented': allSourceEerosRepresented,
+      };
 }
 
 class NetworkMoveSourceRouter {
@@ -291,6 +298,9 @@ class NetworkMovePlan {
   final String verification;
   final String recovery;
   bool get readyForLabReview => decision == 'ready_for_lab_review';
+  bool get readyForExecutionReview =>
+      decision == 'ready_for_lab_review' ||
+      decision == 'ready_for_execution_review';
   String get affectedScope => 'whole_source_network';
   bool get unknownOfflineDevices => true;
   bool get inventoryComplete => false;
@@ -328,6 +338,7 @@ class NetworkMovePlan {
     return NetworkMovePlan(
       decision: _choice(value['decision'], const {
         'ready_for_lab_review',
+        'ready_for_execution_review',
         'needs_evidence',
       }),
       blockers: blockers,
@@ -409,6 +420,7 @@ class NetworkMoveExecutionReview {
       operationId: _safeText(value['operation_id']),
       profileId: _choice(value['profile_id'], const {
         'openthread-posix-lab-v1',
+        'eero-source-network-alpha-v1',
       }),
       expiresAt: expiry,
       sourceRouterIds: List.unmodifiable(sources),
@@ -430,10 +442,11 @@ class NetworkMoveExecutionStatus {
   final String operationId, profileId, stage, disposition, reason;
 
   bool get terminal => const {
-    'verified_complete',
-    'verified_unchanged',
-    'proven_not_sent',
-  }.contains(stage);
+        'verified_complete',
+        'verified_configuration',
+        'verified_unchanged',
+        'proven_not_sent',
+      }.contains(stage);
 
   factory NetworkMoveExecutionStatus.fromJson(Object? value) {
     if (value is! Map<String, dynamic> ||
@@ -445,6 +458,7 @@ class NetworkMoveExecutionStatus {
       operationId: _safeText(value['operation_id']),
       profileId: _choice(value['profile_id'], const {
         'openthread-posix-lab-v1',
+        'eero-source-network-alpha-v1',
       }),
       stage: _choice(value['stage'], const {
         'dispatch_fenced',
@@ -452,6 +466,7 @@ class NetworkMoveExecutionStatus {
         'needs_attention',
         'observation_stopped',
         'verified_complete',
+        'verified_configuration',
         'verified_unchanged',
         'proven_not_sent',
       }),
@@ -476,6 +491,7 @@ class NetworkMoveExecutionStatus {
         'verification_pending',
         'verification_failed',
         'verification_complete',
+        'configuration_verified',
         'verification_unchanged',
         'observation_stopped',
       }),
@@ -496,15 +512,19 @@ abstract class NetworkMoveExecutionApi implements NetworkMoveApi {
   Future<NetworkMoveExecutionStatus> stopExecution(String operationId);
 }
 
+abstract interface class ExecutionProfileInfo {
+  String get executionProfileId;
+}
+
 class HttpLiveApi implements NetworkMoveApi {
   HttpLiveApi({
     required String session,
     required Uri baseUri,
     http.Client? client,
-  }) : assert(RegExp(r'^[0-9a-f]{64}$').hasMatch(session)),
-       _session = session,
-       _baseUri = baseUri,
-       _client = client ?? http.Client();
+  })  : assert(RegExp(r'^[0-9a-f]{64}$').hasMatch(session)),
+        _session = session,
+        _baseUri = baseUri,
+        _client = client ?? http.Client();
 
   final String _session;
   final Uri _baseUri;
@@ -584,13 +604,14 @@ class HttpLiveApi implements NetworkMoveApi {
     required String targetRouterId,
     required EmptySourceAttestationInput attestation,
     required int delaySeconds,
-  }) async => NetworkMovePlan.fromJson(
-    await _planRequest('POST', '/api/network-move/plan', {
-      'target_router_id': targetRouterId,
-      'empty_source_attestation': attestation.toJson(),
-      'delay_seconds': delaySeconds,
-    }),
-  );
+  }) async =>
+      NetworkMovePlan.fromJson(
+        await _planRequest('POST', '/api/network-move/plan', {
+          'target_router_id': targetRouterId,
+          'empty_source_attestation': attestation.toJson(),
+          'delay_seconds': delaySeconds,
+        }),
+      );
 
   @override
   Future<NetworkMovePlan?> currentNetworkMovePlan() async {

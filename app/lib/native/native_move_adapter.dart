@@ -6,6 +6,7 @@ import '../move/move_execution.dart';
 import '../move/move_execution_controller.dart';
 import '../move/native_move_journal.dart';
 import 'native_move_diagnostic.dart';
+import 'move_adapter.dart';
 
 /// Private IPC to the isolated simulator supervisor. This is never a household
 /// discovery/provider fallback and never uses a TCP listener.
@@ -95,7 +96,7 @@ class _PreparedMove {
 
 /// Only constructed by an explicit isolated test/development entry point.
 /// Production platform routing does not instantiate this adapter.
-class NativeMoveAdapter {
+class NativeMoveAdapter implements MoveAdapter {
   NativeMoveAdapter({
     required this.workerExecutable,
     required this.manifestPath,
@@ -113,6 +114,7 @@ class NativeMoveAdapter {
   final String workerExecutable, manifestPath, lifecycleDirectory;
   final IsolatedFixtureClient fixture;
   final NativeMoveJournal journal;
+  @override
   late final MoveExecutionController controller;
   final Map<String, _PreparedMove> _prepared = {};
   String? _recoverySource, _recoveryTarget;
@@ -126,6 +128,7 @@ class NativeMoveAdapter {
   /// Explicit isolated test hook; ordinary app construction emits no markers.
   void Function(NativePreparationDiagnostic)? onPreparationFailure;
 
+  @override
   bool get available =>
       Platform.isLinux &&
       File(workerExecutable).isAbsolute &&
@@ -133,6 +136,7 @@ class NativeMoveAdapter {
       File(manifestPath).isAbsolute &&
       File(manifestPath).existsSync();
 
+  @override
   Future<void> initialize() {
     final existing = _initializing;
     if (existing != null) return existing;
@@ -146,6 +150,7 @@ class NativeMoveAdapter {
     return _initializing = attempt;
   }
 
+  @override
   void credentialsChanged(
       {required String? source,
       required String? target,
@@ -162,6 +167,7 @@ class NativeMoveAdapter {
     _discoveryRevision = discoveryRevision;
   }
 
+  @override
   void invalidateReviews() => _prepared.clear();
 
   Future<MoveExecutionPlan> prepare(NativeMoveRequest request) async {
@@ -180,7 +186,8 @@ class NativeMoveAdapter {
       final result = await _run(request.encode('inspect', this));
       nativeResult = result;
       stage = result['ready'] == true
-          ? NativePreparationStage.evidence : NativePreparationStage.nativeResult;
+          ? NativePreparationStage.evidence
+          : NativePreparationStage.nativeResult;
       _requireEvidence(result, request.operationId);
       if (result['ready'] != true) {
         throw const MoveExecutionFailure('preflight_failed');
@@ -211,9 +218,10 @@ class NativeMoveAdapter {
       } else {
         final code = switch (stage) {
           NativePreparationStage.journal => 'journal_failure',
-          NativePreparationStage.recovery =>
-            failure is MoveExecutionFailure && failure.code == 'unresolved_operation'
-                ? 'unresolved_operation' : 'journal_failure',
+          NativePreparationStage.recovery => failure is MoveExecutionFailure &&
+                  failure.code == 'unresolved_operation'
+              ? 'unresolved_operation'
+              : 'journal_failure',
           NativePreparationStage.fixtureRefresh => 'fixture_unavailable',
           NativePreparationStage.nativeProcess => 'worker_failure',
           NativePreparationStage.evidence =>
@@ -234,6 +242,7 @@ class NativeMoveAdapter {
     }
   }
 
+  @override
   MoveExecutionPlan resolveReview(String reviewId) => _prepared.values
       .singleWhere((value) => value.plan.reviewId == reviewId,
           orElse: () => throw const MoveExecutionFailure('review_invalidated'))

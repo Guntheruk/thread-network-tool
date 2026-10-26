@@ -13,11 +13,13 @@ String? liveSessionFromFragment(String fragment) =>
         .firstMatch(fragment)
         ?.group(1);
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   platform.configureRouting();
+  final liveApi = await platform.platformLiveApi();
   runApp(ThreadNetworkApp(
     liveSession: liveSessionFromFragment(Uri.base.fragment),
-    liveApi: platform.platformLiveApi(),
+    liveApi: liveApi,
   ));
 }
 
