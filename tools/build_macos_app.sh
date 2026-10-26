@@ -4,6 +4,9 @@ set -euo pipefail
 die() { printf 'build_macos_app: %s\n' "$*" >&2; exit 1; }
 [[ "$(uname -s)" == Darwin ]] || die 'macOS is required'
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mac_alpha="${TNT_MAC_ALPHA:-0}"
+[[ "$mac_alpha" == 0 || "$mac_alpha" == 1 ]] || die 'TNT_MAC_ALPHA must be 0 or 1'
+export TNT_MAC_ALPHA="$mac_alpha"
 
 # Flutter's macOS build needs the full Xcode app. Do this before resolving
 # dependencies or creating any build output.
@@ -39,16 +42,26 @@ flutter_root="$("$python_bin" -c 'import pathlib,sys; print(pathlib.Path(sys.arg
 commissioner_source="$("$python_bin" "$project_root/tools/resolve_commissioner_source.py" \
   --source "$commissioner_source" --output "$native_build/commissioner-source")" || die 'Commissioner preparation or verification failed'
 "$python_bin" "$project_root/tools/prepare_commissioner_source.py" --verify-only --output "$commissioner_source"
+move_build=OFF
+if [[ "$mac_alpha" == 1 ]]; then move_build=ON; fi
 cmake_args=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
   "-DCMAKE_OSX_ARCHITECTURES=$macos_architectures" -DTNT_BUILD_TESTS=OFF
-  -DTNT_WITH_COMMISSIONER=ON -DTNT_BUILD_MOVE_LAB=OFF -DTNT_BUILD_APP_MOVE_LAB=OFF -DTNT_BUILD_MOVE_JOURNAL=OFF
+  -DTNT_WITH_COMMISSIONER=ON -DTNT_BUILD_MOVE_LAB=OFF -DTNT_BUILD_APP_MOVE_LAB=OFF
+  "-DTNT_BUILD_MAC_MOVE_WORKER=$move_build" "-DTNT_BUILD_MOVE_JOURNAL=$move_build"
   "-DPython3_EXECUTABLE=$python_bin" "-DTNT_COMMISSIONER_SOURCE=$commissioner_source")
 "$cmake_bin" -S "$project_root" -B "$native_build" "${cmake_args[@]}"
 "$cmake_bin" --build "$native_build" --config Release --parallel 4
 "$python_bin" "$project_root/tools/prepare_commissioner_source.py" --verify-only --output "$commissioner_source"
 capabilities="$("$native_build/thread-network" capabilities)" || die 'native capabilities check failed'
-python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["authenticated_probe"] is True and d["network_writes"] is False' \
+"$python_bin" -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["authenticated_probe"] is True and d["network_writes"] is False' \
   "$capabilities" || die 'native helper is not a read-only authenticated-probe build'
+if [[ "$mac_alpha" == 1 ]]; then
+  [[ -x "$native_build/tnt-mac-move-worker" ]] || die 'Mac alpha worker executable missing'
+  [[ -x "$native_build/thread-move-journal" ]] || die 'Mac alpha journal executable missing'
+  worker_capabilities="$("$native_build/tnt-mac-move-worker" capabilities)" || die 'Mac alpha worker capabilities check failed'
+  "$python_bin" -c 'import json,sys; d=json.loads(sys.argv[1]); assert type(d) is dict and d == {"schema_version":1,"profile_id":"eero-source-network-alpha-v1","network_writes":True,"authenticated_reads":True,"durable_fence":True}' \
+    "$worker_capabilities" || die 'Mac alpha worker capabilities are invalid'
+fi
 (cd "$project_root/app" && "$flutter_bin" build macos --release)
 
 products="$project_root/app/build/macos/Build/Products/Release"
@@ -61,10 +74,20 @@ app_executable="$(plutil -extract CFBundleExecutable raw "${apps[0]}/Contents/In
 [[ -x "${apps[0]}/Contents/MacOS/$app_executable" ]] || die 'Flutter app executable missing'
 app_archs="$(lipo -archs "${apps[0]}/Contents/MacOS/$app_executable")"
 helper_archs="$(lipo -archs "$native_build/thread-network")"
+[[ -n "$app_archs" && -n "$helper_archs" ]] || die 'app or native helper architecture list is empty'
 for arch in $app_archs; do
   [[ " $helper_archs " == *" $arch "* ]] || \
     die "native helper lacks Flutter app architecture $arch (set TNT_MACOS_ARCHITECTURES)"
 done
+if [[ "$mac_alpha" == 1 ]]; then
+  for move_helper in tnt-mac-move-worker thread-move-journal; do
+    move_archs="$(lipo -archs "$native_build/$move_helper")"
+    [[ -n "$move_archs" ]] || die "$move_helper architecture list is empty"
+    for arch in $app_archs; do
+      [[ " $move_archs " == *" $arch "* ]] || die "$move_helper lacks Flutter app architecture $arch"
+    done
+  done
+fi
 output_parent="$(dirname "$output_dir")"
 output_name="$(basename "$output_dir")"
 mkdir -p "$output_parent"
@@ -75,7 +98,7 @@ stage_app="$stage_root/$app_name"
 /usr/bin/ditto "${apps[0]}" "$stage_app"
 TNT_CMAKE_BIN="$cmake_bin" TNT_SIGN_IDENTITY="${TNT_SIGN_IDENTITY:-}" \
   "$project_root/tools/bundle_macos_helper.sh" "$native_build" "$stage_app" "$sign_mode"
-# Keep build provenance outside the app; native helper payload stays read-only.
+# Keep build provenance outside the app.
 "$python_bin" "$project_root/tools/prepare_commissioner_source.py" --verify-only --output "$commissioner_source"
 cp "$commissioner_source/tnt-source-provenance.json" "$stage_root/commissioner-source-provenance.json"
 cp "$project_root/patches/commissioner/manifest.json" "$stage_root/commissioner-source-manifest.json"
