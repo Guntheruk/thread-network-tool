@@ -1016,16 +1016,26 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
             if (status != null) ...[
               if (_macExecution) ...[
                 Text(
-                  status.stage == 'verified_configuration'
-                      ? 'Network settings verified'
-                      : status.stage == 'needs_attention'
-                          ? 'Join needs attention'
-                          : 'Checking network settings',
+                  switch (status.stage) {
+                    'verified_configuration' => 'Network settings verified',
+                    'verified_unchanged' => 'Network settings unchanged',
+                    'proven_not_sent' => 'Join was not sent',
+                    'needs_attention' => 'Join needs attention',
+                    'observation_stopped' => 'Settings checks stopped',
+                    _ => 'Checking network settings',
+                  },
                   key: const Key('move-execution-stage'),
                 ),
-                Text(status.stage == 'verified_configuration'
-                    ? 'All selected routers report the chosen settings. Accessory connectivity has not been tested.'
-                    : 'Do not start another join while this outcome is unresolved.'),
+                Text(switch (status.stage) {
+                  'verified_configuration' =>
+                    'All selected routers report the chosen settings. Accessory connectivity has not been tested.',
+                  'verified_unchanged' =>
+                    'The change was rejected and fresh checks confirm the original network settings.',
+                  'proven_not_sent' =>
+                    'No network change was sent. You can review the setup before trying a new join.',
+                  _ =>
+                    'Do not start another join while this outcome is unresolved.',
+                }),
                 ExpansionTile(
                   title: const Text('Details'),
                   children: [
@@ -1059,6 +1069,24 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                       ? null
                       : () => _executionAction('check', resume: true),
                   child: const Text('Resume observation'),
+                ),
+              if (status.terminal)
+                OutlinedButton(
+                  key: const Key('move-new-review'),
+                  onPressed: _executionBusy
+                      ? null
+                      : () => setState(() {
+                            // Keep the durable terminal journal. A future operation
+                            // needs a new review, attestations and confirmation.
+                            _clearReview();
+                            _executionStatus = null;
+                            _executionNotice = null;
+                            _confirmationAttempted = false;
+                            _attested = false;
+                            _eeroConfirmed = false;
+                            _groupConfirmed = false;
+                          }),
+                  child: const Text('Review another join'),
                 ),
               if (!status.terminal && status.stage != 'observation_stopped')
                 OutlinedButton(

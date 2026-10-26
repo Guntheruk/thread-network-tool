@@ -296,6 +296,45 @@ Future<void> _ensureEndKeyVisible(WidgetTester tester, Key key) async {
 }
 
 void main() {
+  for (final entry in [
+    (
+      'verified_unchanged',
+      'rejected',
+      'verification_unchanged',
+      'Network settings unchanged'
+    ),
+    (
+      'proven_not_sent',
+      'proven_not_sent',
+      'worker_not_sent',
+      'Join was not sent'
+    ),
+  ]) {
+    testWidgets(
+        'Mac terminal ${entry.$1} shows a final result and permits a fresh review',
+        (tester) async {
+      final api = MacExecutionMoveFake()
+        ..status = NetworkMoveExecutionStatus.fromJson({
+          'schema_version': 1,
+          'mode': 'network_move_execution_status',
+          'operation_id': 'operation-1',
+          'profile_id': 'eero-source-network-alpha-v1',
+          'stage': entry.$1,
+          'disposition': entry.$2,
+          'reason': entry.$3,
+        });
+      await _pump(tester, api);
+      expect(find.text(entry.$4), findsOneWidget);
+      expect(find.text('Checking network settings'), findsNothing);
+      expect(
+          find.text(
+              'Do not start another join while this outcome is unresolved.'),
+          findsNothing);
+      await _tapVisible(tester, const Key('move-new-review'));
+      expect(api.actions.where((a) => a.startsWith('confirm:')), isEmpty);
+      expect(find.text(entry.$4), findsNothing);
+    });
+  }
   testWidgets(
       'runtime helper refuses a current-status-blocked execution action',
       (tester) async {
