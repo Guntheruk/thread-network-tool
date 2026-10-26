@@ -29,9 +29,13 @@ fi
 
 native_build="${TNT_NATIVE_BUILD_DIR:-$project_root/build/macos-native-package}"
 output_dir="${TNT_OUTPUT_DIR:-$project_root/build/macos-package}"
+# One fresh package directory is the publication unit. Never extend an earlier
+# app/provenance/notices set, even if the existing directory appears empty.
+[[ ! -e "$output_dir" && ! -L "$output_dir" ]] || die "output already exists: $output_dir (choose a fresh TNT_OUTPUT_DIR)"
 macos_architectures="${TNT_MACOS_ARCHITECTURES:-arm64;x86_64}"
 python_bin="$(command -v "${TNT_PYTHON_BIN:-python3}")" || die 'Python unavailable (set TNT_PYTHON_BIN)'
 export PYTHONDONTWRITEBYTECODE=1
+flutter_root="$("$python_bin" -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve().parent.parent)' "$flutter_bin")"
 commissioner_source="$("$python_bin" "$project_root/tools/resolve_commissioner_source.py" \
   --source "$commissioner_source" --output "$native_build/commissioner-source")" || die 'Commissioner preparation or verification failed'
 "$python_bin" "$project_root/tools/prepare_commissioner_source.py" --verify-only --output "$commissioner_source"
@@ -61,15 +65,12 @@ for arch in $app_archs; do
   [[ " $helper_archs " == *" $arch "* ]] || \
     die "native helper lacks Flutter app architecture $arch (set TNT_MACOS_ARCHITECTURES)"
 done
-[[ -d "$output_dir" || ! -e "$output_dir" ]] || die "output path is not a directory: $output_dir"
-mkdir -p "$output_dir"
-packaged_app="$output_dir/$app_name"
-for provenance_file in commissioner-source-provenance.json commissioner-source-manifest.json commissioner-source.patch; do
-  [[ ! -e "$output_dir/$provenance_file" ]] || die "provenance output already exists: $provenance_file (choose a fresh TNT_OUTPUT_DIR)"
-done
-[[ ! -e "$packaged_app" ]] || die "output already exists: $packaged_app (choose a fresh TNT_OUTPUT_DIR)"
-stage_root="$(mktemp -d "$output_dir/.stage.XXXXXX")"
+output_parent="$(dirname "$output_dir")"
+output_name="$(basename "$output_dir")"
+mkdir -p "$output_parent"
+stage_root="$(mktemp -d "$output_parent/.$output_name.stage.XXXXXX")"
 trap 'rm -rf "$stage_root"' EXIT
+packaged_app="$output_dir/$app_name"
 stage_app="$stage_root/$app_name"
 /usr/bin/ditto "${apps[0]}" "$stage_app"
 TNT_CMAKE_BIN="$cmake_bin" TNT_SIGN_IDENTITY="${TNT_SIGN_IDENTITY:-}" \
@@ -79,10 +80,42 @@ TNT_CMAKE_BIN="$cmake_bin" TNT_SIGN_IDENTITY="${TNT_SIGN_IDENTITY:-}" \
 cp "$commissioner_source/tnt-source-provenance.json" "$stage_root/commissioner-source-provenance.json"
 cp "$project_root/patches/commissioner/manifest.json" "$stage_root/commissioner-source-manifest.json"
 cp "$project_root/patches/commissioner/legacy-wakeup-channel.patch" "$stage_root/commissioner-source.patch"
-mv "$stage_app" "$packaged_app"
-for provenance_file in commissioner-source-provenance.json commissioner-source-manifest.json commissioner-source.patch; do
-  mv "$stage_root/$provenance_file" "$output_dir/$provenance_file"
-done
+# Collect from the actual just-built/signed app, using this build's verified
+# dependency and selected toolchain. Collector status 1 records gaps; status 2
+# records a collection failure. Neither is a publishable package.
+flutter_notices="$stage_app/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/NOTICES.Z"
+notice_status=0
+"$python_bin" "$project_root/tools/collect_third_party_notices.py" \
+  --output-dir "$stage_root/release-notices" --app-root "$project_root/app" \
+  --commissioner-root "$commissioner_source" --flutter-root "$flutter_root" \
+  --flutter-notices "$flutter_notices" >"$stage_root/notice-collection.log" 2>&1 || notice_status=$?
+if [[ "$notice_status" != 0 ]]; then
+  # Preserve incomplete manifests and fixed failure diagnostics separately,
+  # without retaining an app that could be mistaken for a complete package.
+  failure_root="$(mktemp -d "$output_parent/.$output_name.notices-failed.XXXXXX")"
+  if [[ -d "$stage_root/release-notices" ]]; then
+    mv "$stage_root/release-notices" "$failure_root/release-notices"
+  fi
+  mv "$stage_root/notice-collection.log" "$failure_root/notice-collection.log"
+  printf '%s\n' "$notice_status" >"$failure_root/collector-exit-status.txt"
+  die "notice collection incomplete or failed; no package published. Evidence: $failure_root"
+fi
+[[ -f "$stage_root/release-notices/MANIFEST.md" ]] || die 'notice collector did not produce a manifest'
+# Publish all artifacts together using Darwin's exclusive atomic rename.
+# RENAME_EXCL also refuses an empty directory/symlink created by another writer
+# after our preflight; a check followed by ordinary rename would race.
+"$python_bin" - "$stage_root" "$output_dir" <<'PYTHON'
+import ctypes
+import os
+import sys
+rename = ctypes.CDLL('/usr/lib/libSystem.B.dylib', use_errno=True).renamex_np
+rename.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+rename.restype = ctypes.c_int
+# macOS sys/stdio.h: RENAME_EXCL = 0x00000004 (macOS 10.12+).
+if rename(os.fsencode(sys.argv[1]), os.fsencode(sys.argv[2]), 0x00000004):
+    error = ctypes.get_errno()
+    raise OSError(error, os.strerror(error))
+PYTHON
 printf 'Package created: %s\n' "$packaged_app"
 if [[ "$sign_mode" == local ]]; then
   printf 'Local ad hoc signature only. This app has no trusted Developer ID signature or notarization.\n'

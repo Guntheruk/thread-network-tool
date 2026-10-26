@@ -41,16 +41,38 @@ recursive pins and the generated tree. It never patches or checks out the input
 cache. A verified generated input is used directly. `PYTHONDONTWRITEBYTECODE=1`
 keeps dependency script imports from changing source identity.
 
-The output directory also retains `commissioner-source-provenance.json`,
-`commissioner-source-manifest.json` and `commissioner-source.patch`; existing
-sidecars are never overwritten. These describe the modified dependency with its
-original parent/recursive pins, patch hash and complete generated-tree hash.
+The output directory retains `commissioner-source-provenance.json`,
+`commissioner-source-manifest.json` and `commissioner-source.patch`. These describe
+the modified dependency with its original parent/recursive pins, patch hash and
+complete generated-tree hash. It also retains `release-notices/` with the
+collector's `MANIFEST.md`, copied upstream licence/notice texts, dependency
+provenance and decompressed Flutter notices, plus `notice-collection.log`.
+
+Notice collection runs after the actual Flutter build and signed app staging.
+It uses the selected Flutter executable's resolved SDK root, this app's resolved
+package configuration/lockfile, the verified generated Commissioner source and
+`Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/NOTICES.Z`
+from that exact staged app. It never substitutes an older package's notices.
+The collector's manifest retains unresolved licence alternatives and provenance
+qualifications honestly; a successful collection does not select the project
+licence, choose an Mbed TLS licence alternative or establish legal clearance.
+
+Collector exit 1 (missing/ambiguous required inputs) or 2 (collection failure)
+blocks packaging. Any incomplete notice directory/manifest, collection log and
+exit status remain separately under a fresh sibling
+`.<output-name>.notices-failed.*` directory; the app and partial package staging
+are removed. This evidence is an incomplete collection attempt, not a package.
+The complete app, three provenance sidecars and notice artifact are staged in
+one sibling temporary directory, then published together with an exclusive
+atomic macOS directory rename. Build/signing/collection failures publish no
+package, and a destination created during the build is never replaced.
 The script explicitly disables both move worker and journal helper, including
 when reusing a CMake cache that previously enabled them.
 
 The default result is a local ad hoc signed app in `build/macos-package/`.
-The script refuses to overwrite a prior package; set `TNT_OUTPUT_DIR` to a
-fresh directory for another run. `TNT_NATIVE_BUILD_DIR` sets the native build
+The script requires `TNT_OUTPUT_DIR` to be an absent path, including refusing an
+existing empty directory or symlink; its parent may already exist. Choose a fresh
+path for another run. Existing outputs are never extended or overwritten. `TNT_NATIVE_BUILD_DIR` sets the native build
 directory. Native code targets macOS 12.0 and builds `arm64;x86_64` by
 default to match Flutter's universal release output. If Flutter is explicitly
 configured for one architecture, `TNT_MACOS_ARCHITECTURES` can set the native
