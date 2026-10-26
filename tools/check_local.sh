@@ -40,4 +40,5 @@ cd "$project_root/app"
 "$dart_bin" run tool/network_move_api_test.dart
 "$dart_bin" run tool/local_server_test.dart
 "$dart_bin" run tool/move_execution_test.dart "$TNT_JOURNAL_CLI"
+"$dart_bin" run tool/native_move_adapter_initialization_test.dart "$TNT_JOURNAL_CLI"
 printf 'Local checks passed. Platform builds and isolated app moves are separate evidence.\n'

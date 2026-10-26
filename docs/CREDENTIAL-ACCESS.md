@@ -42,6 +42,21 @@ mandatory. Mobile diagnostics must reflect observable capabilities; credential
 access does not provide a complete device inventory or authority over every
 accessory.
 
+One candidate standalone phone job is **Check my home**: the person selects a
+few important accessories and deliberately compares fresh read-only results
+before and after setup. This is a product option, not approved release scope or
+an implemented feature. Apple HomeKit provides accessory reachability and
+characteristic reads; Google Home provides authorized device/trait state and
+bounded forced reads. Results must identify the provider and time checked;
+they do not prove a particular Thread route, provide a complete mesh map, or
+automatically move existing accessories. Credential access can remain a separate
+optional action. Evaluate this small workflow before adding another controller,
+continuous polling, accounts or AI.
+
+- [Apple accessory reachability](https://developer.apple.com/documentation/homekit/hmaccessory/isreachable)
+- [Apple characteristic reads](https://developer.apple.com/documentation/homekit/hmcharacteristic/readvalue(completionhandler:))
+- [Google device state and forced reads](https://developers.home.google.com/apis/android/device)
+
 ## Primary references
 
 - [Home Assistant Thread WebSocket implementation](https://github.com/home-assistant/core/blob/dev/homeassistant/components/thread/websocket_api.py)

@@ -333,3 +333,54 @@ Known limits: the native Mac app is a locally signed development build, without 
   explicit lab test and records optional credential/phone scope. A fresh local
   diagnostic candidate is being tested. No actual app convergence, vendor
   compatibility, real iPhone retrieval or phone-to-Mac transfer is claimed.
+
+## Local candidate evidence — 26 October 2026
+
+- Hosted build/test workflows now use manual dispatch only in the local
+  candidate, and `tools/check_local.sh` provides local verification. These
+  changes have not been pushed; no new hosted build or cloud review was
+  requested after the owner's cost concern.
+- At `a2949a68ec159bdc4b76304ef955bb028f5f097d`, local verification passed
+  seven native CTests, 90 Python tests, Flutter analysis, 163 Flutter tests
+  (one explicit Linux-only runtime skip), and 43 standalone execution checks.
+  The fresh independently reconstructed Commissioner source verified before
+  and after the build. An older prepared cache failed integrity and was not
+  reused; verification was not relaxed.
+- That head's universal locally signed Mac package passed strict recursive
+  signature verification. Its exact executable was inspected through the native
+  window. An optional Home Assistant import against a disposable loopback-only
+  synthetic server waited for explicit network selection, cleared the token,
+  fetched only the selected nonpreferred network, passed native validation and
+  displayed **Credentials ready for SyntheticTwo**. An incomplete fixture was
+  refused. No real Home Assistant server/token or household router was used.
+  The test app and fake server were stopped afterward.
+- The optional Home Assistant route uses only existing read-only Thread APIs.
+  Independent review reproduced and closed the initial HTTPS/plaintext defect;
+  explicit TLS now validates the original hostname over the pinned address.
+  Correct-host/trusted-CA success, wrong-host/untrusted rejection and stalled-TLS
+  cancellation were tested. Live server compatibility is still unverified.
+- The actual isolated Flutter-screen workflow at the same head used frozen
+  image `sha256:6b5f1eb97aa01133fc75316556a07d1c1b552531e7485fa75ae4df2020d8979b`.
+  Lost-result recovery passed in 375 seconds with two real app processes,
+  one Petition/SET, zero restart dispatches, full independent verification and
+  secret redaction. Key-change reached recovery but exited unsuccessfully after
+  506.9 seconds. Its supervisor stayed alive, but the exact assertion and final
+  oracle flags were not retained; physical nonconvergence is unproven. Both
+  original containers were removed and neither operation was retried.
+  Exact evidence and reproduction recipes remain under
+  `/tmp/tnt-full-app-lab-a2949a68` on linuxbox, with sanitized evidence copied
+  to the same local path. This is mixed evidence, not app runtime acceptance.
+- Review found an additional cached adapter-initialization failure. A real
+  journal lock reproduced `journal_busy` persisting after the lock released.
+  The narrow repair evicts failed attempts, shares in-flight attempts and
+  retains successful initialization; its real-lock regression passes. The
+  local check script now includes that regression.
+- The lab failure path now retains only fixed app outcome categories and seven
+  allowlisted independent oracle booleans, with sample count/age. Unknown
+  fields, identifiers, addresses, datasets and raw errors remain excluded.
+  This improves the next diagnosis; it does not establish the previous failure's
+  cause or relax the timing/verification requirements.
+- The optional mobile product remains an exploration. A selected-accessory
+  **Check my home** workflow could provide value beyond credential transfer;
+  it is not an approved expansion of first-release scope. Mac-first delivery
+  continues and the desktop does not require a phone companion.
