@@ -133,7 +133,18 @@ class NativeMoveAdapter {
       File(manifestPath).isAbsolute &&
       File(manifestPath).existsSync();
 
-  Future<void> initialize() => _initializing ??= journal.initialize();
+  Future<void> initialize() {
+    final existing = _initializing;
+    if (existing != null) return existing;
+    late final Future<void> attempt;
+    attempt = journal.initialize().catchError((Object error, StackTrace stack) {
+      // Keep shared in-flight/successful initialization, but allow a later call
+      // to recover from transient journal contention or startup failure.
+      if (identical(_initializing, attempt)) _initializing = null;
+      Error.throwWithStackTrace(error, stack);
+    });
+    return _initializing = attempt;
+  }
 
   void credentialsChanged(
       {required String? source,
