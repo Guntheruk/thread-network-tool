@@ -438,8 +438,15 @@ class NetworkMoveExecutionStatus {
     required this.stage,
     required this.disposition,
     required this.reason,
+    this.observeAfter,
+    this.observationSeconds,
   });
   final String operationId, profileId, stage, disposition, reason;
+
+  /// Earliest time to begin read-only post-change checks. Absent for older or
+  /// non-Mac status responses; absence never grants automatic checking.
+  final DateTime? observeAfter;
+  final int? observationSeconds;
 
   bool get terminal => const {
         'verified_complete',
@@ -452,6 +459,22 @@ class NetworkMoveExecutionStatus {
     if (value is! Map<String, dynamic> ||
         value['schema_version'] != 1 ||
         value['mode'] != 'network_move_execution_status') {
+      throw const FormatException('Invalid execution status');
+    }
+    final rawObserveAfter = value['observe_after'];
+    final rawObservationSeconds = value['observation_seconds'];
+    final observeAfter = rawObserveAfter == null
+        ? null
+        : DateTime.tryParse(_safeText(rawObserveAfter));
+    if ((rawObserveAfter == null) != (rawObservationSeconds == null) ||
+        (rawObserveAfter != null &&
+            (observeAfter == null ||
+                !observeAfter.isUtc ||
+                rawObserveAfter != observeAfter.toIso8601String())) ||
+        (rawObservationSeconds != null &&
+            (rawObservationSeconds is! int ||
+                rawObservationSeconds < 1 ||
+                rawObservationSeconds > 3600))) {
       throw const FormatException('Invalid execution status');
     }
     return NetworkMoveExecutionStatus(
@@ -495,6 +518,8 @@ class NetworkMoveExecutionStatus {
         'verification_unchanged',
         'observation_stopped',
       }),
+      observeAfter: observeAfter,
+      observationSeconds: rawObservationSeconds as int?,
     );
   }
 }

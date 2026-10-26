@@ -633,6 +633,11 @@ class LiveSession {
         'stage': record.stage.wire,
         'disposition': record.disposition.wire,
         'reason': record.reason,
+        'observe_after': record.observeUntil
+            .subtract(Duration(seconds: record.observationSeconds))
+            .toUtc()
+            .toIso8601String(),
+        'observation_seconds': record.observationSeconds,
       };
 
   Map<String, dynamic>? get currentReview {

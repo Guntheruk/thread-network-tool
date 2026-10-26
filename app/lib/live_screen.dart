@@ -344,12 +344,13 @@ class _LiveScreenState extends State<LiveScreen> {
                     ),
                     const SizedBox(height: 10),
                   ],
-                  OutlinedButton.icon(
-                    key: const Key('live-join-disabled'),
-                    onPressed: null,
-                    icon: const Icon(Icons.lock_outline),
-                    label: const Text('Join router · unavailable'),
-                  ),
+                  if (!macJoin)
+                    OutlinedButton.icon(
+                      key: const Key('live-join-disabled'),
+                      onPressed: null,
+                      icon: const Icon(Icons.lock_outline),
+                      label: const Text('Join router · unavailable'),
+                    ),
                 ],
               ],
             ),

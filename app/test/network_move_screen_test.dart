@@ -228,11 +228,132 @@ class MacExecutionMoveFake extends ExecutionMoveFake
   String get executionProfileId => 'eero-source-network-alpha-v1';
 }
 
+class _Clock {
+  _Clock(this.value);
+  DateTime value;
+  DateTime call() => value;
+}
+
+class _AutoMacMoveFake extends MacExecutionMoveFake {
+  _AutoMacMoveFake(this.clock);
+  final _Clock clock;
+  String dispatchDisposition = 'accepted';
+  String nextCheckStage = 'observing';
+  bool failChecks = false;
+  Completer<NetworkMoveExecutionStatus>? heldCheck;
+  int confirmCalls = 0;
+  int checkCalls = 0;
+
+  NetworkMoveExecutionStatus timedStatus(String stage, String disposition) =>
+      NetworkMoveExecutionStatus.fromJson({
+        'schema_version': 1,
+        'mode': 'network_move_execution_status',
+        'operation_id': 'operation-1',
+        'profile_id': 'eero-source-network-alpha-v1',
+        'stage': stage,
+        'disposition': disposition,
+        'reason': stage == 'verified_configuration'
+            ? 'configuration_verified'
+            : stage == 'observation_stopped'
+                ? 'observation_stopped'
+                : 'verification_pending',
+        'observe_after': clock.value
+            .add(const Duration(minutes: 5))
+            .toUtc()
+            .toIso8601String(),
+        'observation_seconds': 30,
+      });
+
+  @override
+  Future<NetworkMoveExecutionReview> prepareExecution(String reviewId) async {
+    actions.add('prepare:$reviewId');
+    return NetworkMoveExecutionReview.fromJson({
+      'schema_version': 1,
+      'mode': 'network_move_execution_review',
+      'review_id': reviewId,
+      'operation_id': 'operation-1',
+      'profile_id': 'eero-source-network-alpha-v1',
+      'expires_at': DateTime.now()
+          .toUtc()
+          .add(const Duration(minutes: 2))
+          .toIso8601String(),
+      'source_router_ids': ['source-a', 'source-b'],
+      'target_router_id': 'target-id',
+      'delay_seconds': 300,
+      'observation_seconds': 30,
+    });
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus> confirmExecution(String reviewId) async {
+    confirmCalls++;
+    actions.add('confirm:$reviewId');
+    return status = timedStatus(
+      dispatchDisposition == 'uncertain' ? 'needs_attention' : 'observing',
+      dispatchDisposition,
+    );
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus> checkExecution(
+    String operationId, {
+    bool resume = false,
+  }) async {
+    checkCalls++;
+    actions.add('check:$operationId:$resume');
+    if (failChecks) throw const LiveApiException();
+    final held = heldCheck;
+    if (held != null) {
+      heldCheck = null;
+      return status = await held.future;
+    }
+    return status = timedStatus(nextCheckStage, dispatchDisposition);
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus> stopExecution(String operationId) async {
+    actions.add('stop:$operationId');
+    return status = timedStatus('observation_stopped', dispatchDisposition);
+  }
+}
+
+Future<void> _startAutoMove(
+  WidgetTester tester,
+  _AutoMacMoveFake api,
+  _Clock clock,
+) async {
+  api.preparedPlan = _plan(
+    decision: 'ready_for_execution_review',
+    validUntil: DateTime.now().toUtc().add(const Duration(minutes: 10)),
+  );
+  await _pump(tester, api, now: clock.call);
+  await _tapVisible(tester, const Key('move-target-target-id'));
+  await _tapVisible(tester, const Key('move-empty-source-attestation'));
+  await _tapVisible(tester, const Key('move-eero-source-attestation'));
+  await _tapVisible(tester, const Key('move-whole-eero-group-attestation'));
+  await _tapVisible(tester, const Key('move-prepare'));
+  await _tapVisible(tester, const Key('move-execution-prepare'));
+  expect(api.checkCalls, 0);
+  await _tapVisible(tester, const Key('move-execution-confirm'));
+  expect(api.confirmCalls, 1);
+}
+
+Future<void> _advance(
+  WidgetTester tester,
+  _Clock clock,
+  Duration duration,
+) async {
+  clock.value = clock.value.add(duration);
+  await tester.pump(duration);
+  await tester.pump();
+}
+
 Future<void> _pump(
   WidgetTester tester,
   MoveFake api, {
   Size size = const Size(900, 900),
   double textScale = 1,
+  DateTime Function()? now,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -242,7 +363,7 @@ Future<void> _pump(
     MaterialApp(
       home: MediaQuery(
         data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-        child: NetworkMoveScreen(api: api, initialState: api.current),
+        child: NetworkMoveScreen(api: api, initialState: api.current, now: now),
       ),
     ),
   );
@@ -847,5 +968,111 @@ void main() {
       findsNothing,
     );
     expect(find.textContaining('review is no longer current'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Mac checks wait for confirmed delay, serialize, and stop at terminal',
+      (tester) async {
+    final clock = _Clock(DateTime.now().toUtc());
+    final api = _AutoMacMoveFake(clock);
+    await _startAutoMove(tester, api, clock);
+    expect(api.checkCalls, 0);
+    await _ensureVisible(tester, const Key('move-automatic-progress'));
+    expect(
+        find.textContaining('Checks start in about 5 minutes'), findsOneWidget);
+    await _advance(tester, clock, const Duration(minutes: 4, seconds: 59));
+    expect(api.checkCalls, 0);
+    final held = Completer<NetworkMoveExecutionStatus>();
+    api.heldCheck = held;
+    await _advance(tester, clock, const Duration(seconds: 1));
+    expect(api.checkCalls, 1);
+    await _advance(tester, clock, const Duration(seconds: 20));
+    expect(api.checkCalls, 1,
+        reason: 'A pending read must not overlap a second read');
+    held.complete(api.timedStatus('observing', 'accepted'));
+    await tester.pump();
+    await _advance(tester, clock, const Duration(seconds: 10));
+    expect(api.checkCalls, 2);
+    await _advance(tester, clock, const Duration(seconds: 10));
+    expect(api.checkCalls, 3);
+    api.nextCheckStage = 'verified_configuration';
+    await _advance(tester, clock, const Duration(seconds: 10));
+    expect(api.checkCalls, 4);
+    await _ensureVisible(tester, const Key('move-execution-stage'));
+    expect(find.text('Network settings verified'), findsOneWidget);
+    await _advance(tester, clock, const Duration(minutes: 1));
+    expect(api.checkCalls, 4);
+    expect(api.confirmCalls, 1);
+  });
+
+  testWidgets('uncertain Mac submission checks after delay without resending',
+      (tester) async {
+    final clock = _Clock(DateTime.now().toUtc());
+    final api = _AutoMacMoveFake(clock)
+      ..dispatchDisposition = 'uncertain'
+      ..nextCheckStage = 'verified_configuration';
+    await _startAutoMove(tester, api, clock);
+    expect(api.confirmCalls, 1);
+    expect(api.checkCalls, 0);
+    await _advance(tester, clock, const Duration(minutes: 5));
+    expect(api.checkCalls, 1);
+    expect(api.confirmCalls, 1);
+    await _ensureVisible(tester, const Key('move-execution-stage'));
+    expect(find.text('Network settings verified'), findsOneWidget);
+  });
+
+  testWidgets('Mac read errors stop within the bounded observation window',
+      (tester) async {
+    final clock = _Clock(DateTime.now().toUtc());
+    final api = _AutoMacMoveFake(clock)..failChecks = true;
+    await _startAutoMove(tester, api, clock);
+    await _advance(tester, clock, const Duration(minutes: 5));
+    expect(api.checkCalls, 1);
+    await _advance(tester, clock, const Duration(minutes: 2, seconds: 1));
+    expect(api.checkCalls, lessThanOrEqualTo(13));
+    await _ensureVisible(tester, const Key('move-automatic-paused'));
+    expect(find.textContaining('Automatic checks are paused'), findsOneWidget);
+    final stoppedAt = api.checkCalls;
+    await _advance(tester, clock, const Duration(minutes: 1));
+    expect(api.checkCalls, stoppedAt);
+  });
+
+  testWidgets('stop and disposal cancel Mac automatic checks', (tester) async {
+    final clock = _Clock(DateTime.now().toUtc());
+    final stopped = _AutoMacMoveFake(clock);
+    await _startAutoMove(tester, stopped, clock);
+    await _tapVisible(tester, const Key('move-execution-stop'));
+    await _advance(tester, clock, const Duration(minutes: 6));
+    expect(stopped.checkCalls, 0);
+    await tester.pumpWidget(const SizedBox());
+
+    final nextClock = _Clock(DateTime.now().toUtc());
+    final disposed = _AutoMacMoveFake(nextClock);
+    await _startAutoMove(tester, disposed, nextClock);
+    await tester.pumpWidget(const SizedBox());
+    await _advance(tester, nextClock, const Duration(minutes: 6));
+    expect(disposed.checkCalls, 0);
+  });
+
+  testWidgets('background and startup restore leave checks manual',
+      (tester) async {
+    final clock = _Clock(DateTime.now().toUtc());
+    final running = _AutoMacMoveFake(clock);
+    await _startAutoMove(tester, running, clock);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await _advance(tester, clock, const Duration(minutes: 6));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(running.checkCalls, 0);
+    await tester.pumpWidget(const SizedBox());
+
+    final restored = _AutoMacMoveFake(clock)
+      ..status = _AutoMacMoveFake(clock).timedStatus('observing', 'accepted');
+    await _pump(tester, restored, now: clock.call);
+    await _advance(tester, clock, const Duration(minutes: 6));
+    expect(restored.checkCalls, 0);
+    await _tapVisible(tester, const Key('move-execution-check'));
+    expect(restored.checkCalls, 1);
+    expect(restored.confirmCalls, 0);
   });
 }

@@ -280,6 +280,8 @@ void main() {
       final result = await api.confirmExecution(reviewId);
       expect(result.stage, 'observing');
       expect(result.disposition, 'accepted');
+      expect(result.observeAfter, isNotNull);
+      expect(result.observationSeconds, 30);
       expect(adapter.dispatchLaunches, 1);
       expect(await harness.modes(), ['inspect', 'inspect', 'dispatch']);
       final durable = await adapter.journal.read();
@@ -291,6 +293,7 @@ void main() {
       final restored = await restartedApi.currentExecution();
       expect(restored?.operationId, review.operationId);
       expect(restored?.stage, 'needs_attention');
+      expect(restored?.observeAfter, result.observeAfter);
       expect(restartedAdapter.dispatchLaunches, 0);
       await restartedApi.credentialsForRole('source', _sourceDataset);
       await restartedApi.credentialsForRole('target', _targetDataset);

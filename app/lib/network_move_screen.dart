@@ -12,10 +12,12 @@ class NetworkMoveScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.initialState,
+    this.now,
   });
 
   final NetworkMoveApi api;
   final LiveState initialState;
+  final DateTime Function()? now;
 
   @override
   State<NetworkMoveScreen> createState() => _NetworkMoveScreenState();
@@ -44,6 +46,15 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
   bool _executionBusy = false;
   bool _executionStatusVerified = false;
   bool _confirmationAttempted = false;
+  Timer? _automaticCheckTimer;
+  int _automaticCheckGeneration = 0;
+  int _automaticCheckAttempts = 0;
+  bool _automaticChecksActive = false;
+  bool _automaticChecksStarted = false;
+  bool _automaticChecksPaused = false;
+  DateTime? _automaticObserveAfter;
+  DateTime? _automaticDeadline;
+  String? _automaticOperationId;
   int _reviewGeneration = 0;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
 
@@ -67,10 +78,133 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
       (widget.api as ExecutionProfileInfo).executionProfileId ==
           'eero-source-network-alpha-v1';
 
+  DateTime get _now => (widget.now ?? DateTime.now)().toUtc();
+
+  void _cancelAutomaticChecks({bool paused = false}) {
+    _automaticCheckGeneration++;
+    _automaticCheckTimer?.cancel();
+    _automaticCheckTimer = null;
+    _automaticChecksActive = false;
+    _automaticChecksPaused = paused;
+  }
+
+  void _startAutomaticChecks(NetworkMoveExecutionStatus status) {
+    _cancelAutomaticChecks();
+    if (!_macExecution ||
+        status.profileId != 'eero-source-network-alpha-v1' ||
+        status.terminal ||
+        status.stage == 'observation_stopped' ||
+        !{'accepted', 'uncertain', 'rejected'}.contains(status.disposition) ||
+        status.observeAfter == null ||
+        status.observationSeconds == null ||
+        _lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    final observeAfter = status.observeAfter!;
+    final deadline = observeAfter.add(const Duration(minutes: 2));
+    if (_now.isAfter(deadline) ||
+        observeAfter.isAfter(_now.add(const Duration(minutes: 10)))) {
+      _automaticChecksPaused = true;
+      return;
+    }
+    _automaticChecksActive = true;
+    _automaticChecksStarted = false;
+    _automaticCheckAttempts = 0;
+    _automaticObserveAfter = observeAfter;
+    _automaticDeadline = deadline;
+    _automaticOperationId = status.operationId;
+    _scheduleAutomaticCheck();
+  }
+
+  void _scheduleAutomaticCheck() {
+    if (!_automaticChecksActive ||
+        _lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    if (_automaticCheckAttempts >= 13 || _now.isAfter(_automaticDeadline!)) {
+      setState(() => _cancelAutomaticChecks(paused: true));
+      return;
+    }
+    final delay = _automaticChecksStarted
+        ? const Duration(seconds: 10)
+        : _automaticObserveAfter!.difference(_now);
+    final generation = _automaticCheckGeneration;
+    _automaticCheckTimer = Timer(
+      delay.isNegative ? Duration.zero : delay,
+      () => _runAutomaticCheck(generation),
+    );
+  }
+
+  Future<void> _runAutomaticCheck(int generation) async {
+    if (!mounted ||
+        !_automaticChecksActive ||
+        generation != _automaticCheckGeneration ||
+        _lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    if (_now.isAfter(_automaticDeadline!)) {
+      setState(() => _cancelAutomaticChecks(paused: true));
+      return;
+    }
+    if (_executionBusy) {
+      _automaticCheckTimer = Timer(
+          const Duration(seconds: 1), () => _runAutomaticCheck(generation));
+      return;
+    }
+    final api = _executionApi;
+    final operationId = _automaticOperationId;
+    if (api == null || operationId == null) {
+      setState(() => _cancelAutomaticChecks(paused: true));
+      return;
+    }
+    setState(() {
+      _automaticChecksStarted = true;
+      _automaticCheckAttempts++;
+      _executionBusy = true;
+    });
+    try {
+      final next = await api
+          .checkExecution(operationId)
+          .timeout(const Duration(seconds: 130));
+      if (!mounted || generation != _automaticCheckGeneration) return;
+      if (next.operationId != operationId ||
+          next.profileId != 'eero-source-network-alpha-v1') {
+        setState(() => _cancelAutomaticChecks(paused: true));
+        return;
+      }
+      setState(() {
+        _executionStatus = next;
+        _executionNotice = null;
+        if (next.terminal || next.stage == 'observation_stopped') {
+          _cancelAutomaticChecks();
+        }
+      });
+    } on TimeoutException {
+      if (mounted && generation == _automaticCheckGeneration) {
+        setState(() => _cancelAutomaticChecks(paused: true));
+      }
+    } catch (_) {
+      // A completed failed read may be checked again inside the bounded window.
+      if (mounted &&
+          generation == _automaticCheckGeneration &&
+          _now.isAfter(_automaticDeadline!)) {
+        setState(() => _cancelAutomaticChecks(paused: true));
+      }
+    } finally {
+      if (mounted && generation == _automaticCheckGeneration) {
+        setState(() => _executionBusy = false);
+        if (_automaticChecksActive) _scheduleAutomaticCheck();
+      } else if (mounted) {
+        setState(() => _executionBusy = false);
+      }
+    }
+  }
+
   Future<void> _restoreExecution() async {
     final api = _executionApi;
     if (api == null) return;
     setState(() {
+      _cancelAutomaticChecks();
       _executionBusy = true;
       _executionStatusVerified = false;
     });
@@ -164,8 +298,13 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
       final status = await api.confirmExecution(review.reviewId);
       if (mounted) {
         setState(() {
+          if (_macExecution) {
+            _clearReview();
+          } else {
+            _executionReview = null;
+          }
           _executionStatus = status;
-          _executionReview = null;
+          _startAutomaticChecks(status);
         });
       }
     } catch (_) {
@@ -185,6 +324,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
     final status = _executionStatus;
     if (api == null || status == null || _executionBusy) return;
     setState(() {
+      _cancelAutomaticChecks();
       _executionBusy = true;
       _executionNotice = null;
     });
@@ -218,6 +358,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
         _checkReview();
       }
     } else {
+      if (_automaticChecksActive) {
+        setState(() => _cancelAutomaticChecks(paused: true));
+      }
       _reviewCheckTimer?.cancel();
       _reviewCheckTimer = null;
     }
@@ -228,6 +371,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
     WidgetsBinding.instance.removeObserver(this);
     _reviewExpiryTimer?.cancel();
     _reviewCheckTimer?.cancel();
+    _cancelAutomaticChecks();
     super.dispose();
   }
 
@@ -1015,6 +1159,18 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
             ],
             if (status != null) ...[
               if (_macExecution) ...[
+                if (_automaticChecksActive)
+                  Text(
+                    _automaticChecksStarted
+                        ? 'Checking routers'
+                        : 'Settings are applying. Checks start in about 5 minutes.',
+                    key: const Key('move-automatic-progress'),
+                  ),
+                if (_automaticChecksPaused && !status.terminal)
+                  const Text(
+                    'Automatic checks are paused. Use Check settings to continue manually.',
+                    key: Key('move-automatic-paused'),
+                  ),
                 Text(
                   switch (status.stage) {
                     'verified_configuration' => 'Network settings verified',
@@ -1068,7 +1224,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   onPressed: _executionBusy
                       ? null
                       : () => _executionAction('check', resume: true),
-                  child: const Text('Resume observation'),
+                  child: Text(
+                      _macExecution ? 'Resume checks' : 'Resume observation'),
                 ),
               if (status.terminal)
                 OutlinedButton(
@@ -1093,7 +1250,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   key: const Key('move-execution-stop'),
                   onPressed:
                       _executionBusy ? null : () => _executionAction('stop'),
-                  child: const Text('Stop observation'),
+                  child:
+                      Text(_macExecution ? 'Stop checks' : 'Stop observation'),
                 ),
             ],
           ],
