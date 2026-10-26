@@ -99,6 +99,7 @@ Run helper regression checks with `dart run tool/local_server_test.dart` from `a
 
 ## Scope and progress
 
+- [Mac alpha tester quickstart](docs/MAC-ALPHA-TESTER.md)
 - [Current build scope](docs/BUILD-SCOPE.md)
 - [First-release completion plan](docs/RELEASE-PLAN.md)
 - [Compatibility and evidence](docs/COMPATIBILITY.md)

@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thread_network_tool/live_api.dart';
 import 'package:thread_network_tool/move/native_move_journal.dart';
 import 'package:thread_network_tool/native/mac_move_adapter.dart';
 import 'package:thread_network_tool/native/session.dart';
 import 'package:thread_network_tool/native_live_api.dart';
+import 'package:thread_network_tool/network_move_screen.dart';
 
 const _sourceName = 'LabSource';
 const _targetName = 'LabTarget';
@@ -249,7 +251,155 @@ Future<(String, List<String>)> _review(NativeLiveApi api,
   return (plan.reviewId, plan.blockers);
 }
 
+/// Processes need real event-loop time inside the widget test's fake clock.
+/// Keep all production delays intact; this only waits for local child replies.
+Future<void> _settleNative(WidgetTester tester) async {
+  for (var attempt = 0; attempt < 200; attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+    if (find.byType(LinearProgressIndicator).evaluate().isEmpty) {
+      await tester.pumpAndSettle();
+      return;
+    }
+  }
+  fail('Local synthetic native action did not finish within ten seconds');
+}
+
+Future<void> _tapNative(WidgetTester tester, Key key) async {
+  final finder = find.byKey(key);
+  await tester.scrollUntilVisible(finder, 250);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.runAsync(() => tester.tap(finder));
+  await tester.pump();
+  await _settleNative(tester);
+}
+
 void main() {
+  testWidgets(
+    'production screen confirms once and restores real journal for manual recovery',
+    (tester) async {
+      // This acceptance connects the production UI/API/session/adapter/journal.
+      // Read replies and the process worker remain synthetic: real worker wire
+      // behavior and signed-parent sandbox execution have separate acceptances.
+      final root = await tester.runAsync(
+        () => Directory.systemTemp.createTemp('tnt-mac-screen-session-'),
+      );
+      final harness = _Harness(root!);
+      tester.view.physicalSize = const Size(1000, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      try {
+        await tester.runAsync(harness.initialize);
+        final adapter = harness.adapter();
+        final api = harness.api(adapter);
+        final discovered = await tester.runAsync(() async {
+          await api.credentialsForRole('source', _sourceDataset);
+          await api.credentialsForRole('target', _targetDataset);
+          return api.discover();
+        });
+        final state = discovered!;
+        await tester.runAsync(() => tester.pumpWidget(
+          MaterialApp(
+            home: NetworkMoveScreen(api: api, initialState: state),
+          ),
+        ));
+        await _settleNative(tester);
+        await _tapNative(tester, Key('move-target-${state.routers[2].id}'));
+        await _tapNative(tester, const Key('move-check-target'));
+        for (final router in state.routers.take(2)) {
+          await _tapNative(tester, Key('move-check-source-${router.id}'));
+        }
+        for (final key in [
+          'move-empty-source-attestation',
+          'move-eero-source-attestation',
+          'move-whole-eero-group-attestation',
+          'move-prepare',
+          'move-execution-prepare',
+        ]) {
+          await _tapNative(tester, Key(key));
+        }
+        expect(await tester.runAsync(harness.modes), ['inspect']);
+        expect(
+          await tester.runAsync(adapter.journal.read),
+          isNull,
+          reason: 'Preparation does not grant durable send authority',
+        );
+        expect(find.byKey(const Key('move-execution-confirm')), findsOneWidget);
+        await _tapNative(tester, const Key('move-execution-confirm'));
+        final record = await tester.runAsync(adapter.journal.read);
+        expect(record?.stage.wire, 'observing');
+        expect(record?.disposition.wire, 'accepted');
+        expect(adapter.dispatchLaunches, 1);
+        expect(await tester.runAsync(harness.modes), [
+          'inspect',
+          'inspect',
+          'dispatch',
+        ]);
+        expect(
+          find.byKey(const Key('move-automatic-progress')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('move-execution-confirm')), findsNothing);
+
+        // Destroy the first screen/session/adapter. The new adapter learns only
+        // the durable record; credentials and send authorization are not restored.
+        await tester.pumpWidget(const SizedBox.shrink());
+        final restartedAdapter = harness.adapter();
+        final restartedApi = harness.api(restartedAdapter);
+        final emptyState = await tester.runAsync(restartedApi.state);
+        expect(emptyState?.sourceCredentialAvailable, isFalse);
+        expect(emptyState?.targetCredentialAvailable, isFalse);
+        await tester.runAsync(() => tester.pumpWidget(
+          MaterialApp(
+            home: NetworkMoveScreen(
+              api: restartedApi,
+              initialState: emptyState!,
+            ),
+          ),
+        ));
+        await _settleNative(tester);
+        expect(find.text('Join needs attention'), findsOneWidget);
+        expect(find.byKey(const Key('move-execution-confirm')), findsNothing);
+        expect(find.byKey(const Key('move-automatic-progress')), findsNothing);
+        expect(restartedAdapter.dispatchLaunches, 0);
+        expect(await tester.runAsync(harness.modes), [
+          'inspect',
+          'inspect',
+          'dispatch',
+        ]);
+
+        // Reimport and rediscover through the session. Reopening starts no
+        // automatic checks; the explicit recovery button performs one read only.
+        await tester.runAsync(() async {
+          await restartedApi.credentialsForRole('source', _sourceDataset);
+          await restartedApi.credentialsForRole('target', _targetDataset);
+        });
+        await _tapNative(tester, const Key('move-discover'));
+        await _tapNative(tester, const Key('move-execution-check'));
+        final recovered = await tester.runAsync(restartedAdapter.journal.read);
+        expect(recovered?.operationId, record?.operationId);
+        expect(recovered?.stage.wire, 'observing');
+        expect(restartedAdapter.dispatchLaunches, 0);
+        expect(await tester.runAsync(harness.modes), [
+          'inspect',
+          'inspect',
+          'dispatch',
+          'observe',
+        ]);
+        expect(find.byKey(const Key('move-automatic-progress')), findsNothing);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.runAsync(() => root.delete(recursive: true));
+      }
+    },
+    skip: _skipNativeSession != false,
+  );
+
   test(
       'real Mac journal fences one accepted session dispatch and recovery reads',
       () async {
