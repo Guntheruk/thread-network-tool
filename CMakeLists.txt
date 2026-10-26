@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(TNT_WITH_COMMISSIONER "Build optional OpenThread read-only probe" OFF)
 option(TNT_BUILD_MOVE_LAB "Build isolated loopback-only native move lab worker" OFF)
 option(TNT_BUILD_APP_MOVE_LAB "Build isolated app move lab worker" OFF)
+option(TNT_BUILD_MAC_MOVE_WORKER "Build opt-in Mac source-network move worker" OFF)
+option(TNT_BUILD_MAC_MOVE_FIXTURE "Build opt-in loopback-only mutable DTLS test fixture" OFF)
 option(TNT_BUILD_TESTS "Build native tests" ON)
 option(TNT_BUILD_MOVE_JOURNAL "Build private POSIX move journal helper (no network access)" OFF)
 option(TNT_BUILD_MACOS_PROBE_FIXTURE "Build isolated loopback DTLS probe fixture" OFF)
@@ -117,7 +119,7 @@ if(TNT_BUILD_TESTS)
 endif()
 
 # No mutation entry point is added to the application CLI or installed payload.
-if(TNT_BUILD_MOVE_LAB OR TNT_BUILD_APP_MOVE_LAB)
+if(TNT_BUILD_MOVE_LAB OR TNT_BUILD_APP_MOVE_LAB OR TNT_BUILD_MAC_MOVE_WORKER)
   if(NOT TNT_WITH_COMMISSIONER OR WIN32)
     message(FATAL_ERROR "Isolated move workers require the pinned Commissioner on POSIX")
   endif()
@@ -157,6 +159,57 @@ if(TNT_BUILD_MOVE_LAB OR TNT_BUILD_APP_MOVE_LAB)
         native/network_move_worker_fixture.cpp)
       target_include_directories(tnt-move-app-socket-owner-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/native")
     endif()
+  endif()
+  if(TNT_BUILD_MAC_MOVE_WORKER)
+    if(NOT APPLE)
+      message(FATAL_ERROR "Mac source-network worker requires macOS")
+    endif()
+    add_executable(tnt-mac-move-worker
+      native/mac_move_worker_main.cpp
+      native/mac_move_worker_protocol.cpp
+      native/network_move_commissioner.cpp
+      native/network_move_worker_lifecycle.cpp
+      native/move_journal.cpp)
+    target_include_directories(tnt-mac-move-worker PRIVATE
+      "${TNT_COMMISSIONER_SOURCE}/include"
+      "${TNT_COMMISSIONER_SOURCE}/third_party/mbedtls/repo/include")
+    target_link_libraries(tnt-mac-move-worker PRIVATE tnt-network-move commissioner)
+    set_target_properties(tnt-mac-move-worker PROPERTIES INSTALL_RPATH "@executable_path/../Frameworks")
+    install(TARGETS tnt-mac-move-worker RUNTIME DESTINATION Helpers)
+    if(TNT_BUILD_TESTS)
+      add_executable(tnt-mac-move-protocol-tests
+        tests/native/test_mac_move_worker_protocol.cpp
+        native/mac_move_worker_protocol.cpp
+        native/move_journal.cpp)
+      target_include_directories(tnt-mac-move-protocol-tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/native"
+        "${TNT_COMMISSIONER_SOURCE}/third_party/mbedtls/repo/include")
+      target_link_libraries(tnt-mac-move-protocol-tests PRIVATE tnt-network-move commissioner)
+      add_test(NAME native-mac-move-protocol COMMAND tnt-mac-move-protocol-tests)
+      add_executable(tnt-mac-move-lifecycle-tests
+        tests/native/test_network_move_worker_lifecycle.cpp
+        native/network_move_worker_lifecycle.cpp)
+      target_include_directories(tnt-mac-move-lifecycle-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/native")
+      add_test(NAME native-mac-move-lifecycle COMMAND tnt-mac-move-lifecycle-tests)
+      add_test(NAME native-mac-move-capabilities COMMAND tnt-mac-move-worker capabilities)
+      set_tests_properties(native-mac-move-capabilities PROPERTIES
+        PASS_REGULAR_EXPRESSION "\"network_writes\":true")
+    endif()
+  endif()
+endif()
+
+if(TNT_BUILD_MAC_MOVE_FIXTURE)
+  if(NOT APPLE OR NOT TNT_WITH_COMMISSIONER)
+    message(FATAL_ERROR "Mutable Mac test fixture requires macOS and the pinned Commissioner")
+  endif()
+  add_executable(tnt-mac-move-write-fixture tests/native/mac_move_write_fixture.cpp)
+  target_include_directories(tnt-mac-move-write-fixture PRIVATE
+    "${TNT_COMMISSIONER_SOURCE}/include" "${TNT_COMMISSIONER_SOURCE}/src")
+  target_link_libraries(tnt-mac-move-write-fixture PRIVATE commissioner)
+  if(TNT_BUILD_TESTS AND TNT_BUILD_MAC_MOVE_WORKER)
+    add_test(NAME native-mac-move-wire
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_mac_move_wire.py"
+      "$<TARGET_FILE:tnt-mac-move-worker>" "$<TARGET_FILE:tnt-mac-move-write-fixture>")
   endif()
 endif()
 

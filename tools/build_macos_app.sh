@@ -47,6 +47,7 @@ if [[ "$mac_alpha" == 1 ]]; then move_build=ON; fi
 cmake_args=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
   "-DCMAKE_OSX_ARCHITECTURES=$macos_architectures" -DTNT_BUILD_TESTS=OFF
   -DTNT_WITH_COMMISSIONER=ON -DTNT_BUILD_MOVE_LAB=OFF -DTNT_BUILD_APP_MOVE_LAB=OFF
+  -DTNT_BUILD_MACOS_PROBE_FIXTURE=OFF -DTNT_BUILD_MAC_MOVE_FIXTURE=OFF
   "-DTNT_BUILD_MAC_MOVE_WORKER=$move_build" "-DTNT_BUILD_MOVE_JOURNAL=$move_build"
   "-DPython3_EXECUTABLE=$python_bin" "-DTNT_COMMISSIONER_SOURCE=$commissioner_source")
 "$cmake_bin" -S "$project_root" -B "$native_build" "${cmake_args[@]}"

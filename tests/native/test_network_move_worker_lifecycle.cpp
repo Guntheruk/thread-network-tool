@@ -15,5 +15,8 @@ int main(){
   bool replay=false;try{WriteReceipt(dir,op,binding,1000,"started");}catch(const std::runtime_error&){replay=true;}CHECK(replay);
   WriteReceipt(dir,op,binding,1000,"accepted");CHECK(ReadReceipt(dir,op,binding,1000));
  }
- unlink((dir+"/receipt-"+op).c_str());rmdir(dir.c_str());std::cout<<"worker lifecycle checks passed: 6 checks\n";
+ {
+  Lease active(dir);bool blocked=false;try{Lease concurrent(dir);}catch(const std::runtime_error&){blocked=true;}CHECK(blocked);
+ }
+ unlink((dir+"/receipt-"+op).c_str());unlink((dir+"/global.lock").c_str());rmdir(dir.c_str());std::cout<<"worker lifecycle checks passed: 7 checks\n";
 }
