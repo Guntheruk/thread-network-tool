@@ -204,8 +204,11 @@ if(TNT_BUILD_MAC_MOVE_FIXTURE)
   endif()
   add_executable(tnt-mac-move-write-fixture tests/native/mac_move_write_fixture.cpp)
   target_include_directories(tnt-mac-move-write-fixture PRIVATE
-    "${TNT_COMMISSIONER_SOURCE}/include" "${TNT_COMMISSIONER_SOURCE}/src")
-  target_link_libraries(tnt-mac-move-write-fixture PRIVATE commissioner)
+    "${TNT_COMMISSIONER_SOURCE}/include" "${TNT_COMMISSIONER_SOURCE}/src"
+    "${TNT_COMMISSIONER_SOURCE}/third_party/libevent/repo/include"
+    "${CMAKE_CURRENT_BINARY_DIR}/ot-commissioner/third_party/libevent/repo/include"
+    "${TNT_COMMISSIONER_SOURCE}/third_party/mbedtls/repo/include")
+  target_link_libraries(tnt-mac-move-write-fixture PRIVATE commissioner fmt::fmt event_core mbedtls)
   if(TNT_BUILD_TESTS AND TNT_BUILD_MAC_MOVE_WORKER)
     add_test(NAME native-mac-move-wire
       COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_mac_move_wire.py"
