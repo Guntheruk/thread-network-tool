@@ -197,7 +197,8 @@ class AppFixtureTests(unittest.TestCase):
 
     def test_one_shot_ping_treats_only_pinned_transient_failure_as_false(self):
         class Node:
-            def __init__(self, error=None):
+            def __init__(self, output="", error=None):
+                self.output = output
                 self.error = error
                 self.calls = []
 
@@ -205,35 +206,37 @@ class AppFixtureTests(unittest.TestCase):
                 self.calls.append(command)
                 if self.error:
                     raise self.error
-                return "ping response\nDone\n"
+                return self.output
 
             def read(self, pattern, timeout):
-                self.calls.append(timeout)
-                raise TimeoutError()
+                raise AssertionError("ping must not perform an extra read")
 
         address = "fd00::1"
-        no_route = Node(fixture.reads.LabError("simulator_command", "unknown", 4))
+        no_route = Node(error=fixture.reads.LabError("simulator_command", "unknown", 4))
         self.assertFalse(fixture.ping_once(no_route, address))
         self.assertEqual(len(no_route.calls), 1)
-        timed_out = Node()
+        timed_out = Node(error=TimeoutError())
         self.assertFalse(fixture.ping_once(timed_out, address))
-        self.assertLessEqual(timed_out.calls[-1], 3)
-        unexpected = Node(fixture.reads.LabError("simulator_command", "unknown", 5))
+        unexpected = Node(error=fixture.reads.LabError("simulator_command", "unknown", 5))
         with self.assertRaises(fixture.reads.LabError):
             fixture.ping_once(unexpected, address)
-        async_error = Node()
-        async_error.read = lambda pattern, timeout: "Error 4: NoRoute\n"
-        self.assertFalse(fixture.ping_once(async_error, address))
-        async_unexpected = Node()
-        async_unexpected.read = lambda pattern, timeout: "Error 5: Busy\n"
-        with self.assertRaises(fixture.reads.LabError):
-            fixture.ping_once(async_unexpected, address)
-        verified = Node()
-        verified.read = lambda pattern, timeout: "8 bytes from fd00::1: icmp_seq=1\n"
+        prefix = "ping fd00::1 8 1\n"
+        verified = Node(prefix + "8 bytes from fd00:0:0:0:0:0:0:1: icmp_seq=42 hlim=64 time=0ms\nDone\n")
         self.assertTrue(fixture.ping_once(verified, address))
-        wrong_peer = Node()
-        wrong_peer.read = lambda pattern, timeout: "8 bytes from fd00::2: icmp_seq=1\n"
+        self.assertEqual(verified.calls, ["ping fd00::1 8 1"])
+        wrong_then_valid = Node(prefix + "8 bytes from fd00::2: icmp_seq=2 hlim=64 time=0ms\n"
+                                "8 bytes from fd00::1: icmp_seq=65535 hlim=64 time=0ms\nDone\n")
+        self.assertTrue(fixture.ping_once(wrong_then_valid, address))
+        stale_before_echo = Node("8 bytes from fd00::1: icmp_seq=1 hlim=64 time=0ms\n" + prefix + "Done\n")
+        self.assertFalse(fixture.ping_once(stale_before_echo, address))
+        wrong_peer = Node(prefix + "8 bytes from fd00::2: icmp_seq=1 hlim=64 time=0ms\nDone\n")
         self.assertFalse(fixture.ping_once(wrong_peer, address))
+        summary_only = Node(prefix + "1 packets received\nDone\n")
+        self.assertFalse(fixture.ping_once(summary_only, address))
+        missing_done = Node(prefix + "8 bytes from fd00::1: icmp_seq=7 hlim=64 time=0ms\n")
+        self.assertFalse(fixture.ping_once(missing_done, address))
+        malformed = Node(prefix + "noise 8 bytes from fd00::1: icmp_seq=7 hlim=64 time=0ms extra\nDone\n")
+        self.assertFalse(fixture.ping_once(malformed, address))
 
     def test_disconnected_client_does_not_stop_control_handler(self):
         class Connection:

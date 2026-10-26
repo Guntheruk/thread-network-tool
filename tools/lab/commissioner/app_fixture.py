@@ -4,6 +4,7 @@ Only setup writes reach OpenThread. Once ready, the Oracle permits reads only;
 the application under test owns any subsequent network mutation.
 """
 import argparse
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -24,7 +25,6 @@ ROOT = Path("/tmp/app-fixture")
 MANIFEST = ROOT / "fixture"
 CONTROL = ROOT / "control"
 MAX_REQUEST = 1024
-PING_REPLY_TIMEOUT = 3
 TRANSIENT_PING_ERRORS = frozenset((4, 28))  # Pinned OpenThread NoRoute, ResponseTimeout.
 REFRESH_STAGES = frozenset(("process", "ports", "datasets", "states", "partitions",
                             "pending", "connectivity", "manifest"))
@@ -122,20 +122,52 @@ def process_startticks(pid):
 
 def ping_once(node, address):
     """A single read-only connectivity check; transient absence is false."""
+    target = ipaddress.IPv6Address(address)
+    command = "ping " + address + " 8 1"
     try:
-        output = node.cmd("ping " + address + " 8 1")
-        if re.search(r"\bbytes from " + re.escape(address) + r"\b", output):
-            return True
-        # The pinned CLI reports ping replies asynchronously after command Done.
-        output = node.read(re.compile(r"(?:\d+ bytes from [0-9a-f:]+|1 packets received|Error \d+:)"),
-                           PING_REPLY_TIMEOUT)
+        output = node.cmd(command)
+        lines = output.replace("\r", "").splitlines()
+        # Ignore queued output until this command's PTY echo, then inspect only
+        # the synchronous response through its Done/Error terminator.
+        echo = next((index for index, line in enumerate(lines)
+                    if line.strip() in (command, ">" + command, "> " + command)), None)
+        if echo is None:
+            return False
+        frame = []
+        completed = False
+        for line in lines[echo + 1:]:
+            stripped = line.strip()
+            if stripped == "Done":
+                completed = True
+                break
+            if re.fullmatch(r"Error \d+:[^\n]*", stripped):
+                if stripped.startswith("Error "):
+                    frame.append(stripped)
+                break
+            frame.append(stripped)
+        output = "\n".join(frame)
         error = re.search(r"Error (\d+):", output)
         if error:
             code = int(error.group(1))
             if code in TRANSIENT_PING_ERRORS:
                 return False
             raise reads.LabError("simulator_command", "ping", code)
-        return bool(re.search(r"\bbytes from " + re.escape(address) + r"\b", output))
+        if not completed:
+            return False
+        for line in frame:
+            reply = re.fullmatch(
+                r"(\d+) bytes from ([^\s]+): icmp_seq=(\d+) hlim=(\d+) time=(\d+)ms", line)
+            if not reply:
+                continue
+            _, peer_text, sequence_text, _, _ = reply.groups()
+            try:
+                peer = ipaddress.IPv6Address(peer_text)
+                sequence = int(sequence_text)
+            except ValueError:
+                continue
+            if peer == target and 0 <= sequence <= 65535:
+                return True
+        return False
     except reads.LabError as error:
         if str(error) == "simulator_command" and error.cli_error in TRANSIENT_PING_ERRORS:
             return False
