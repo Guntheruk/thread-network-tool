@@ -7,6 +7,7 @@ option(TNT_BUILD_MOVE_LAB "Build isolated loopback-only native move lab worker" 
 option(TNT_BUILD_APP_MOVE_LAB "Build isolated app move lab worker" OFF)
 option(TNT_BUILD_TESTS "Build native tests" ON)
 option(TNT_BUILD_MOVE_JOURNAL "Build private POSIX move journal helper (no network access)" OFF)
+option(TNT_BUILD_MACOS_PROBE_FIXTURE "Build isolated loopback DTLS probe fixture" OFF)
 if(TNT_BUILD_TESTS)
   enable_testing()
 endif()
@@ -72,6 +73,18 @@ if(TNT_WITH_COMMISSIONER)
   target_include_directories(thread-network PRIVATE "${TNT_COMMISSIONER_SOURCE}/include")
   target_compile_definitions(thread-network PRIVATE TNT_WITH_COMMISSIONER)
   target_link_libraries(thread-network PRIVATE commissioner)
+  if(TNT_BUILD_MACOS_PROBE_FIXTURE)
+    if(NOT APPLE)
+      message(FATAL_ERROR "Mac probe fixture requires macOS")
+    endif()
+    add_executable(tnt-macos-probe-fixture tests/native/macos_probe_fixture.cpp)
+    target_include_directories(tnt-macos-probe-fixture PRIVATE
+      "${TNT_COMMISSIONER_SOURCE}/include" "${TNT_COMMISSIONER_SOURCE}/src"
+      "${TNT_COMMISSIONER_SOURCE}/third_party/libevent/repo/include"
+      "${CMAKE_CURRENT_BINARY_DIR}/ot-commissioner/third_party/libevent/repo/include"
+      "${TNT_COMMISSIONER_SOURCE}/third_party/mbedtls/repo/include")
+    target_link_libraries(tnt-macos-probe-fixture PRIVATE commissioner fmt::fmt event_core mbedtls)
+  endif()
   if(TNT_BUILD_TESTS)
     add_executable(tnt-commissioner-codec-tests patches/commissioner/tests/test_legacy_wakeup.cpp)
     target_include_directories(tnt-commissioner-codec-tests PRIVATE "${TNT_COMMISSIONER_SOURCE}/src")

@@ -62,7 +62,14 @@ if [[ "$mac_alpha" == 1 ]]; then
   "$python_bin" -c 'import json,sys; d=json.loads(sys.argv[1]); assert type(d) is dict and d == {"schema_version":1,"profile_id":"eero-source-network-alpha-v1","network_writes":True,"authenticated_reads":True,"durable_fence":True}' \
     "$worker_capabilities" || die 'Mac alpha worker capabilities are invalid'
 fi
-(cd "$project_root/app" && "$flutter_bin" build macos --release)
+flutter_target="${TNT_FLUTTER_TARGET:-lib/main.dart}"
+case "$flutter_target" in
+  lib/main.dart) ;;
+  lib/macos_probe_sandbox_main.dart|lib/macos_move_sandbox_main.dart)
+    [[ "${TNT_TEST_PACKAGE:-0}" == 1 ]] || die 'isolated entrypoint requires TNT_TEST_PACKAGE=1' ;;
+  *) die 'unknown Flutter entrypoint' ;;
+esac
+(cd "$project_root/app" && "$flutter_bin" build macos --release --target "$flutter_target")
 
 products="$project_root/app/build/macos/Build/Products/Release"
 [[ -d "$products" ]] || die "Flutter release product directory missing: $products"

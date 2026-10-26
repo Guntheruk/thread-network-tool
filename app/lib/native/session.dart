@@ -122,10 +122,16 @@ bool localEndpoint(String value) {
 }
 
 class LiveSession {
-  LiveSession(this.native, {DateTime Function()? now, this.execution})
-      : now = now ?? DateTime.now;
+  LiveSession(this.native,
+      {DateTime Function()? now,
+      this.execution,
+      bool permitLoopbackFixture = false})
+      : now = now ?? DateTime.now,
+        _permitLoopbackFixture = permitLoopbackFixture;
   final NativeCall native;
   final DateTime Function() now;
+  // Used only by the separately compiled loopback test entrypoint.
+  final bool _permitLoopbackFixture;
   final MoveAdapter? execution;
   bool get executionAvailable => execution?.available ?? false;
   bool get executionRecoveryAvailable => execution != null;
@@ -331,7 +337,8 @@ class LiveSession {
       final address = item['address'] as String;
       final port = item['port'] as int;
       final id = randomToken();
-      final usable = _usableEndpoint(address);
+      final usable = _usableEndpoint(address) ||
+          (_permitLoopbackFixture && address == '::1');
       _routers[id] = {
         'id': id,
         'service_name': name,
