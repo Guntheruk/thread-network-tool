@@ -78,3 +78,11 @@ Google Home commands, Windows networking and accessory migration are outside
 this bounded alpha. The owner's working household has not been used as a test
 network. All source commits and package artifacts remain local under the push
 and cloud-cost hold.
+
+## Additional local acceptance
+
+[The local follow-up record](MAC-ALPHA-LOCAL-FOLLOWUP.md) adds the production
+screen/session/real-journal recovery test, review at `220bf75`, unpacked-app
+launch and x86_64 parser/worker checks under Rosetta. Application binaries remain
+identical to this record. These checks do not close the retail, clean-Mac,
+physical Intel or trusted-distribution gates.

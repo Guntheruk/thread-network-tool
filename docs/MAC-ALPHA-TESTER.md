@@ -1,6 +1,6 @@
 # Mac Eero alpha: local tester quickstart
 
-This is a local development build, not a released or broadly supported product. The packaged join has been tested with synthetic peers, not a retail Eero move. The local package is ad hoc signed, not notarized; clean-Mac installation and Intel execution have not been verified. Do not invite pilot participants until the [pilot gates](PILOT.md) are met. See the [acceptance record](MAC-ALPHA-ACCEPTANCE.md) for the exact package and evidence.
+This is a local development build, not a released or broadly supported product. The packaged join has been tested with synthetic peers, not a retail Eero move. The local package is ad hoc signed, not notarized; clean-Mac installation and full-app execution on Intel hardware have not been verified. Do not invite pilot participants until the [pilot gates](PILOT.md) are met. See the [acceptance record](MAC-ALPHA-ACCEPTANCE.md) for the exact package and evidence.
 
 **Do not use a working household as a test network.** A real join needs a separately authorized, controlled setup. The action changes the entire source Thread network, not just the Eero you select. It can interrupt that network, does not move accessories, and has no automatic rollback. The source must have no accessories; independently inventory it and all source Eeros. A missing advertisement or an empty list in the app does not prove the network is empty or that every Eero is present.
 

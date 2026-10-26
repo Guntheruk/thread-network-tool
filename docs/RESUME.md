@@ -25,6 +25,17 @@ Read `MAC-ALPHA-ACCEPTANCE.md` for exact source, tests, artifacts and remaining
 controlled retail/distribution gates. The owner has no spare Eero; do not test
 a network-wide change on working household Eeros.
 
+Local follow-up `220bf75` adds the tester guide and screen-to-real-journal
+confirmation/recovery acceptance. The three focused tests passed and independent
+review found no actionable issue. `MAC-ALPHA-LOCAL-FOLLOWUP.md` records unpacked
+app launch and translated x86_64 helper evidence; these do not close retail or
+trusted-distribution gates. App binaries still use production code `7422ddc`.
+The one frozen follow-up fixture still failed cross-original-network data
+connectivity while moved-source peers communicated; ping parsing is excluded
+as the immediate cause. No fixture remains running and no repeated operation is
+queued. Follow the recorded evidence before any new exact-cause experiment.
+
+
 ---
 
 ## Historical account-switch handoff

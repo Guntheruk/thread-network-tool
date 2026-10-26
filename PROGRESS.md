@@ -41,6 +41,32 @@ connectivity check false. All other convergence checks were true. A separate,
 read-only synthetic ping diagnostic confirmed synchronous reply-before-Done
 framing. No repeated move or relaxed connectivity check was used to claim a pass.
 
+## Local completion follow-up
+
+At `220bf75`, a new production screen/API/session/adapter acceptance uses the
+real native journal and synthetic process replies to confirm exactly one send,
+then recovery without restored credentials, automatic checks or a second send.
+All three focused integration tests passed without skips; analysis was clean.
+Independent review found no actionable finding. A plain-language tester guide
+is linked from README. The app binaries remain at `7422ddc`; no production-code
+repair was justified by these checks.
+
+The original ZIP was unpacked to a fresh directory; signatures passed and the
+native window launched from that exact path with discovery idle. The packaged
+parser and move worker also passed x86_64-pinned checks under Rosetta from a
+signed sandbox parent. This does not cover physical Intel, the full translated
+Flutter app, or clean-Mac installation. See `docs/MAC-ALPHA-LOCAL-FOLLOWUP.md`.
+No household calls, pushes, hosted jobs or publication were performed.
+
+A single frozen `787ace4` diagnostic repeated the key-change failure: cross-
+original-network pings failed in both directions, while moved-source peers
+communicated. Explicit packet-loss output excludes discarded reply parsing;
+underlying simulator routing/key/address state remains unresolved. All six
+configuration checks passed, connectivity stayed false, and the app correctly
+retained `needs_attention`. The disposable container was removed. Exact evidence
+and remaining scope are in the follow-up record; no production fix was invented.
+
+
 ---
 
 # Progress — 25 October 2026
