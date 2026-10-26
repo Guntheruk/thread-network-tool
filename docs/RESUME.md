@@ -1,0 +1,91 @@
+# Paused handoff — 26 October 2026
+
+Owner requested all agents pause while switching accounts. Do not resume work,
+builds, fixtures, pushes, hosted jobs or reviews until the owner resumes it.
+All subagents are stopped/completed. No active task-owned lab/build process
+remains. No household changes were performed during this application work.
+
+## Exact checkpoint
+
+- Repository: `/Users/richard/thread`, private upstream
+  `https://github.com/Guntheruk/thread-network-tool`.
+- Branch: `feat/app-move-candidate`.
+- Last implementation/test head: `fff2f784b9679cbba8605ef15468b857c6875dc0`.
+  This handoff adds documentation only after that head.
+- Later work remains local. PR #8 is still the last published candidate; no new
+  push, hosted build or cloud review was requested after the owner's cost hold.
+- Local candidate workflows are manual-dispatch only. The published remote
+  workflows do not acquire that change until it is pushed.
+
+## Built and verified
+
+- Native Flutter Mac application with bundled read-only C++ helper; universal
+  local ad hoc package built and inspected on Apple Silicon. This is a native
+  desktop application. The localhost web preview is a separate development view.
+- Discovery, guided eero copy, Advanced input, credential validation, router
+  checks, network-move review, local report preview, and guarded execution code.
+  Default consumer packages remain read-only; execution is an explicit isolated
+  Linux software-lab profile only.
+- Optional existing-Home-Assistant import with explicit server/token action,
+  explicit network choice, identity checks and authenticated TLS. At `a2949a68`,
+  the actual packaged Mac window imported a complete nonpreferred synthetic
+  dataset from a disposable loopback server and rejected an incomplete one.
+  No actual household HA server/token was used.
+- At `a2949a68`: seven native CTests, 90 Python tests, clean Flutter analysis,
+  163 Flutter tests plus one Linux-only skip, and 43 execution checks passed.
+- At `fff2f784`: clean full analysis; real-journal adapter lock/retry regression;
+  actual-journal startup recovery widget test; 19 fixture tests including the two
+  real Unix-socket cases passed. The Linux-only runtime test remained skipped on
+  Mac. Independent review closed the adapter initialization finding.
+
+## Actual application move evidence
+
+Frozen `a2949a68` image:
+`sha256:6b5f1eb97aa01133fc75316556a07d1c1b552531e7485fa75ae4df2020d8979b`.
+
+- Lost native result: passed after 375 seconds, two real Flutter app processes,
+  one Petition/SET, no redispatch on restart, independent convergence checks and
+  secret redaction.
+- Key-change/older target: failed in recovery after 506.9 seconds. The exact
+  assertion and final network-check booleans were discarded. Cause and physical
+  convergence remain unknown. No blind retry was performed.
+- Both original containers were removed. Evidence:
+  `/tmp/tnt-full-app-lab-a2949a68` locally and on linuxbox.
+- The next head adds sanitized final app stage/reason/category and seven oracle
+  booleans with sample freshness, retaining failure status and verification gates.
+- The `fff2f784` image build completed (agent build handle `38722`, exit 0), but
+  **no new fixture was started** before the pause. Preserved context and image
+  checkpoint: `linuxbox:/tmp/tnt-full-app-lab-fff2f784/paused-state.json`.
+  Resume from that record rather than starting an untracked duplicate operation.
+
+## Still unfinished
+
+1. Diagnose the key-change case using the new bounded diagnostics, then verify
+   any repair at a frozen head. Existing software-lab success proves no retail
+   eero, HomePod or Nest combination.
+2. Controlled packaged-Mac sandbox authenticated-read/error-path evidence;
+   final exact-candidate window, layout, credential-clearing and report checks.
+3. Exact-candidate third-party notices retained alongside the package; reconcile
+   stale compatibility, pilot, Android and dependency documentation with PROGRESS.
+4. Apple native Mac provisioning remains unresolved. iPhone credential bridge
+   and unsigned builds exist, but real device consent/retrieval and secure phone
+   transfer are unfinished. A phone companion is optional; keep Mac-first scope.
+5. Android credential bridge/APK compiled historically, but it has no usable
+   production setup route yet. Windows desktop compiled historically, but live
+   discovery/probe networking remains unavailable. Google Home account/trait
+   integration is researched but not implemented.
+6. Retail-model/firmware compatibility and recovery; trusted distribution signing,
+   notarization, clean-Mac/Intel testing and owner license/distribution decisions.
+
+The suggested optional phone product, **Check my home**, remains exploration:
+selected-device before/after response checks, not a promised complete Thread map.
+AI, Home Assistant, an account and a phone companion are not core requirements.
+Internal Mac Thread radio work remains a separate project/chat.
+
+## Resume boundaries
+
+Read AGENTS.md, BUILD-SCOPE, RELEASE-PLAN and PROGRESS. Verify clean branch/head,
+the saved paused-state record and original process/container absence before
+resuming. Root owns Git. Preserve local-first testing and the current push hold.
+Do not change working household devices, reset/re-pair accessories, regenerate
+credentials, access a mailbox, purchase, publish or enable telemetry.

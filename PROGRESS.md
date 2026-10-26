@@ -384,3 +384,7 @@ Known limits: the native Mac app is a locally signed development build, without 
   **Check my home** workflow could provide value beyond credential transfer;
   it is not an approved expansion of first-release scope. Mac-first delivery
   continues and the desktop does not require a phone companion.
+
+Owner pause: all agents stopped for an account switch. The `fff2f784` image
+build completed, but its new fixture never started; no task-owned build or lab
+process remains active. Resume from `docs/RESUME.md` only after owner direction.
