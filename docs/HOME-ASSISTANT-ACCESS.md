@@ -43,16 +43,22 @@ The only WebSocket commands sent are authentication, `thread/list_datasets` and
 network change, retry or automatic dataset selection. Authentication is sent only
 after the expected `auth_required` message, over the same fixed-origin socket.
 Redirects are disabled before the HTTP upgrade; no token or dataset can follow
-a redirect to another server. HTTPS retains Dart/platform certificate and
-hostname validation, without a permissive certificate callback.
+a redirect to another server. For HTTPS the custom connection factory explicitly
+performs TLS before any HTTP/WebSocket bytes. `RawSecureSocket.secure` receives
+the original URL hostname and normal platform trust, without a permissive
+certificate callback. The test-only constructor can supply a synthetic CA
+context; the public/default provider always uses platform trust.
 
 The HTTP destination is resolved once per connection. Every returned address
 must pass the private-address policy, and the socket connects to the actual
 validated numeric address. It never performs a second hostname lookup after
 approving a private address, preventing HTTP DNS rebinding to a public address.
 Connections bypass proxies so the checked destination is the actual destination.
-HTTPS also uses the fixed numeric socket while retaining original-host TLS
-verification.
+HTTPS also uses the fixed numeric socket while passing the original hostname
+explicitly into TLS verification; that TLS step performs no new DNS lookup.
+The raw TCP transport remains owned across TLS negotiation. Cancellation closes
+that transport even while the handshake is stalled; it does not rely solely on
+`SecureSocket.startConnect` task cancellation after TCP has connected.
 
 Each list operation has one 15-second total deadline across DNS, connection,
 authentication and listing; fetching has its own 15-second deadline. Cancellation
@@ -65,7 +71,7 @@ this is session-only use, not a secure-memory vault.
 
 A socket guard bounds individual WebSocket frames and complete fragmented
 messages at 32 KiB before the WebSocket library aggregates them, with compression
-disabled,
+disabled.
 JSON nesting is capped at 16, lists at 64 networks, tokens at 4096 characters,
 network names at 16 UTF-8 bytes and dataset hex at 254 decoded bytes. Only fixed
 error enums cross the provider boundary; raw HTTP/server/TLS error messages,
@@ -83,8 +89,17 @@ household server or token. Coverage includes the chosen nonpreferred ID reaching
 the supplied role callback, explicit actions, empty/admin/missing states,
 malformed/bounded data, name/XPAN/PAN/channel mismatches, deadline/cancellation,
 redirect refusal, DNS address pinning, mixed private/public DNS refusal,
-untrusted TLS rejection and fixed error redaction. Narrow enlarged-text layouts
+HTTPS-to-plaintext refusal before authentication, trusted synthetic-CA success
+with the correct hostname, trusted wrong-host rejection, default untrusted-CA
+rejection and fixed error redaction. Stalled-TLS cancellation and deadline tests
+verify EOF at the remote raw socket, not merely completion of the caller Future. Narrow enlarged-text layouts
 and masked/cleared token behavior are checked separately from transport.
+
+The earlier untrusted-certificate-only test did not establish TLS: it also
+passed when HTTPS was incorrectly sent over plaintext. Independent review
+reproduced that defect at `c07bf048`; a regression first reproduced successful
+authentication against a plaintext server despite an HTTPS URL. The explicit
+TLS path and positive/negative/cancellation matrix replace that false assurance.
 
 No live Home Assistant compatibility or packaged Mac runtime is established by
 these tests. Existing Home Assistant versions and account policies may differ;

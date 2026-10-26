@@ -7,12 +7,18 @@ import 'package:thread_network_tool/home_assistant_credentials.dart';
 import 'package:thread_network_tool/home_assistant_credentials_io.dart';
 
 import 'support/home_assistant_stub.dart';
+import 'support/home_assistant_tls.dart';
 
 Matcher failure(HomeAssistantFailure code) =>
     isA<HomeAssistantCredentialException>()
         .having((e) => e.failure, 'fixed failure', code);
 
 void main() {
+  late HaTlsFixture tls;
+  setUpAll(() async {
+    tls = await HaTlsFixture.create();
+  });
+  tearDownAll(() => tls.close());
   test(
       'real websocket authenticates, lists, and fetches only selected nonpreferred ID',
       () async {
@@ -66,46 +72,145 @@ void main() {
     expect(stub.commands, isEmpty);
   });
 
-  test('HTTPS rejects an untrusted certificate without sending a token',
+  test(
+      'HTTPS to plaintext refuses before sending authentication without HTTP consent',
       () async {
-    final temporary = await Directory.systemTemp.createTemp('tnt-ha-tls-test-');
-    addTearDown(() => temporary.delete(recursive: true));
-    final cert = '${temporary.path}/cert.pem';
-    final key = '${temporary.path}/key.pem';
-    final generated = await Process.run('openssl', [
-      'req',
-      '-x509',
-      '-newkey',
-      'rsa:2048',
-      '-nodes',
-      '-keyout',
-      key,
-      '-out',
-      cert,
-      '-days',
-      '1',
-      '-subj',
-      '/CN=127.0.0.1',
-      '-addext',
-      'subjectAltName=IP:127.0.0.1'
-    ]);
-    expect(generated.exitCode, 0);
-    final context = SecurityContext()
-      ..useCertificateChain(cert)
-      ..usePrivateKey(key);
-    final server =
-        await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
-    var requests = 0;
-    server.listen((request) {
-      requests++;
-      request.response.close();
-    }, onError: (_) {});
-    addTearDown(() => server.close(force: true));
+    final stub = await HaStub.start();
+    addTearDown(stub.close);
+    final provider =
+        HomeAssistantCredentials(timeout: const Duration(seconds: 2));
+    addTearDown(provider.cancel);
     await expectLater(
-        HomeAssistantCredentials()
-            .connectAndList('https://127.0.0.1:${server.port}', token),
+        provider.connectAndList('https://127.0.0.1:${stub.server.port}', token),
         throwsA(failure(HomeAssistantFailure.connectionFailed)));
-    expect(requests, 0);
+    expect(stub.authenticated, false);
+    expect(stub.commands, isEmpty);
+  });
+
+  test(
+      'HTTPS with trusted test CA and original hostname lists and imports selected network',
+      () async {
+    final stub = await HaStub.start(securityContext: tls.serverContext);
+    addTearDown(stub.close);
+    var lookups = 0;
+    final provider = IoHomeAssistantCredentials(
+      securityContext: tls.clientContext,
+      lookup: (host) async {
+        expect(host, 'localhost');
+        lookups++;
+        // Return only a numeric destination: TLS must still verify the URL hostname.
+        return [InternetAddress('127.0.0.1')];
+      },
+    );
+    addTearDown(provider.cancel);
+    final networks = await provider.connectAndList(
+        'https://localhost:${stub.server.port}', token);
+    expect(stub.authenticated, true);
+    expect(lookups, 1);
+    expect(await provider.fetchDataset(networks[1]),
+        dataset('LabTwo', '8899aabbccddeeff', 20));
+    expect(stub.commands.last['dataset_id'], 'second');
+  });
+
+  test(
+      'trusted TLS certificate for a different hostname is rejected before auth',
+      () async {
+    final stub = await HaStub.start(securityContext: tls.serverContext);
+    addTearDown(stub.close);
+    final provider =
+        IoHomeAssistantCredentials(securityContext: tls.clientContext);
+    addTearDown(provider.cancel);
+    // The certificate is trusted but has DNS:localhost only, not this IP SAN.
+    await expectLater(
+        provider.connectAndList('https://127.0.0.1:${stub.server.port}', token),
+        throwsA(failure(HomeAssistantFailure.connectionFailed)));
+    expect(stub.commands, isEmpty);
+    expect(stub.authenticated, false);
+  });
+
+  test('production OS trust rejects the synthetic CA with correct hostname',
+      () async {
+    final stub = await HaStub.start(securityContext: tls.serverContext);
+    addTearDown(stub.close);
+    final provider = IoHomeAssistantCredentials(
+        lookup: (host) async => (await InternetAddress.lookup(host))
+            .where((a) => a.type == InternetAddressType.IPv4)
+            .toList());
+    addTearDown(provider.cancel);
+    await expectLater(
+        provider.connectAndList('https://localhost:${stub.server.port}', token),
+        throwsA(failure(HomeAssistantFailure.connectionFailed)));
+    expect(stub.commands, isEmpty);
+    expect(stub.authenticated, false);
+  });
+
+  for (final cancel in [true, false]) {
+    test(
+        '${cancel ? 'cancellation' : 'deadline'} closes an in-progress TLS connection',
+        () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final hello = Completer<void>();
+      final closed = Completer<void>();
+      final sockets = <Socket>[];
+      server.listen((socket) {
+        sockets.add(socket);
+        socket.listen((bytes) {
+          // A real TLS client hello, never a plaintext HTTP GET.
+          expect(bytes.first, 22);
+          expect(
+              utf8.decode(bytes, allowMalformed: true), isNot(contains(token)));
+          if (!hello.isCompleted) hello.complete();
+        }, onDone: () {
+          if (!closed.isCompleted) closed.complete();
+        }, onError: (_) {
+          if (!closed.isCompleted) closed.complete();
+        });
+        // Deliberately withhold the server TLS handshake.
+      });
+      addTearDown(() async {
+        for (final socket in sockets) {
+          socket.destroy();
+        }
+        await server.close();
+      });
+      final provider = IoHomeAssistantCredentials(
+          timeout: Duration(milliseconds: cancel ? 3000 : 150));
+      addTearDown(provider.cancel);
+      final outcome = expectLater(
+          provider.connectAndList('https://127.0.0.1:${server.port}', token),
+          throwsA(failure(cancel
+              ? HomeAssistantFailure.cancelled
+              : HomeAssistantFailure.timedOut)));
+      await hello.future.timeout(const Duration(seconds: 1));
+      if (cancel) provider.cancel();
+      await outcome;
+      // This checks remote EOF, not merely a completed caller Future.
+      await closed.future.timeout(const Duration(seconds: 1));
+    });
+  }
+
+  test('cancellation during DNS prevents a late TCP/TLS connection', () async {
+    final stub = await HaStub.start(securityContext: tls.serverContext);
+    addTearDown(stub.close);
+    final lookup = Completer<List<InternetAddress>>();
+    final started = Completer<void>();
+    final provider = IoHomeAssistantCredentials(
+        lookup: (_) {
+          started.complete();
+          return lookup.future;
+        },
+        securityContext: tls.clientContext);
+    final outcome = expectLater(
+        provider.connectAndList('https://localhost:${stub.server.port}', token),
+        throwsA(failure(HomeAssistantFailure.cancelled)));
+    await started.future;
+    provider.cancel();
+    await outcome;
+    lookup.complete((await InternetAddress.lookup('localhost'))
+        .where((a) => a.type == InternetAddressType.IPv4)
+        .toList());
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(stub.commands, isEmpty);
   });
 
   test('HTTP requires explicit consent before opening connection', () async {

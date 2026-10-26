@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'home_assistant_credentials.dart';
+import 'home_assistant_tls_socket.dart';
 
 HomeAssistantCredentials createHomeAssistantCredentials(Duration timeout) =>
     IoHomeAssistantCredentials(timeout: timeout);
@@ -13,9 +14,14 @@ HomeAssistantCredentials createHomeAssistantCredentials(Duration timeout) =>
 class IoHomeAssistantCredentials implements HomeAssistantCredentials {
   IoHomeAssistantCredentials(
       {this.timeout = const Duration(seconds: 15),
-      Future<List<InternetAddress>> Function(String)? lookup})
-      : _lookup = lookup ?? InternetAddress.lookup;
+      Future<List<InternetAddress>> Function(String)? lookup,
+      SecurityContext? securityContext})
+      : _lookup = lookup ?? InternetAddress.lookup,
+        _securityContext = securityContext;
   final Future<List<InternetAddress>> Function(String) _lookup;
+  // Test fixtures may trust a synthetic CA. The public/default provider passes
+  // null, which preserves the platform trust store. No bad-certificate callback.
+  final SecurityContext? _securityContext;
   final Duration timeout;
   _FixedOriginClient? _client;
   WebSocket? _socket;
@@ -100,7 +106,8 @@ class IoHomeAssistantCredentials implements HomeAssistantCredentials {
         throw const HomeAssistantCredentialException(
             HomeAssistantFailure.authenticationRejected);
       }
-      final client = _FixedOriginClient(uri, () => _check(generation), _lookup);
+      final client = _FixedOriginClient(
+          uri, () => _check(generation), _lookup, _securityContext);
       _client = client;
       final socket = await WebSocket.connect(
         uri
@@ -271,7 +278,8 @@ bool isPrivateHomeAssistantAddress(InternetAddress address) {
 /// WebSocket.connect uses openUrl for its handshake. This adapter refuses all
 /// other requests and disables redirects before the handshake is sent.
 class _FixedOriginClient implements HttpClient {
-  _FixedOriginClient(this.origin, this.check, this.lookup) {
+  _FixedOriginClient(
+      this.origin, this.check, this.lookup, SecurityContext? context) {
     _inner.findProxy = (_) => 'DIRECT';
     _inner.connectionTimeout = const Duration(seconds: 10);
     _inner.connectionFactory = (uri, proxyHost, proxyPort) async {
@@ -288,14 +296,14 @@ class _FixedOriginClient implements HttpClient {
         throw const HomeAssistantCredentialException(
             HomeAssistantFailure.publicHttpRefused);
       }
-      // Dial the actual validated numeric address. No second DNS lookup can
-      // rebind an approved private hostname to a public destination.
-      final task = await Socket.startConnect(addresses.first, uri.port);
-      _tasks.add(task);
-      if (_closed) {
-        task.cancel();
-        check();
-      }
+      // A custom connection factory must provide TLS itself. Retain the
+      // numeric TCP transport across the entire TLS handshake so both TCP and
+      // stalled TLS can be cancelled without a second DNS lookup.
+      final ConnectionTask<Socket> task = uri.scheme == 'https'
+          ? await startPinnedHomeAssistantTls(
+              addresses.first, uri.port, uri.host, context)
+          : await Socket.startConnect(addresses.first, uri.port);
+      // Attach the completion/error owner before any cancellation race.
       task.socket.then((socket) {
         if (_closed) {
           socket.destroy();
@@ -303,6 +311,12 @@ class _FixedOriginClient implements HttpClient {
           _sockets.add(socket);
         }
       }, onError: (Object _) {});
+      _tasks.add(task);
+      if (_closed) {
+        task.cancel();
+        throw const HomeAssistantCredentialException(
+            HomeAssistantFailure.cancelled);
+      }
       return task;
     };
   }

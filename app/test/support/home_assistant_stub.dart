@@ -41,8 +41,12 @@ class HaStub {
     FutureOr<void> Function(HaStub, WebSocket, Map<String, dynamic>)? handler,
     String greeting = '{"type":"auth_required","ha_version":"test"}',
     bool greet = true,
+    SecurityContext? securityContext,
   }) async {
-    final stub = HaStub(await HttpServer.bind(InternetAddress.loopbackIPv4, 0));
+    final stub = HaStub(securityContext == null
+        ? await HttpServer.bind(InternetAddress.loopbackIPv4, 0)
+        : await HttpServer.bindSecure(
+            InternetAddress.loopbackIPv4, 0, securityContext));
     stub.server.listen((request) async {
       expect(request.uri.path, '/api/websocket');
       expect(request.uri.query, isEmpty);
@@ -59,7 +63,7 @@ class HaStub {
           stub.reply(ws, message);
         }
       }, onError: (_) {});
-    });
+    }, onError: (_) {});
     return stub;
   }
 
