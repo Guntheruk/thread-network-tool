@@ -74,8 +74,12 @@ The Mac framework/API being present or compiling does **not** establish a
 provisionable native macOS credential capability. Apple's current entitlement
 availability and macOS capability table omit macOS; Xcode's Thread credential
 capability catalog lists only IOS/VISION_OS. Native Mac access is therefore
-unsupported/unproven for this app, not something promised after a certificate
-or distribution request. Keep the current safe unavailable fallback and guided
+unproven for this app, not something promised after a certificate
+or distribution request. The owner prefers resolving a legitimate Mac route.
+The separate Mac project reports availability/retrieval timeouts without
+callbacks in its current unentitled local probe. That does not prove failure of
+a legitimately provisioned native, Catalyst or iPad-app-on-Mac route.
+Keep the current safe unavailable fallback and guided
 eero/Advanced import. Do not add this restricted entitlement to an ad hoc Mac
 package to try to bypass provisioning. A future small iPhone companion needs a
 separately designed, authenticated, encrypted transfer before it can supply the
