@@ -1,8 +1,10 @@
 # Candidate pilot gates
 
 This is a proposed gate list, not evidence that a pilot is ready or has run. The
-default consumer app has joining disabled; isolated software-lab execution is
-separate. Do not invite participants until the required candidate gates below
+default consumer app has joining disabled; the explicit Mac alpha includes a
+separate guarded join worker. Signed-parent loopback tests pass, but controlled
+retail acceptance and distribution are unfinished (see `MAC-ALPHA.md`).
+Do not invite participants until the required candidate gates below
 have evidence for the exact build and supported workflow.
 
 ## Gates before inviting participants

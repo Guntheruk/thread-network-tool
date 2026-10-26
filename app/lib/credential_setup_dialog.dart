@@ -52,9 +52,12 @@ class _CredentialSetupDialogState extends State<CredentialSetupDialog> {
 
   bool get _showAppleRoute =>
       widget.showAppleRoute ??
-      (!kIsWeb &&
-          (defaultTargetPlatform == TargetPlatform.macOS ||
-              defaultTargetPlatform == TargetPlatform.iOS));
+      (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS);
+
+  bool get _showMacAppleLimitNote =>
+      !kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.macOS &&
+      !_showAppleRoute;
 
   @override
   void dispose() {
@@ -350,6 +353,11 @@ class _CredentialSetupDialogState extends State<CredentialSetupDialog> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _choose(_Route.advanced),
                 ),
+                if (_showMacAppleLimitNote) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                      'To access an Apple Thread network, use complete credentials already saved in Home Assistant or obtained elsewhere. This app cannot retrieve Apple credentials on Mac.'),
+                ],
               ] else ...[
                 TextButton.icon(
                   onPressed:

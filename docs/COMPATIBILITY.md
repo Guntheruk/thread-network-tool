@@ -4,14 +4,16 @@ This is a source capability inventory, not a promise that every Thread device
 or platform works. “Implemented” describes code; “verified” names the evidence
 that has actually been collected. Advertisements, credential access, router
 authentication, a proposed join, command acceptance and a verified outcome are
-separate states. Default consumer builds remain read-only with joining disabled;
-execution is available only in the explicit isolated software lab.
+separate states. Default consumer builds remain read-only with joining disabled.
+The explicit [Mac Eero alpha](MAC-ALPHA.md) includes a separate source-only move
+worker. Its actual signed-parent protocol tests use isolated synthetic peers;
+retail compatibility is still unverified for the packaged app.
 
 ## Current platform and provider status
 
 | Area | Source state | Evidence and limit |
 | --- | --- | --- |
-| macOS local app | Implemented | A locally signed universal app opened on Apple Silicon. Packaged-window discovery and synthetic import passed. One read against a router and the direct native adapter passed separately; neither proves authenticated reads from the packaged sandbox. Intel execution, packaged DTLS reads, Developer ID distribution signing and notarization are unverified. |
+| macOS local app | Implemented, opt-in Eero alpha | A locally signed universal production app opens on Apple Silicon with the real join review. Signed Flutter test packages performed authenticated DTLS reads and source-only SET operations against loopback peers using bundled sandbox-inherited helpers and the private durable journal. Real Eero firmware acceptance, Intel execution, Developer ID distribution signing and notarization remain unverified. |
 | Apple credential access (macOS) | Unavailable in the local build | The framework/bridge compiles, but Apple's entitlement availability and Xcode capability catalog omit native macOS. A signing certificate alone does not establish a supported provisioning route. Guided import remains available; see `APPLE-ACCESS.md`. |
 | Android preferred credentials | Bridge and debug APK build verified | At `c60c5b4`, hosted run `40224904977` compiled the Kotlin/Flutter bridge and produced a nonempty debug APK with Thread SDK 16.3.0, desugaring 2.1.3 and minimum API 26. The production credential dialog does not expose an Android route, and phone discovery/read and desktop transfer are unfinished. Installation, launch, consent and credential retrieval remain unverified on a device. |
 | Google Home / Nest device commands | Documented route only | Capability reads and temporary credential-sharing/join commands are described in `GOOGLE-HOME.md`; no Google account bridge, Home API implementation, Google device approval or verified Nest model exists. |
@@ -24,10 +26,11 @@ execution is available only in the explicit isolated software lab.
 ## What the evidence covers
 
 The source contains a bounded dataset parser and read-only authenticated-probe
-path. A direct adapter read succeeded once against one router. The packaged Mac
-app has separate evidence for local discovery and synthetic dataset handling,
-not for that authenticated probe. Default consumer builds expose no mutation
-command. The original CLI simulation in `PROTOCOL-LAB.md` and subsequent native
+path. A direct adapter read succeeded once against one router. Signed Mac test
+packages now have separate evidence for authenticated loopback DTLS reads,
+source-only SET, rejection and guards that prevent sending. Default consumer
+builds expose no mutation command; `TNT_MAC_ALPHA=1` includes the dedicated
+worker described in `MAC-ALPHA.md`. The original CLI simulation in `PROTOCOL-LAB.md` and subsequent native
 Commissioner lab in `NETWORK-MOVE-ADAPTER.md` have distinct historical evidence;
 the latter completed three isolated software-network moves.
 

@@ -2,7 +2,7 @@
 
 A local application for understanding Thread networks and joining compatible border routers to a chosen existing network.
 
-**Development candidate.** Default packages inspect credentials, discover routers and perform authenticated reads. A separate opt-in Linux profile exercises guarded moves against isolated software routers; physical/vendor compatibility remains unverified. The native Mac app and local web preview share session logic. Automatic accessory transfer is optional for the first release; Home Assistant and AI are not required by the core.
+**Development candidate.** Default packages inspect credentials, discover routers and perform authenticated reads. The explicit [Mac Eero alpha](docs/MAC-ALPHA.md) also includes the real source-network join worker, confirmation and recovery flow. It requires an empty source network and complete credentials for both networks, using guided eero copying, existing Home Assistant or Advanced input. Automatic Apple credential retrieval is outside this alpha. Physical/vendor compatibility remains unverified for this packaged app. A separate Linux profile exercises guarded moves against isolated software routers. Home Assistant and AI are not required by the core.
 
 ## Run the interface
 
@@ -46,7 +46,7 @@ flutter run -d macos \
   --dart-define=TNT_ENGINE_PATH="$PWD/../build/probe/thread-network"
 ```
 
-The bundle lookup is `Contents/Helpers/thread-network`, with its core library in `Contents/Frameworks`. The [macOS packaging workflow](docs/MACOS-BUILD.md) builds a universal native helper, bundles it with Flutter, and applies a local ad hoc signature or an explicitly selected Developer ID identity. The complete package built with Xcode 27.1 and launched on the development Apple Silicon Mac. Its sandboxed helper completed live discovery, accepted a synthetic dataset and rejected malformed input. Quitting and reopening cleared the imported test credentials. Authenticated router reads from this packaged app and Intel execution remain unverified.
+The bundle lookup is `Contents/Helpers/thread-network`, with its core library in `Contents/Frameworks`. The [macOS packaging workflow](docs/MACOS-BUILD.md) builds universal native helpers, bundles them with Flutter, and applies a local ad hoc signature or an explicitly selected Developer ID identity. Set `TNT_MAC_ALPHA=1` for the additional move worker and durable journal. Signed Flutter test packages have completed authenticated DTLS reads and source-only SET operations against isolated synthetic peers. The normal production window exposes the join flow; actual Eero firmware acceptance, Intel execution and trusted distribution remain separate checks. See [current alpha evidence and limits](docs/MAC-ALPHA.md).
 
 A missing helper is shown as unavailable; it does not silently become demo data. Windows and phone launch paths explicitly report unsupported until their native integrations are implemented. Developer ID signing and notarization are separate distribution gates.
 
@@ -91,7 +91,7 @@ The fetch helper refuses unexpected or modified inputs. See [third-party notes](
 
 `thread-network probe <numeric-ip> <port>` accepts one dataset line through stdin. It establishes DTLS and requests active metadata and pending status only. It never petitions, enables joiners, syncs network data, or sends a dataset SET. Check both process exit status and structured output. The POSIX CLI has a 30-second process deadline; callers should also use a bounded wait. IPv6 addresses requiring an interface-zone suffix are not yet supported by this CLI.
 
-Probe builds have been tested on macOS only. Windows probe builds deliberately report unsupported rather than implying that compiling the parser establishes Windows networking support. No network-changing command exists in this build.
+Probe builds have been tested on macOS only. Windows probe builds deliberately report unsupported rather than implying that compiling the parser establishes Windows networking support. This general probe and default package contain no network-changing command; the [explicit Mac alpha](docs/MAC-ALPHA.md) uses a separate worker.
 
 `thread-network discover` needs no credential input. On macOS it browses `_meshcop._udp.local` for seven seconds, with an eight-second process deadline. Its bounded output contains allowlisted advertised metadata and resolved endpoints, not authentication proof. Other platforms return unsupported.
 

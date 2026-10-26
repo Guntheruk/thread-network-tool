@@ -78,7 +78,27 @@ Future<void> openSetup(WidgetTester tester, FakeAppleCredentials provider,
 }
 
 void main() {
-  testWidgets('iOS shows saved Apple route by default without requesting access',
+  testWidgets('Mac defaults to available import routes without Apple calls',
+      (tester) async {
+    final provider = FakeAppleCredentials();
+    await openSetup(tester, provider, (_) async => importedState,
+        showAppleRoute: null);
+    expect(find.byKey(const Key('live-apple-route')), findsNothing);
+    expect(
+        find.textContaining(
+            'complete credentials already saved in Home Assistant'),
+        findsOneWidget);
+    expect(find.textContaining('cannot retrieve Apple credentials'),
+        findsOneWidget);
+    expect(find.byKey(const Key('live-ha-route')), findsOneWidget);
+    expect(find.byKey(const Key('live-eero-route')), findsOneWidget);
+    expect(find.byKey(const Key('live-advanced-route')), findsOneWidget);
+    expect(provider.availabilityCalls, 0);
+    expect(provider.fetchCalls, 0);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets(
+      'iOS shows saved Apple route by default without requesting access',
       (tester) async {
     final provider = FakeAppleCredentials();
     await openSetup(tester, provider, (_) async => importedState,

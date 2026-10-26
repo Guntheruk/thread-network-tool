@@ -339,7 +339,7 @@ class _LiveScreenState extends State<LiveScreen> {
                           : _openNetworkMove,
                       icon: const Icon(Icons.account_tree_outlined),
                       label: Text(macJoin
-                          ? 'Join Eero network'
+                          ? 'Join Eeros to a network'
                           : 'Prepare a network move'),
                     ),
                     const SizedBox(height: 10),

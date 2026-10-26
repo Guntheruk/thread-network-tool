@@ -1,8 +1,10 @@
 # macOS native app packaging
 
-This builds a local macOS Flutter app with the read-only native helper. It does
-not publish or notarize. Building alone does not establish runtime support;
-the separate native-window checks below record the current evidence.
+This builds a local macOS Flutter app with the read-only native helper. Set
+`TNT_MAC_ALPHA=1` to include the separate Eero source-network join worker and
+durable journal; see [Mac alpha scope and current evidence](MAC-ALPHA.md).
+It does not publish or notarize. Building alone does not establish vendor support;
+the dated native-window checks below retain their original evidence.
 
 ## Prerequisites
 
@@ -66,8 +68,11 @@ The complete app, three provenance sidecars and notice artifact are staged in
 one sibling temporary directory, then published together with an exclusive
 atomic macOS directory rename. Build/signing/collection failures publish no
 package, and a destination created during the build is never replaced.
-The script explicitly disables both move worker and journal helper, including
-when reusing a CMake cache that previously enabled them.
+By default the script explicitly disables both move worker and journal helper,
+including when reusing a CMake cache that previously enabled them. With
+`TNT_MAC_ALPHA=1`, it requires and signs both alpha helpers and validates the
+worker's exact capabilities. Isolated fixtures and Linux lab workers are always
+excluded from production packages.
 
 The default result is a local ad hoc signed app in `build/macos-package/`.
 The script requires `TNT_OUTPUT_DIR` to be an absent path, including refusing an

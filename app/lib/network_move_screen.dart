@@ -644,8 +644,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
         _state.routers.where((r) => r.id == _targetRouterId).firstOrNull;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            _macExecution ? 'Join Eero network' : 'Prepare a network move'),
+        title: Text(_macExecution
+            ? 'Join Eeros to a network'
+            : 'Prepare a network move'),
       ),
       body: SafeArea(
         child: Center(
@@ -655,7 +656,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               children: [
                 Text(
-                  _macExecution ? 'Join Eero network' : 'Network move review',
+                  _macExecution
+                      ? 'Join Eeros to a network'
+                      : 'Network move review',
                   style: theme.textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 6),
