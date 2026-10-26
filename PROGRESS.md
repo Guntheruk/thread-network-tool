@@ -36,10 +36,15 @@ source for a whole-network change. Retail model/firmware acceptance remains
 unverified; working devices stay excluded. This local functional package is
 not a claim that the broader release or original multi-platform goal is done.
 
-The frozen Linux scenario `787ace4` still ended `needs_attention` with its
-connectivity check false. All other convergence checks were true. A separate,
-read-only synthetic ping diagnostic confirmed synchronous reply-before-Done
-framing. No repeated move or relaxed connectivity check was used to claim a pass.
+The frozen Linux key-change scenario `787ace4` is now repaired in the lab's
+pinned OpenThread dependency: own host MAC counters are reset before new key
+installation, matching the simulated radio. The native regression demonstrates
+red/green and same-key safety. With only that host-stack correction, the unchanged
+full app reached `verified_complete` in 375.3 seconds: all seven original gates,
+bidirectional connectivity, two-process recovery and no redispatch passed.
+Independent review found no actionable finding. See `docs/SIMULATOR-COUNTER-FIX.md`.
+This changes neither Mac app binaries nor Eero firmware and proves no retail
+compatibility or cause of household sensor failures.
 
 ## Local completion follow-up
 
@@ -66,13 +71,18 @@ signed sandbox parent. This does not cover physical Intel, the full translated
 Flutter app, or clean-Mac installation. See `docs/MAC-ALPHA-LOCAL-FOLLOWUP.md`.
 No household calls, pushes, hosted jobs or publication were performed.
 
-A single frozen `787ace4` diagnostic repeated the key-change failure: cross-
-original-network pings failed in both directions, while moved-source peers
-communicated. Explicit packet-loss output excludes discarded reply parsing;
-underlying simulator routing/key/address state remains unresolved. All six
-configuration checks passed, connectivity stayed false, and the app correctly
-retained `needs_attention`. The disposable container was removed. Exact evidence
-and remaining scope are in the follow-up record; no production fix was invented.
+The earlier frozen diagnostic correctly retained `needs_attention` because
+cross-network pings failed despite six configuration checks passing. Subsequent
+address/key/route diagnostics and native red/green isolated the own-counter
+mismatch described above. A fresh corrected-image comparison restored all seven
+connectivity controls while preserving every application/fixture byte. All task
+containers were removed. Reusable hash-guarded lab recipes and the bounded
+receipt are in `tools/lab/openthread-counter-fix/`.
+
+`docs/CONTRIBUTOR-PREVIEW.md` prepares a developer source preview and names
+contribution areas, separate from general household pilot acceptance. Source
+sharing does not require Apple signing. Publication, licensing and the existing
+push/cloud-cost hold remain owner decisions; nothing has been published.
 
 
 ---

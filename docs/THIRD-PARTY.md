@@ -33,3 +33,13 @@ collector preserves every distinct leading Everest copyright/license block in
 `commissioner/Everest-NOTICES.txt` alongside the Mbed TLS license containing the
 full Apache text. The inventory does not choose between the Mbed TLS alternatives
 or approve a distribution license.
+
+## Lab-only OpenThread correction
+
+The isolated router simulation additionally uses OpenThread
+`53e8322140dde7b26827332100504507cec9cc4e`. Its reviewed own-MAC-counter patch,
+original/patched source hashes and regression are retained in
+`tools/lab/openthread-counter-fix/`; see `SIMULATOR-COUNTER-FIX.md` for scope.
+This is a local patch, not an upstream acceptance claim. The simulated router
+stack is not bundled with the Mac app; its Commissioner library and collected
+binary notices are unchanged by this lab repair.

@@ -38,10 +38,15 @@ confirmation/recovery acceptance. The three focused tests passed and independent
 review found no actionable issue. `MAC-ALPHA-LOCAL-FOLLOWUP.md` records unpacked
 app launch and translated x86_64 helper evidence; these do not close retail or
 trusted-distribution gates. App binaries still use production code `7422ddc`.
-The one frozen follow-up fixture still failed cross-original-network data
-connectivity while moved-source peers communicated; ping parsing is excluded
-as the immediate cause. No fixture remains running and no repeated operation is
-queued. Follow the recorded evidence before any new exact-cause experiment.
+The simulator connectivity defect is now repaired and verified. Read
+`SIMULATOR-COUNTER-FIX.md` and `tools/lab/openthread-counter-fix/evidence.json`:
+the native counter regression is red/green; the unchanged frozen `787ace4` app
+passes all seven gates in corrected image `4340ad60`, with two-process recovery,
+one send and real bidirectional connectivity. The fix affects the lab's pinned
+OpenThread host stack, not the Mac app or Eero firmware. All task containers
+were removed; no repeat operation is queued. A new contributor-preview guide
+supports source sharing once the owner's licensing/publication and push-hold
+choices are resolved. Do not revive the old unexplained-simulator-failure status.
 
 
 ---

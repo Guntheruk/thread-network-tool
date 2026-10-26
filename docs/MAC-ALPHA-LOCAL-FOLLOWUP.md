@@ -48,7 +48,12 @@ sandbox or signatures. No network entitlement or network command was used in
 these helper checks. This does not verify the journal or Flutter app in Intel
 mode, or execution on physical Intel hardware.
 
-## Remaining isolated migration failure
+## Historical isolated migration failure
+
+The failure below is preserved as original evidence. The later
+[simulator counter repair](SIMULATOR-COUNTER-FIX.md) now passes the unchanged
+full application flow and independent connectivity checks. It changes the lab's
+OpenThread host stack; this package's Mac application binaries are unchanged.
 
 One fresh diagnostic run of frozen `787ace4d43d2317744238d172d94e0b892b89677`
 used image `sha256:5a8f1acb35081de5188db0eebebd8e3c2b315dd9b42cf19f9c7a664401e356e9`.
@@ -60,9 +65,10 @@ Failed ping frames contained the command echo and completion marker, no reply,
 and explicit 100% loss. Original target to moved peer also failed; moved peer to
 moved source passed. This excludes discarded ping replies as the immediate
 explanation and localizes the failure to communication across the original
-network boundary in this simulator. Routing, key-sequence or address state has
-not been distinguished; there is no evidence-backed application repair yet.
-The strict connectivity check was preserved.
+network boundary in this simulator. At that checkpoint, routing, key-sequence
+and address state had not been distinguished. The subsequent counter repair
+linked above resolves this pinned reproduction while preserving the strict
+connectivity check. No application success criteria were weakened.
 
 This was a disposable software fixture with no external network, host binds,
 ports or devices, a read-only root and unprivileged user. The container was
