@@ -8,7 +8,7 @@ Thread dataset.
 | --- | --- | --- |
 | Copy from eero | Guided copying and local validation implemented | App/version differences; authenticated checks must confirm the selected network. |
 | Advanced import | Implemented; datasets stay in memory | The person must already have an authorized complete dataset. |
-| Existing Home Assistant | Earlier household work used credentials HA already held | Optional consumer importer not implemented; HA is not required by the core app. |
+| Existing Home Assistant | Optional selected-network importer implemented and tested with loopback servers | Actual HA server compatibility remains unverified; HA is not required by the core app. |
 | Mac saved credentials | Public API and a local probe exist; access is unproven | Current unentitled Mac probe timed out. Legitimate native/Catalyst/iPad-on-Mac provisioning remains unresolved. |
 | Apple saved credentials | iOS request bridge and unsigned builds implemented | Provisioning, actual consent/retrieval, secure desktop transfer, and separate distribution approval. |
 | Android saved credentials | Thread SDK bridge and APK build implemented | Actual device retrieval and desktop transfer. |

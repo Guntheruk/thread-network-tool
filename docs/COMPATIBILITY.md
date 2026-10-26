@@ -16,7 +16,8 @@ separate states. Joining remains disabled.
 | Google Home / Nest device commands | Documented route only | Capability reads and temporary credential-sharing/join commands are described in `GOOGLE-HOME.md`; no Google account bridge, Home API implementation, Google device approval or verified Nest model exists. |
 | Windows | Desktop build verified; networking unavailable | At `6498a9e`, hosted run `40220629150` passed the native core checks and Flutter Windows desktop build. Discovery and authenticated router communication remain unavailable; no Windows device runtime check is recorded. |
 | iOS saved credentials | Bridge implemented; unsigned build verified | Explicit-consent provider and Flutter routing compile in the complete Runner, including the enabled physical-device branch. Default/simulator builds report access not configured. Development provisioning, device installation and real consent/retrieval remain unverified. Native phone discovery and secure phone-to-Mac transfer are separate unfinished work. |
-| Home Assistant / AI | Optional and unused by core | Neither is required by the local workflow; neither is an account or credential provider in this app. |
+| Home Assistant credentials | Optional desktop importer implemented | Real loopback WebSocket/TLS and role-bound UI tests pass; independent review verified the repaired TLS transport. Actual household-server compatibility remains unverified. Uses an existing installation and its saved datasets. |
+| AI | Unused by core | No AI service or account is required by the app. |
 | Mac internal Thread radio | Separate experimental probe; not integrated | An ordinary-user Skywalk/Spinel probe received version and capability replies on an M3 Pro Mac with macOS 27.0.1. This proves coprocessor access, not RF reception, app-sandbox support or a replacement for border-router networking. See `MAC-RADIO-RESEARCH.md`. |
 
 ## What the evidence covers
