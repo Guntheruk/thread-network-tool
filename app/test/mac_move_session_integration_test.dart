@@ -13,8 +13,10 @@ const _targetName = 'LabTarget';
 const _sourceXpan = '1111111111111111';
 const _targetXpan = '2222222222222222';
 const _stamp = '0000000000010000';
-const _journalHelper =
-    '/Users/richard/thread-alpha-worktrees/integration/build/profile-checks/thread-move-journal';
+final _journalHelper = Platform.environment['TNT_JOURNAL_CLI'] ?? '';
+final _skipNativeSession = !Platform.isMacOS || _journalHelper.isEmpty
+    ? 'Requires macOS and TNT_JOURNAL_CLI from the native test build'
+    : false;
 
 String _dataset(String name, String xpan, int channel) {
   final nameBytes = utf8.encode(name);
@@ -303,7 +305,7 @@ void main() {
     } finally {
       await root.delete(recursive: true);
     }
-  });
+  }, skip: _skipNativeSession);
 
   test('uncertain result restores without sending another command', () async {
     expect(Platform.isMacOS, isTrue,
@@ -350,5 +352,5 @@ void main() {
     } finally {
       await root.delete(recursive: true);
     }
-  });
+  }, skip: _skipNativeSession);
 }
