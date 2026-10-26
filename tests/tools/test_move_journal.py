@@ -87,6 +87,38 @@ class JournalProcessTests(unittest.TestCase):
         self.assertEqual(self.call("update", done, 1).returncode, 0)
         self.assertEqual(self.call("begin", record()).stdout, "operation_already_exists\n")
 
+    def test_mac_configuration_result_is_distinct_and_replay_stays_fenced(self):
+        initial = record().replace("openthread-posix-lab-v1", "eero-source-network-alpha-v1")
+        self.assertEqual(self.call("begin", initial).returncode, 0)
+        complete = record(revision=2, stage="verified_configuration", disposition="accepted", reason="configuration_verified")
+        complete = complete.replace("openthread-posix-lab-v1", "eero-source-network-alpha-v1")
+        complete = complete.replace("stable_since_ms=0", "stable_since_ms=391000").replace("stable_last_ms=0", "stable_last_ms=401000")
+        self.assertEqual(self.call("update", complete, 1).returncode, 0)
+        self.assertEqual(self.call("read").stdout, complete)
+        self.assertNotEqual(self.call("update", complete.replace("revision=2", "revision=3"), 2).returncode, 0)
+        self.assertEqual(self.call("begin", initial).stdout, "operation_already_exists\n")
+
+    def test_profile_cannot_claim_the_other_profiles_verification(self):
+        for profile, stage, reason in [
+            ("eero-source-network-alpha-v1", "verified_complete", "verification_complete"),
+            ("openthread-posix-lab-v1", "verified_configuration", "configuration_verified"),
+        ]:
+            bad = record(stage=stage, disposition="accepted", reason=reason).replace("openthread-posix-lab-v1", profile)
+            bad = bad.replace("stable_since_ms=0", "stable_since_ms=391000").replace("stable_last_ms=0", "stable_last_ms=401000")
+            (self.directory / "operation").write_text(bad)
+            (self.directory / "operation").chmod(0o600)
+            self.assertEqual(self.call("read").stdout, "journal_unavailable\n")
+            (self.directory / "operation").unlink()
+
+    def test_mac_unknown_profile_and_premature_configuration_are_refused(self):
+        bad = record().replace("openthread-posix-lab-v1", "unverified-vendor")
+        self.assertNotEqual(self.call("begin", bad).returncode, 0)
+        initial = record().replace("openthread-posix-lab-v1", "eero-source-network-alpha-v1")
+        self.assertEqual(self.call("begin", initial).returncode, 0)
+        early = initial.replace("revision=1", "revision=2").replace("stage=dispatch_fenced", "stage=verified_configuration").replace("disposition=unknown", "disposition=accepted").replace("reason=none", "reason=configuration_verified")
+        self.assertNotEqual(self.call("update", early, 1).returncode, 0)
+        self.assertEqual(self.call("read").stdout, initial)
+
     def test_corruption_fails_closed(self):
         self.call("begin", record())
         (self.directory / "operation").write_text("broken\n")

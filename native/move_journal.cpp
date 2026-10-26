@@ -34,8 +34,8 @@ unsigned long long Number(const std::string &s) {
 }
 void Validate(const JournalRecord &r) {
   if (!Hex(r.operation_id) || r.revision == 0 || r.revision > 9007199254740991ULL ||
-      r.profile != "openthread-posix-lab-v1" ||
-      !Member(r.stage, {"dispatch_fenced", "observing", "needs_attention", "observation_stopped", "verified_complete", "verified_unchanged", "proven_not_sent"}) ||
+      !Member(r.profile, {"openthread-posix-lab-v1", "eero-source-network-alpha-v1"}) ||
+      !Member(r.stage, {"dispatch_fenced", "observing", "needs_attention", "observation_stopped", "verified_complete", "verified_configuration", "verified_unchanged", "proven_not_sent"}) ||
       !Member(r.disposition, {"unknown", "accepted", "rejected", "uncertain", "proven_not_sent"}) ||
       !Hex(r.source_commitment) || !Hex(r.target_commitment) || !Hex(r.target_router_binding) ||
       r.source_commitment == r.target_commitment ||
@@ -46,15 +46,17 @@ void Validate(const JournalRecord &r) {
       ((r.stable_since_ms == 0) != (r.stable_last_ms == 0)) ||
       (r.stable_since_ms != 0 && (r.stable_since_ms <= r.fenced_at_ms ||
         r.stable_last_ms < r.stable_since_ms || r.stable_last_ms > 9007199254740991ULL)) ||
-      !Member(r.reason, {"none", "worker_accepted", "worker_rejected", "worker_not_sent", "worker_uncertain", "worker_failure", "journal_failure", "restart_requires_reads", "credentials_required", "recovery_binding_mismatch", "verification_pending", "verification_failed", "verification_complete", "verification_unchanged", "observation_stopped"})) Fail();
+      !Member(r.reason, {"none", "worker_accepted", "worker_rejected", "worker_not_sent", "worker_uncertain", "worker_failure", "journal_failure", "restart_requires_reads", "credentials_required", "recovery_binding_mismatch", "verification_pending", "verification_failed", "verification_complete", "configuration_verified", "verification_unchanged", "observation_stopped"})) Fail();
   if (!std::is_sorted(r.router_bindings.begin(), r.router_bindings.end()) ||
       std::adjacent_find(r.router_bindings.begin(), r.router_bindings.end()) != r.router_bindings.end()) Fail();
   for (const auto &binding : r.router_bindings) if (!Hex(binding) || binding == r.target_router_binding) Fail();
   if (r.stage == "dispatch_fenced" && (r.disposition != "unknown" || r.reason != "none" || r.stable_since_ms != 0)) Fail();
   if (r.stage == "proven_not_sent" && r.disposition != "proven_not_sent") Fail();
-  if (r.stage == "verified_complete" && !Member(r.disposition, {"accepted", "uncertain"})) Fail();
+  if (Member(r.stage, {"verified_complete", "verified_configuration"}) && !Member(r.disposition, {"accepted", "uncertain"})) Fail();
+  if (r.stage == "verified_complete" && (r.profile != "openthread-posix-lab-v1" || r.reason != "verification_complete")) Fail();
+  if (r.stage == "verified_configuration" && (r.profile != "eero-source-network-alpha-v1" || r.reason != "configuration_verified")) Fail();
   if (r.stage == "verified_unchanged" && r.disposition != "rejected") Fail();
-  if (Member(r.stage, {"verified_complete", "verified_unchanged"}) && (r.stable_since_ms == 0 ||
+  if (Member(r.stage, {"verified_complete", "verified_configuration", "verified_unchanged"}) && (r.stable_since_ms == 0 ||
       r.stable_last_ms < r.observe_until_ms ||
       r.stable_last_ms - r.stable_since_ms < r.observation_seconds * 1000)) Fail();
 }
@@ -152,7 +154,7 @@ void WriteAt(int directory, const JournalRecord &record, const Journal::FaultHoo
 }  // namespace
 
 bool IsTerminal(const JournalRecord &r) {
-  return r.stage == "proven_not_sent" || r.stage == "verified_complete" || r.stage == "verified_unchanged";
+  return r.stage == "proven_not_sent" || r.stage == "verified_complete" || r.stage == "verified_configuration" || r.stage == "verified_unchanged";
 }
 std::string EncodeRecord(const JournalRecord &r) {
   Validate(r);

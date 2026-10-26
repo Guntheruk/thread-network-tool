@@ -63,7 +63,7 @@ class MoveExecutionController {
 
   Future<MoveRecord> _start(MoveExecutionPlan plan) async {
     await _initialize();
-    if (plan.profileId != isolatedMoveProfile) {
+    if (!supportedMoveProfiles.contains(plan.profileId)) {
       throw const MoveExecutionFailure('unsupported_profile');
     }
     if (!now().isBefore(plan.expiresAt)) {
@@ -277,7 +277,9 @@ class MoveExecutionController {
     bool valid(MoveRouterObservation value, String expectedCommitment) =>
         value.authenticated &&
         value.pendingEmpty &&
-        value.connectivityVerified &&
+        (record.profileId == eeroMacMoveProfile
+            ? value.fullMatch
+            : value.connectivityVerified) &&
         value.datasetCommitment == expectedCommitment &&
         value.checkedAt.isAfter(record.fencedAt) &&
         (record.stableLast == null ||
@@ -318,14 +320,18 @@ class MoveExecutionController {
         complete
             ? rejected
                 ? MoveStage.verifiedUnchanged
-                : MoveStage.verifiedComplete
+                : record.profileId == eeroMacMoveProfile
+                    ? MoveStage.verifiedConfiguration
+                    : MoveStage.verifiedComplete
             : waiting
                 ? MoveStage.observing
                 : MoveStage.needsAttention,
         complete
             ? rejected
                 ? 'verification_unchanged'
-                : 'verification_complete'
+                : record.profileId == eeroMacMoveProfile
+                    ? 'configuration_verified'
+                    : 'verification_complete'
             : waiting
                 ? 'verification_pending'
                 : 'verification_failed',

@@ -45,6 +45,8 @@ class Rig {
   bool sourcePending = false;
   bool staleReads = false;
   bool targetPending = false;
+  bool fullMatch = true;
+  bool connectivityVerified = true;
   bool throwingObservation = false;
   Duration observationClockAdvance = Duration.zero;
   MoveDisposition disposition = MoveDisposition.accepted;
@@ -88,7 +90,8 @@ class Rig {
             pendingEmpty: record.routerBindings.contains(binding)
                 ? !sourcePending
                 : !targetPending,
-            connectivityVerified: true,
+            connectivityVerified: connectivityVerified,
+            fullMatch: fullMatch,
           );
       final evidence = MoveObservation(
         operationId: record.operationId,
@@ -757,6 +760,91 @@ Future<void> main(List<String> args) async {
         );
       }
     }
+    await test('Mac alpha verifies settings without claiming mesh connectivity',
+        (r) async {
+      r.connectivityVerified = false;
+      final operation = await r.controller
+          .confirmAndStart(r.plan(profile: eeroMacMoveProfile));
+      r.clock = r.clock.add(const Duration(seconds: 310));
+      expect(!(await r.controller.checkOutcome(operation.operationId)).terminal,
+          'One settings sample cannot complete');
+      r.clock = r.clock.add(const Duration(seconds: 10));
+      final complete = await r.controller.checkOutcome(operation.operationId);
+      expect(
+          complete.stage == MoveStage.verifiedConfiguration &&
+              complete.reason == 'configuration_verified',
+          'Mac settings proof must stay distinct from mesh proof');
+      expect(complete.terminal && r.calls == 1,
+          'Single dispatch and terminal settings result');
+      expect(
+          MoveRecord.decode(complete.encode()).stage ==
+              MoveStage.verifiedConfiguration,
+          'Settings result survives journal roundtrip');
+    });
+    for (final defect in [
+      'partial',
+      'target_changed',
+      'missing_source',
+      'pending',
+      'worker_alive'
+    ]) {
+      await test('Mac settings verification refuses $defect', (r) async {
+        r.connectivityVerified = false;
+        final operation = await r.controller
+            .confirmAndStart(r.plan(profile: eeroMacMoveProfile));
+        if (defect == 'partial') r.fullMatch = false;
+        if (defect == 'target_changed') r.targetChanged = true;
+        if (defect == 'missing_source') r.missingRouter = true;
+        if (defect == 'pending') r.sourcePending = true;
+        if (defect == 'worker_alive') r.workerTerminated = false;
+        r.clock = r.clock.add(const Duration(seconds: 310));
+        await r.controller.checkOutcome(operation.operationId);
+        r.clock = r.clock.add(const Duration(seconds: 10));
+        expect(
+            !(await r.controller.checkOutcome(operation.operationId)).terminal,
+            'Incomplete evidence cannot clear Mac fence');
+        await failure(
+            r.controller
+                .confirmAndStart(r.plan(id: '2', profile: eeroMacMoveProfile)),
+            'unresolved_operation');
+        expect(r.calls == 1, 'No retry after incomplete verification');
+      });
+    }
+    await test('lab still requires independent connectivity', (r) async {
+      r.connectivityVerified = false;
+      final operation = await r.controller.confirmAndStart(r.plan());
+      r.clock = r.clock.add(const Duration(seconds: 310));
+      await r.controller.checkOutcome(operation.operationId);
+      r.clock = r.clock.add(const Duration(seconds: 10));
+      expect(!(await r.controller.checkOutcome(operation.operationId)).terminal,
+          'Mac configuration semantics must not weaken lab connectivity');
+    });
+    await test('Mac restart preserves fence and requires new settings interval',
+        (r) async {
+      r.disposition = MoveDisposition.uncertain;
+      final operation = await r.controller
+          .confirmAndStart(r.plan(profile: eeroMacMoveProfile));
+      r.clock = r.clock.add(const Duration(seconds: 310));
+      await r.controller.checkOutcome(operation.operationId);
+      final recovered = Rig(r.journal)
+        ..clock = r.clock.add(const Duration(seconds: 10))
+        ..connectivityVerified = false;
+      expect(
+          (await recovered.controller.current())!.stage ==
+              MoveStage.needsAttention,
+          'Restart stays uncertain');
+      expect(
+          !(await recovered.controller.checkOutcome(operation.operationId))
+              .terminal,
+          'Restart cannot inherit stable interval');
+      recovered.clock = recovered.clock.add(const Duration(seconds: 10));
+      expect(
+          (await recovered.controller.checkOutcome(operation.operationId))
+                  .stage ==
+              MoveStage.verifiedConfiguration,
+          'Fresh settings interval completes distinctly');
+      expect(recovered.calls == 0 && r.calls == 1, 'Restart only observes');
+    });
     await test('journal has commitments and no private request material', (
       r,
     ) async {

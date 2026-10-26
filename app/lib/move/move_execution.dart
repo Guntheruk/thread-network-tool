@@ -2,12 +2,18 @@
 /// does not establish support for eero, HomePod, Nest, or other vendor devices.
 const isolatedMoveProfile = 'openthread-posix-lab-v1';
 
+/// Explicitly confirmed whole-source Eero alpha. Completion verifies router
+/// configuration only; it does not prove accessory reachability or RF coverage.
+const eeroMacMoveProfile = 'eero-source-network-alpha-v1';
+const supportedMoveProfiles = {isolatedMoveProfile, eeroMacMoveProfile};
+
 enum MoveStage {
   dispatchFenced('dispatch_fenced'),
   observing('observing'),
   needsAttention('needs_attention'),
   observationStopped('observation_stopped'),
   verifiedComplete('verified_complete'),
+  verifiedConfiguration('verified_configuration'),
   verifiedUnchanged('verified_unchanged'),
   provenNotSent('proven_not_sent');
 
@@ -40,6 +46,7 @@ const moveReasons = {
   'verification_pending',
   'verification_failed',
   'verification_complete',
+  'configuration_verified',
   'verification_unchanged',
   'observation_stopped',
 };
@@ -158,7 +165,7 @@ class MoveRecord {
         ].every(moveCommitmentValid) ||
         revision < 1 ||
         revision > 9007199254740991 ||
-        profileId != isolatedMoveProfile ||
+        !supportedMoveProfiles.contains(profileId) ||
         sourceCommitment == targetCommitment ||
         routerBindings.contains(targetRouterBinding) ||
         routerBindings.isEmpty ||
@@ -181,15 +188,23 @@ class MoveRecord {
                 stableSince != null)) ||
         (stage == MoveStage.provenNotSent &&
             disposition != MoveDisposition.provenNotSent) ||
-        (stage == MoveStage.verifiedComplete &&
+        ({MoveStage.verifiedComplete, MoveStage.verifiedConfiguration}
+                .contains(stage) &&
             !{
               MoveDisposition.accepted,
               MoveDisposition.uncertain,
             }.contains(disposition)) ||
+        (stage == MoveStage.verifiedComplete &&
+            (profileId != isolatedMoveProfile ||
+                reason != 'verification_complete')) ||
+        (stage == MoveStage.verifiedConfiguration &&
+            (profileId != eeroMacMoveProfile ||
+                reason != 'configuration_verified')) ||
         (stage == MoveStage.verifiedUnchanged &&
             disposition != MoveDisposition.rejected) ||
         ({
               MoveStage.verifiedComplete,
+              MoveStage.verifiedConfiguration,
               MoveStage.verifiedUnchanged,
             }.contains(stage) &&
             (stableSince == null ||
@@ -217,6 +232,7 @@ class MoveRecord {
   final String reason;
   bool get terminal =>
       stage == MoveStage.verifiedComplete ||
+      stage == MoveStage.verifiedConfiguration ||
       stage == MoveStage.verifiedUnchanged ||
       stage == MoveStage.provenNotSent;
 
@@ -227,26 +243,26 @@ class MoveRecord {
     DateTime? nextStableSince,
     DateTime? nextStableLast,
     bool resetStability = false,
-  }) => MoveRecord(
-    operationId: operationId,
-    revision: revision + 1,
-    profileId: profileId,
-    stage: nextStage,
-    disposition: nextDisposition ?? disposition,
-    sourceCommitment: sourceCommitment,
-    targetCommitment: targetCommitment,
-    targetRouterBinding: targetRouterBinding,
-    routerBindings: routerBindings,
-    fencedAt: fencedAt,
-    observeUntil: observeUntil,
-    observationSeconds: observationSeconds,
-    stableSince: resetStability ? null : nextStableSince ?? stableSince,
-    stableLast: resetStability ? null : nextStableLast ?? stableLast,
-    reason: nextReason,
-  );
+  }) =>
+      MoveRecord(
+        operationId: operationId,
+        revision: revision + 1,
+        profileId: profileId,
+        stage: nextStage,
+        disposition: nextDisposition ?? disposition,
+        sourceCommitment: sourceCommitment,
+        targetCommitment: targetCommitment,
+        targetRouterBinding: targetRouterBinding,
+        routerBindings: routerBindings,
+        fencedAt: fencedAt,
+        observeUntil: observeUntil,
+        observationSeconds: observationSeconds,
+        stableSince: resetStability ? null : nextStableSince ?? stableSince,
+        stableLast: resetStability ? null : nextStableLast ?? stableLast,
+        reason: nextReason,
+      );
 
-  String encode() =>
-      'schema=1\noperation=$operationId\nrevision=$revision\n'
+  String encode() => 'schema=1\noperation=$operationId\nrevision=$revision\n'
       'profile=$profileId\nstage=${stage.wire}\ndisposition=${disposition.wire}\n'
       'source=$sourceCommitment\ntarget=$targetCommitment\n'
       'target_router=$targetRouterBinding\nrouters=${routerBindings.join(',')}\n'
@@ -319,6 +335,7 @@ class MoveRouterObservation {
     required this.authenticated,
     required this.pendingEmpty,
     required this.connectivityVerified,
+    this.fullMatch = false,
   });
   final String binding;
   final String datasetCommitment;
@@ -326,6 +343,7 @@ class MoveRouterObservation {
   final bool authenticated;
   final bool pendingEmpty;
   final bool connectivityVerified;
+  final bool fullMatch;
 }
 
 class MoveObservation {
