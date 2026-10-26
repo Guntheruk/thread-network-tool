@@ -1,11 +1,7 @@
 name: iOS unsigned build
 
 on:
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'tests/apple_credentials/**'
-      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read

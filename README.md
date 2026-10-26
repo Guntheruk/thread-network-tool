@@ -2,7 +2,7 @@
 
 A local application for understanding Thread networks and joining compatible border routers to a chosen existing network.
 
-**Initial development build.** The C++ engine performs dataset inspection, macOS DNS-SD discovery, and optional authenticated read-only probes. The Flutter interface can show discovered routers and verified reads. A direct native desktop adapter and a loopback web development preview share the same session logic. The packaged macOS app has passed native launch, sandboxed discovery and synthetic credential-import checks; no joining command exists. Automatic accessory transfer is optional for the first release; Home Assistant and AI are not required by the core.
+**Development candidate.** Default packages inspect credentials, discover routers and perform authenticated reads. A separate opt-in Linux profile exercises guarded moves against isolated software routers; physical/vendor compatibility remains unverified. The native Mac app and local web preview share session logic. Automatic accessory transfer is optional for the first release; Home Assistant and AI are not required by the core.
 
 ## Run the interface
 
@@ -32,7 +32,7 @@ dart run tool/local_server.dart \
 
 Open the private URL in the session file. The helper binds only to `127.0.0.1:5188`; the URL fragment contains a temporary access token, not Thread credentials. Treat the URL and session file as private. The file is published with owner-only permissions and is never overwritten. Use a new filename for a new session. Closing the helper invalidates that session.
 
-Choose **Find routers**, then **Set up network access**. The guided eero route explains how to copy its Active operational dataset; manual hex entry is under Advanced. The macOS app also offers a consent-based Apple credential bridge, which reports unavailable when the required entitlement is absent. After setup, use **Check** on one discovered router to verify its identity. The helper retains credentials only in process memory and passes them to the native engine through stdin. The preview distinguishes advertisements, authenticated reads, identity mismatches and failures. It cannot change networks. A new discovery clears earlier reads, and endpoint handles expire after five minutes. See [the live-read contract](docs/LIVE-READ-CONTRACT.md).
+Choose **Find routers**, then **Set up network access**. The guided eero route explains how to copy its Active operational dataset; manual entry is under Advanced. Apple saved-credential access is implemented as an iOS bridge, with provisioning and device testing still required; native Mac provisioning is unproven. See [credential routes and the optional phone companion](docs/CREDENTIAL-ACCESS.md). After setup, use **Check** to verify a router. Credentials stay in process memory and reach the native engine through stdin. Advertisements, authenticated reads and failures remain distinct. This preview cannot change networks. A new discovery clears earlier reads; endpoint handles expire after five minutes. See [the live-read contract](docs/LIVE-READ-CONTRACT.md).
 
 For an existing trusted credential provider, `--credential-stdin` imports one dataset line before startup. This is optional; the app does not require Home Assistant. `--discovery-engine` can select a separate discovery executable during development, for example while retaining an already-approved probe executable's firewall rule.
 
@@ -77,13 +77,17 @@ That test uses synthetic data and no network access. The live desktop flow separ
 
 ```sh
 tools/fetch_commissioner.sh
+python3 tools/prepare_commissioner_source.py \
+  --source vendor/ot-commissioner --output build/commissioner-source
 cmake -S . -B build/probe -DCMAKE_BUILD_TYPE=Release \
   -DTNT_WITH_COMMISSIONER=ON \
-  -DTNT_COMMISSIONER_SOURCE="$PWD/vendor/ot-commissioner"
+  -DTNT_COMMISSIONER_SOURCE="$PWD/build/commissioner-source"
 cmake --build build/probe
 ```
 
-CMake verifies the upstream commit. The fetch helper refuses to replace an unexpected or modified checkout. The current pinned dependencies need review before release; see [third-party notes](docs/THIRD-PARTY.md).
+Preparation needs Python with `tarfile.data_filter` (3.12+ or a patched interpreter).
+Use a fresh generated output directory. CMake verifies the committed patch/tree identity.
+The fetch helper refuses unexpected or modified inputs. See [third-party notes](docs/THIRD-PARTY.md).
 
 `thread-network probe <numeric-ip> <port>` accepts one dataset line through stdin. It establishes DTLS and requests active metadata and pending status only. It never petitions, enables joiners, syncs network data, or sends a dataset SET. Check both process exit status and structured output. The POSIX CLI has a 30-second process deadline; callers should also use a bounded wait. IPv6 addresses requiring an interface-zone suffix are not yet supported by this CLI.
 
@@ -111,4 +115,18 @@ Run helper regression checks with `dart run tool/local_server_test.dart` from `a
 - [Dependency notice inventory](docs/DEPENDENCY-INVENTORY.md)
 - [Progress and evidence](PROGRESS.md)
 
-Source and pull requests are in the private [GitHub repository](https://github.com/Guntheruk/thread-network-tool). PR checks are configured to cover native core builds on macOS/Linux and Flutter analysis, tests and web compilation. The initial hosted run was blocked before execution by an account billing/spending restriction. Those checks do not establish device compatibility or a working native desktop package. No public release exists; project licensing and platform-provider distribution requirements remain open.
+Source and pull requests are in the private [GitHub repository](https://github.com/Guntheruk/thread-network-tool).
+Hosted build/test workflows are manual to avoid automatic GitHub Actions usage
+on PR updates. Codex code review is separate. No public release exists; licensing
+and platform-provider distribution requirements remain open.
+
+## Local verification
+
+On macOS or Linux with the installed toolchains, run `tools/check_local.sh`.
+Set `TNT_CMAKE_BIN` and `TNT_FLUTTER_BIN` if they are not at the default paths.
+An optional `TNT_COMMISSIONER_SOURCE` enables the verified native dependency;
+otherwise the script builds the parser and private journal only. The script runs
+native, tooling, Flutter and recovery checks using synthetic data and loopback
+servers. It performs no household discovery or router operation. The real
+[isolated app workflow](docs/NETWORK-MOVE-APP-INTEGRATION.md), platform builds and
+device/provider tests remain separate evidence.
