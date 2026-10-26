@@ -3,9 +3,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../lib/move/move_execution.dart';
-import '../lib/move/native_move_journal.dart';
-import '../lib/native/native_move_adapter.dart';
+import 'package:thread_network_tool/move/move_execution.dart';
+import 'package:thread_network_tool/move/native_move_journal.dart';
+import 'package:thread_network_tool/native/native_move_adapter.dart';
 
 void expect(bool condition, String message) {
   if (!condition) throw StateError(message);
