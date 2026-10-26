@@ -1,4 +1,31 @@
-# Paused handoff — 26 October 2026
+# Mac alpha continuation — 26 October 2026
+
+The owner resumed work and explicitly requested the actual Mac Eero join flow,
+using guided/manual or existing Home Assistant credentials. The earlier account
+switch pause below is historical and revoked. Do not resume the separate Mac
+internal-radio or household sensor maintenance scope as part of this app build.
+
+Current integration checkout: `/Users/richard/thread-alpha-worktrees/integration`,
+branch `feat/mac-eero-alpha`, based on clean `21c45b1`; the original
+`/Users/richard/thread` candidate is preserved. Read `MAC-ALPHA.md`, current
+PROGRESS and the newest Git commits before work. Root owns Git. Temporary older
+`/tmp` worktrees disappeared; current work and evidence use persistent paths.
+
+The real Mac native worker, app adapter/review, durable journal profile,
+configuration-only verification and explicit alpha packaging are implemented.
+`fb68f74` received independent app/native source review; the UI finding was
+reproduced and repaired in `c92b4a9`. Native/helper fixtures never address the
+household. No router/account changes or paid/cloud jobs are authorized here.
+
+Push/cloud-review hold remains. All commits are local. Packaging and controlled
+wire tests are not retail compatibility or publication. Current signed-parent
+build/runtime acceptance is being completed before the production app package.
+
+---
+
+## Historical account-switch handoff
+
+### Paused handoff — 26 October 2026
 
 Owner requested all agents pause while switching accounts. Do not resume work,
 builds, fixtures, pushes, hosted jobs or reviews until the owner resumes it.

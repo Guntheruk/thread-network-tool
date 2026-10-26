@@ -1,3 +1,33 @@
+# Progress — Mac alpha continuation, 26 October 2026
+
+Current owner scope is the real Mac Eero source-network join flow, with guided
+manual or existing Home Assistant credentials. Working household devices are
+excluded from development/testing. See `docs/MAC-ALPHA.md` for the current scope
+and limitations; the historical initial-build and pause entries below do not
+supersede this direction.
+
+Integration is on the named `feat/mac-eero-alpha` worktree. It contains the real
+Mac source-only Commissioner worker, shared durable no-replay controller,
+explicit whole-source review, pinned-endpoint recovery and a separate
+`verified_configuration` result that makes no accessory/mesh connectivity claim.
+Default packages remain read-only; `TNT_MAC_ALPHA=1` includes the signed worker
+and journal. All changes remain local under the existing push/cloud-cost hold.
+
+New verification so far: 14 real native journal process tests, 51 standalone
+controller checks, 20 move-screen widget tests, and two Mac session integration
+tests with a real journal and synthetic worker. Tooling suite: 110 tests run,
+one explicitly skipped fresh-source regeneration case. Independent app and
+native-worker reviews of `fb68f74` found no unresolved P1/P2 after repairing
+terminal no-change display. Signed-package and final-candidate evidence is
+recorded below as it completes; no retail app mutation is claimed.
+
+The frozen Linux scenario `787ace4` still ended `needs_attention` with its
+connectivity check false. All other convergence checks were true. A separate,
+read-only synthetic ping diagnostic confirmed synchronous reply-before-Done
+framing. No repeated move or relaxed connectivity check was used to claim a pass.
+
+---
+
 # Progress — 25 October 2026
 
 ## Owner scope
