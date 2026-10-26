@@ -5,7 +5,8 @@ Google Home device control remains planned: there is no Google account connectio
 or verified Nest router support. A separate Android Thread Network SDK credential
 bridge is implemented with consent and cancellation. Its hosted debug APK build
 passed at `c60c5b4`; consent and retrieval remain unverified on a device.
-See [ANDROID-BUILD.md](ANDROID-BUILD.md).
+The production credential dialog has no Android route; phone discovery/read
+and secure desktop transfer remain unfinished. See [ANDROID-BUILD.md](ANDROID-BUILD.md).
 
 ## Documented routes
 
@@ -37,14 +38,19 @@ See [Android permissions](https://developers.home.google.com/apis/android/permis
    router and target before any change. Existing accessories may require separate
    recovery; never reset them automatically.
 
-The current release keeps joining disabled. The next Google implementation is a
-native Kotlin/Swift bridge for consent and read-only capability enumeration,
-followed by testing one actual Nest model. The shared Flutter interface can reuse
-the same states, but it must not display an operational Google connection before
+Default consumer builds keep joining disabled. A future Google implementation
+would need a native Kotlin/Swift bridge for consent and read-only capability
+enumeration, followed by testing one actual Nest model. This remains separate
+from the current Mac-first release and is not an automatic mobile scope
+expansion. The shared Flutter interface can reuse the same states, but it must not display an operational Google connection before
 that bridge exists. Home Assistant and AI remain optional.
 
-Desktop clarification: Apple's own preferred-credential API is documented for
-macOS 13+ as well as iOS. This is a separate possible Mac credential provider,
-not a desktop Google Home SDK. Its entitlement/signing and runtime behavior in
-this app remain unverified. Consumer credential setup, including the eero app's
-observed copy route, is specified in [INTERFACE.md](INTERFACE.md).
+Desktop clarification: Apple's public preferred-credential API is available in
+the Mac framework and the bridge compiles, but that does not establish a
+provisionable native macOS credential capability. Apple's recorded entitlement
+availability and Xcode capability catalog omit native macOS. A signing
+certificate alone does not resolve this, and a legitimate native, Catalyst or
+iPad-app-on-Mac route remains unproven. Keep the safe unavailable fallback;
+see [APPLE-ACCESS.md](APPLE-ACCESS.md). This is separate from Google Home APIs.
+Guided eero copying and Advanced import remain available as specified in
+[INTERFACE.md](INTERFACE.md).

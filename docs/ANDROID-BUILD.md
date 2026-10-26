@@ -70,9 +70,12 @@ It requests read-only repository permissions and has a 60-minute deadline.
 It neither signs a release package nor uploads the APK. The generated project
 pins Android Gradle plugin 9.1.0 and Gradle 9.3.1; Flutter supplies missing
 wrapper scripts/JAR during the build without replacing the checked-in wrapper
-properties. A passing hosted run will establish compilation and debug APK
-packaging for its exact source SHA, including Kotlin bridge compilation. The
-check must run before that result can be claimed.
+properties. Hosted run `40224904977` at `c60c5b4` compiled the Kotlin/Flutter
+bridge and
+produced a nonempty debug APK. That historical result establishes compilation
+and debug packaging for that source head, not device support or a later
+candidate build. Hosted workflows are now manual-only; further pushes and
+hosted jobs remain on hold under the owner's cost boundary.
 
 The first hosted Android run, `40221044175` at `0016ea7`, reached
 `:app:checkDebugAarMetadata` and found that the pinned Thread Network SDK
@@ -81,26 +84,30 @@ requires core library desugaring. The app module now enables it and pins
 SDK's `META-INF/com/android/build/gradle/aar-metadata.properties`. The
 [Android Gradle configuration](https://developer.android.com/studio/write/java8-support)
 documents the required flag and dependency form. The SDK metadata also
-requires AGP 8.2.0 or newer; this project pins AGP 9.1.0. A new hosted run is
-required to establish whether Kotlin compilation and APK packaging pass; the
-first run did not.
+requires AGP 8.2.0 or newer; this project pins AGP 9.1.0. That first run did
+not establish Kotlin compilation or APK packaging; the later successful
+`40224904977` run did.
 
 The next hosted Android run, `40221882673` at `8563d39`, passed dependency
 metadata checks but stopped at `:app:processDebugMainManifest`: the app's
 generated minimum SDK was 24 while the pinned Thread Network AAR declares
 minimum SDK 26. The app now pins `minSdk = 26` (Android 8.0), matching the
 SDK's manifest and its [Android support guidance](https://developers.home.google.com/thread).
-This is a build configuration repair; another hosted APK run is required.
+The later successful `40224904977` run included this minimum-SDK repair.
 
 The Dart channel contract can be tested with
 `cd app && ../.tooling/flutter/bin/flutter test test/android_credentials_test.dart`.
 This uses mock channel responses and does not establish device support.
 
-On this Mac, `~/Library/Android/sdk`, `/Applications/Android Studio.app`, and
-a usable JDK were absent at inspection. The small pinned AAR was inspected,
-but Android source has not been compiled or packaged. Before claiming Android support, build on a
-host with the Android SDK, Google Maven access, and a configured Flutter
-toolchain, then test an Android 8.0+ phone with current Google Play services.
-Test consent approval, cancellation, no preferred credential, no local
-network, service missing/outdated, timeout, and restart while consent is open.
-Record the exact APK build and device results separately from the mock tests.
+The bridge and its Dart channel wrapper are implemented, but the production
+credential dialog has no Android route and production live routing returns
+unavailable on phones. A usable phone discovery/read workflow and secure
+authenticated desktop transfer remain unfinished software. They are separate
+from the Mac-first release and do not make a phone companion mandatory.
+
+Device installation, launch and retrieval remain unverified. When that route is
+implemented and a device test is authorized, test an Android 8.0+ phone with
+current Google Play services: consent approval, cancellation, no preferred
+credential, no local network, service missing/outdated, timeout, and restart
+while consent is open. Record the exact APK build and device results separately
+from the historical build and mock tests.

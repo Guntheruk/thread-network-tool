@@ -1,12 +1,15 @@
 # Dependency and notice inventory
 
-Read-only inventory at source head `422dab9b453c5b4d500c79a45bd9f65099b0d3bc`.
-It records source and build evidence; it does not choose a license for this
-project, resolve legal interpretation, or certify that a distribution package
-is complete. Regenerate local notice inputs with:
+The link inventory below was recorded at source head
+`422dab9b453c5b4d500c79a45bd9f65099b0d3bc`; the collector description reflects
+the subsequent generated-source and Everest notice handling. This is historical
+link evidence, not an inventory of the exact current package. It does not choose
+a license for this project, resolve legal interpretation, or certify that a
+distribution package is complete. Regenerate local notice inputs with:
 
 ```sh
-python3 tools/collect_third_party_notices.py
+python3 tools/collect_third_party_notices.py \
+  --commissioner-root /absolute/path/to/verified/generated-source
 ```
 
 The default output is `build/release-notices/`, which is ignored. The collector
@@ -16,12 +19,17 @@ generated manifest. It reads the Commissioner source from the existing CMake
 cache when available, otherwise from `vendor/ot-commissioner`; use
 `--commissioner-root` when neither path applies. It records missing and
 ambiguous package-license files as gaps and exits nonzero when any required
-input is unavailable. It also exits nonzero when a source checkout's exact Git
-revision cannot be established, tracked source changes are present, or a
-resolved Dart package lacks a lockfile version. The manifest records a dirty
-checkout as a provenance gap while still hashing the copied license bytes; a
-HEAD value beside that warning does not claim those bytes came from the clean
-commit. Local source paths are not included in the manifest.
+input is unavailable. Commissioner input must be a verified generated tree:
+the collector checks its committed tree identity before and after collection,
+records the original parent/submodule revisions from provenance, and retains the
+provenance, manifest and exact patch beside the notices. An unmodified Git
+checkout is not a substitute for this input.
+
+For the Flutter SDK, the collector records a provenance gap if its exact Git
+revision cannot be established or tracked source changes are present. A HEAD
+value beside that warning does not claim the copied license bytes came from a
+clean commit. A resolved Dart package without a lockfile version is also a gap.
+Local source paths are not included in the manifest.
 
 ## Native probe link inputs
 
@@ -39,10 +47,14 @@ exact revisions. License text paths below are relative to that source tree.
 | Mbed TLS | `c765c831e5c2a0971410692f92f7a81d6ec65ec2` (v3.6.4) | `third_party/mbedtls/repo/LICENSE` says Apache-2.0 **OR** GPL-2.0-or-later | `libmbedtls.a`, `libmbedx509.a`, `libmbedcrypto.a`, `libeverest.a`, and `libp256m.a` linked |
 
 Mbed TLS explicitly offers a choice of Apache-2.0 or GPL-2.0-or-later. The
-project has not selected one; this inventory does not do so. Everest and p256-m
-sources are within the pinned Mbed TLS checkout and no distinct license file
-was found under those component directories, so the Mbed TLS top-level notice
-is collected as source provenance rather than a separate legal conclusion.
+project has not selected one; this inventory does not do so. Bundled p256-m
+source carries the same dual terms. Project Everest source/header notices state
+Apache-2.0 and retain separate upstream copyrights. The current collector
+preserves every distinct leading copyright/license comment from Everest `.c`
+and `.h` files in `commissioner/Everest-NOTICES.txt`, alongside the Mbed TLS
+license containing the full Apache text. A missing Everest notice set marks
+collection incomplete; absence of a separate component LICENSE file does not
+justify omitting those notices.
 
 The same Commissioner checkout has uninitialized gitlinks for COSE-C,
 cn-cbor, GoogleTest, JSON and mDNS. Their exact gitlink revisions and absent

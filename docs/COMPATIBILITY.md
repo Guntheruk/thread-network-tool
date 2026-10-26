@@ -4,7 +4,8 @@ This is a source capability inventory, not a promise that every Thread device
 or platform works. “Implemented” describes code; “verified” names the evidence
 that has actually been collected. Advertisements, credential access, router
 authentication, a proposed join, command acceptance and a verified outcome are
-separate states. Joining remains disabled.
+separate states. Default consumer builds remain read-only with joining disabled;
+execution is available only in the explicit isolated software lab.
 
 ## Current platform and provider status
 
@@ -12,7 +13,7 @@ separate states. Joining remains disabled.
 | --- | --- | --- |
 | macOS local app | Implemented | A locally signed universal app opened on Apple Silicon. Packaged-window discovery and synthetic import passed. One read against a router and the direct native adapter passed separately; neither proves authenticated reads from the packaged sandbox. Intel execution, packaged DTLS reads, Developer ID distribution signing and notarization are unverified. |
 | Apple credential access (macOS) | Unavailable in the local build | The framework/bridge compiles, but Apple's entitlement availability and Xcode capability catalog omit native macOS. A signing certificate alone does not establish a supported provisioning route. Guided import remains available; see `APPLE-ACCESS.md`. |
-| Android preferred credentials | Bridge and debug APK build verified | At `c60c5b4`, hosted run `40224904977` compiled the Kotlin/Flutter bridge and produced a nonempty debug APK with Thread SDK 16.3.0, desugaring 2.1.3 and minimum API 26. Installation, launch, consent and credential retrieval remain unverified on a device. |
+| Android preferred credentials | Bridge and debug APK build verified | At `c60c5b4`, hosted run `40224904977` compiled the Kotlin/Flutter bridge and produced a nonempty debug APK with Thread SDK 16.3.0, desugaring 2.1.3 and minimum API 26. The production credential dialog does not expose an Android route, and phone discovery/read and desktop transfer are unfinished. Installation, launch, consent and credential retrieval remain unverified on a device. |
 | Google Home / Nest device commands | Documented route only | Capability reads and temporary credential-sharing/join commands are described in `GOOGLE-HOME.md`; no Google account bridge, Home API implementation, Google device approval or verified Nest model exists. |
 | Windows | Desktop build verified; networking unavailable | At `6498a9e`, hosted run `40220629150` passed the native core checks and Flutter Windows desktop build. Discovery and authenticated router communication remain unavailable; no Windows device runtime check is recorded. |
 | iOS saved credentials | Bridge implemented; unsigned build verified | Explicit-consent provider and Flutter routing compile in the complete Runner, including the enabled physical-device branch. Default/simulator builds report access not configured. Development provisioning, device installation and real consent/retrieval remain unverified. Native phone discovery and secure phone-to-Mac transfer are separate unfinished work. |
@@ -25,12 +26,20 @@ separate states. Joining remains disabled.
 The source contains a bounded dataset parser and read-only authenticated-probe
 path. A direct adapter read succeeded once against one router. The packaged Mac
 app has separate evidence for local discovery and synthetic dataset handling,
-not for that authenticated probe. No mutation command is enabled, and no
-controlled join/recovery result is recorded for the application. The original
-CLI simulation in `PROTOCOL-LAB.md` and subsequent real native Commissioner
-lab in `NETWORK-MOVE-ADAPTER.md` have distinct evidence. The latter completed
-three isolated software-network moves, including lost-result recovery. Neither
-establishes the full application screen workflow or a supported vendor combination.
+not for that authenticated probe. Default consumer builds expose no mutation
+command. The original CLI simulation in `PROTOCOL-LAB.md` and subsequent native
+Commissioner lab in `NETWORK-MOVE-ADAPTER.md` have distinct historical evidence;
+the latter completed three isolated software-network moves.
+
+At `a2949a68ec159bdc4b76304ef955bb028f5f097d`, the actual isolated Flutter-screen
+workflow passed lost-result recovery with two real app processes, one
+Petition/SET, zero restart dispatches, independent outcome verification and
+secret redaction. Its separate key-change attempt reached recovery but exited
+unsuccessfully; the exact assertion and final oracle flags were not retained.
+The cause and physical convergence remain unknown. This mixed evidence is not
+full application runtime acceptance, does not establish results for later
+source heads, and establishes no supported retail-vendor combination. See
+`PROGRESS.md` for the exact evidence and limits.
 
 The product scopes differ by operation. Reading one vendor router is a
 single-router credential/authentication check; it does not inventory or assess
