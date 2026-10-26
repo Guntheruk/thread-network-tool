@@ -25,6 +25,14 @@ Read `MAC-ALPHA-ACCEPTANCE.md` for exact source, tests, artifacts and remaining
 controlled retail/distribution gates. The owner has no spare Eero; do not test
 a network-wide change on working household Eeros.
 
+Latest local ZIP: `build/Thread-Network-Tool-Mac-alpha-699df4e.zip`
+(20,519,395 bytes; SHA-256
+`1e41450d61c7c8640a0f242956905e5892eff3ed12a6954302c402176af1a491`).
+Its folder is `build/mac-alpha-local-699df4e/`; it includes the unchanged signed
+`7422ddc` app, quickstart, notices and acceptance/diagnostic summaries from
+`699df4e`. Binary hashes, recursive signatures and ZIP integrity passed. This
+is a local bundle, not a newly rebuilt or publicly distributed application.
+
 Local follow-up `220bf75` adds the tester guide and screen-to-real-journal
 confirmation/recovery acceptance. The three focused tests passed and independent
 review found no actionable issue. `MAC-ALPHA-LOCAL-FOLLOWUP.md` records unpacked

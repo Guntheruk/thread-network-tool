@@ -43,6 +43,14 @@ framing. No repeated move or relaxed connectivity check was used to claim a pass
 
 ## Local completion follow-up
 
+Latest local ZIP: `build/Thread-Network-Tool-Mac-alpha-699df4e.zip`
+(20,519,395 bytes; SHA-256
+`1e41450d61c7c8640a0f242956905e5892eff3ed12a6954302c402176af1a491`).
+Its folder is `build/mac-alpha-local-699df4e/`; it includes the unchanged signed
+`7422ddc` app, quickstart, notices and acceptance/diagnostic summaries from
+`699df4e`. Binary hashes, recursive signatures and ZIP integrity passed. This
+is a local bundle, not a newly rebuilt or publicly distributed application.
+
 At `220bf75`, a new production screen/API/session/adapter acceptance uses the
 real native journal and synthetic process replies to confirm exactly one send,
 then recovery without restored credentials, automatic checks or a second send.
