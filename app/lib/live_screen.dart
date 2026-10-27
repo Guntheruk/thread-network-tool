@@ -254,6 +254,18 @@ class _LiveScreenState extends State<LiveScreen> {
                   spacing: 9,
                   runSpacing: 8,
                   children: [
+                    if (_api is NetworkMoveApi && state != null)
+                      OutlinedButton.icon(
+                        key: const Key('live-network-move'),
+                        onPressed:
+                            _busy || state.discoveryStatus == 'unsupported'
+                                ? null
+                                : _openNetworkMove,
+                        icon: const Icon(Icons.account_tree_outlined),
+                        label: Text(macJoin
+                            ? 'Join Eeros to a network'
+                            : 'Prepare a network move'),
+                      ),
                     FilledButton.icon(
                       key: const Key('live-discover'),
                       onPressed:
@@ -331,19 +343,6 @@ class _LiveScreenState extends State<LiveScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  if (_api is NetworkMoveApi) ...[
-                    OutlinedButton.icon(
-                      key: const Key('live-network-move'),
-                      onPressed: _busy || state.discoveryStatus == 'unsupported'
-                          ? null
-                          : _openNetworkMove,
-                      icon: const Icon(Icons.account_tree_outlined),
-                      label: Text(macJoin
-                          ? 'Join Eeros to a network'
-                          : 'Prepare a network move'),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
                   if (!macJoin)
                     OutlinedButton.icon(
                       key: const Key('live-join-disabled'),

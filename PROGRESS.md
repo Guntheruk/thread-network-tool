@@ -1,3 +1,13 @@
+# Join screen clarity — 27 October 2026
+
+The join entry now sits in the top action row above the router list. Mac setup
+uses the requested labels “Network to keep” and “Eero Thread network to move”
+in headings and related controls/status text. Generic/lab role labels and
+source/target transport keys remain as before. The existing focused widget
+suites passed 44 tests, including narrow-window top-entry visibility/order,
+capability gating and Mac review attestations. Flutter analysis is clean.
+No network operation was used to verify this UI change.
+
 # Developer alpha release — 27 October 2026
 
 The owner selected Apache 2.0 and authorized public GitHub publication.

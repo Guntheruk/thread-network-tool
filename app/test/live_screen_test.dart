@@ -257,14 +257,18 @@ void main() {
         isNull);
   });
 
-  testWidgets('network-move entry appears only for a capable live adapter',
+  testWidgets('network-move entry is at the top only for a capable adapter',
       (tester) async {
     await pumpLive(tester, FixtureApi(LiveState.fromJson(fixture())));
     expect(find.byKey(const Key('live-network-move')), findsNothing);
     await tester.pumpWidget(const SizedBox());
-    await pumpLive(tester, CapabilityFixtureApi(LiveState.fromJson(fixture())));
-    expect(find.byKey(const Key('live-network-move')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('live-network-move')));
+    await pumpLive(tester, CapabilityFixtureApi(LiveState.fromJson(fixture())),
+        size: const Size(320, 640));
+    final join = find.byKey(const Key('live-network-move'));
+    expect(join.hitTestable(), findsOneWidget);
+    expect(tester.getTopLeft(join).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('live-discover'))).dy));
+    await tester.tap(join);
     await tester.pumpAndSettle();
     expect(find.text('Network move review'), findsOneWidget);
     await tester.scrollUntilVisible(

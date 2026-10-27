@@ -679,6 +679,10 @@ void main() {
         validUntil: DateTime.now().toUtc().add(const Duration(minutes: 2)),
       );
     await _pump(tester, api);
+    expect(find.text('1. Network to keep'), findsOneWidget);
+    expect(find.text('2. Eero Thread network to move'), findsOneWidget);
+    expect(find.text('Set up Network to keep'), findsOneWidget);
+    expect(find.text('Set up Eero Thread network to move'), findsOneWidget);
     await _tapVisible(tester, const Key('move-target-target-id'));
     await _tapVisible(tester, const Key('move-empty-source-attestation'));
     await _ensureVisible(tester, const Key('move-prepare'));
