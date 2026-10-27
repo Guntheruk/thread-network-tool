@@ -7,13 +7,13 @@ This developer prerelease welcomes code review and isolated testing. The package
 ## Prepare
 
 - Use the exact prerelease package named in the release asset record. The ordinary package is read-only; the Mac alpha download includes the join worker. If macOS blocks it, report the message; trusted signing, notarization and installation are open work. Developers can build locally using [the packaging guide](MACOS-BUILD.md).
-- Identify the **network to join** (the one you keep) and the **Eero network to move** (the empty source). You need the complete Active operational dataset for each. Treat both datasets as passwords: do not put them in messages, screenshots, reports or command lines.
-- For the Eero source, choose the guided eero route and copy its Active operational dataset from the eero app. The guide does not prescribe a fixed vendor menu path. For the network to join, use an existing authorized Home Assistant import or Advanced entry. Home Assistant is optional; the Mac app cannot retrieve Apple credentials. Do not regenerate credentials to make a test possible.
+- Identify the **Network to keep** and the **Eero Thread network to move** (the empty source). You need the complete Active operational dataset for each. Treat both datasets as passwords: do not put them in messages, screenshots, reports or command lines.
+- For the Eero source, choose the guided eero route and copy its Active operational dataset from the eero app. The guide does not prescribe a fixed vendor menu path. For Network to keep, use an existing authorized Home Assistant import or Advanced entry. Home Assistant is optional; the Mac app cannot retrieve Apple credentials. Do not regenerate credentials to make a test possible.
 
 ## Review a controlled setup
 
-1. Open **Find routers**, then **Join Eeros to a network**. Discovery is only an advertisement, not proof of identity or a complete inventory.
-2. Set up the **network to join**, select its router and choose **Check network to join**. Set up the **Eero network to move**, then **Check Eero** for each source router. Resolve failed, missing, changed or mismatched endpoints before proceeding. Link-local IPv6 addresses with a zone identifier are unsupported.
+1. Open **Join Eeros to a network** in the top action row. Use **Find routers** when needed. Discovery is only an advertisement, not proof of identity or a complete inventory.
+2. Set up **Network to keep**, select its router and choose **Check Network to keep**. Set up **Eero Thread network to move**, then **Check Eero** for each source router. Resolve failed, missing, changed or mismatched endpoints before proceeding. Link-local IPv6 addresses with a zone identifier are unsupported.
 3. Confirm from your independent inventory that the source is your Eero network, every source Eero is represented and the source has no accessories. Read the whole-source review. Only proceed through the final confirmation if the controlled operation has been explicitly authorized and the details remain correct.
 4. Keep the app in the foreground while it waits for propagation and performs its bounded read-only checks. A configuration-verified result means the original source endpoints repeatedly authenticated with the target settings and the target stayed unchanged; it does not prove accessory connectivity, radio coverage or a working Thread data path.
 

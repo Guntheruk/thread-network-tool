@@ -78,6 +78,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
       (widget.api as ExecutionProfileInfo).executionProfileId ==
           'eero-source-network-alpha-v1';
 
+  String get _sourceNetworkLabel =>
+      _macExecution ? 'Eero Thread network to move' : 'Network to move';
+
   DateTime get _now => (widget.now ?? DateTime.now)().toUtc();
 
   void _cancelAutomaticChecks({bool paused = false}) {
@@ -587,24 +590,25 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
   }
 
   String _blocker(String code) {
-    const messages = <String, String>{
-      'source_credentials_required': 'Set up access to Network to move.',
+    final messages = <String, String>{
+      'source_credentials_required': 'Set up access to $_sourceNetworkLabel.',
       'target_credentials_required': 'Set up access to Network to keep.',
-      'same_network': 'Network to move and Network to keep must be different.',
+      'same_network':
+          '$_sourceNetworkLabel and Network to keep must be different.',
       'discovery_incomplete': 'Refresh router discovery.',
       'source_routers_unverified':
           'No border routers to move have been identified.',
       'target_is_source':
-          'The selected router also appears on Network to move.',
+          'The selected router also appears on $_sourceNetworkLabel.',
       'empty_source_attestation_required':
-          'Confirm that Network to move has no attached devices.',
+          'Confirm that $_sourceNetworkLabel has no attached devices.',
       'empty_source_attestation_stale':
           'The empty-network evidence has expired. Establish it again.',
       'invalid_delay': 'Choose a supported propagation delay.',
       'source_read_missing_or_stale':
           'Check every observed border router being moved again.',
       'source_identity_unverified':
-          'A router being moved did not match access to Network to move.',
+          'A router being moved did not match access to $_sourceNetworkLabel.',
       'source_pending_not_empty':
           'A router being moved has a pending change or unknown pending state.',
       'source_timestamp_unknown':
@@ -626,9 +630,9 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
       'source_advertisement_conflict':
           'An advertisement for a router being moved conflicts with its authenticated identity.',
       'operator_eero_source_required':
-          'Confirm that Network to move is the eero Thread network in the eero app.',
+          'Confirm that $_sourceNetworkLabel is the Thread network shown in the eero app.',
       'source_group_attestation_required':
-          'Confirm that every source eero border router is represented in this review.',
+          'Confirm that every Eero on the Thread network to move is represented in this review.',
       'pinned_endpoint_unavailable':
           'A reviewed router has no supported pinned local endpoint.',
     };
@@ -676,7 +680,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   _executionApi == null
                       ? 'A move would change the border routers on Network to move so they join Network to keep. Other devices may lose connectivity. Accessories need a separate supported move. This page only prepares a review.'
                       : _macExecution
-                          ? 'This moves every Eero on ${_state.sourceCredentialNetworkName ?? 'Network to move'} to ${_state.targetCredentialNetworkName ?? 'Network to keep'}. Only continue if the source network has no accessories. The network you keep stays unchanged.'
+                          ? 'This moves every Eero on ${_state.sourceCredentialNetworkName ?? _sourceNetworkLabel} to ${_state.targetCredentialNetworkName ?? 'Network to keep'}. Only continue if the Eero Thread network to move has no accessories. The network you keep stays unchanged.'
                           : 'A move changes the border routers on Network to move so they join Network to keep. Other devices may lose connectivity; accessories need a separate supported move. The isolated lab route requires separate preparation and confirmation.',
                 ),
                 if (_executionApi != null &&
@@ -698,9 +702,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   ),
                 ],
                 const SizedBox(height: 20),
-                Text(
-                    _macExecution ? '1. Network to join' : '1. Network to keep',
-                    style: theme.textTheme.titleLarge),
+                Text('1. Network to keep', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 6),
                 Text(_macExecution
                     ? 'Choose the network your Eeros will join, then check its settings.'
@@ -718,7 +720,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   onPressed: _busy ? null : () => _setUpAccess('target'),
                   icon: const Icon(Icons.key_outlined),
                   label: Text(_macExecution
-                      ? 'Set up network to join'
+                      ? 'Set up Network to keep'
                       : 'Set up Network to keep access'),
                 ),
                 const SizedBox(height: 8),
@@ -764,13 +766,13 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                                   widget.api.probeForRole('target', target.id),
                             ),
                     child: Text(_macExecution
-                        ? 'Check network to join'
+                        ? 'Check Network to keep'
                         : 'Check router on Network to keep'),
                   ),
                 const SizedBox(height: 18),
                 Text(
                     _macExecution
-                        ? '2. Eero network to move'
+                        ? '2. Eero Thread network to move'
                         : '2. Network to move',
                     style: theme.textTheme.titleLarge),
                 const SizedBox(height: 6),
@@ -780,8 +782,8 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 const SizedBox(height: 8),
                 Text(
                   _state.sourceCredentialAvailable
-                      ? 'Network to move access ready: ${_state.sourceCredentialNetworkName ?? 'network name unavailable'}'
-                      : 'Network to move access not set up',
+                      ? '$_sourceNetworkLabel access ready: ${_state.sourceCredentialNetworkName ?? 'network name unavailable'}'
+                      : '$_sourceNetworkLabel access not set up',
                   key: const Key('move-source-access-status'),
                 ),
                 const SizedBox(height: 8),
@@ -790,7 +792,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                   onPressed: _busy ? null : () => _setUpAccess('source'),
                   icon: const Icon(Icons.key_outlined),
                   label: Text(_macExecution
-                      ? 'Set up Eero network'
+                      ? 'Set up Eero Thread network to move'
                       : 'Set up Network to move access'),
                 ),
                 const SizedBox(height: 8),
@@ -808,7 +810,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                             style: theme.textTheme.titleMedium,
                           ),
                           Text(
-                            'Network to move check: ${_readStatus(router.roleProbes['source'])}',
+                            '$_sourceNetworkLabel check: ${_readStatus(router.roleProbes['source'])}',
                           ),
                           const SizedBox(height: 6),
                           OutlinedButton(
@@ -850,13 +852,13 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 const SizedBox(height: 20),
                 Text(
                   _macExecution
-                      ? '3. Confirm the Eero network is empty'
+                      ? '3. Confirm the Eero Thread network is empty'
                       : '3. Confirm Network to move is empty',
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 6),
                 Text(_macExecution
-                    ? 'Check your home setup to make sure the Eero network you are moving has no accessories.'
+                    ? 'Check your home setup to make sure the Eero Thread network to move has no accessories.'
                     : 'This first supported case requires a controlled inventory showing no attached devices on Network to move. Its border routers remain present. Missing advertisements or an empty child table do not prove this.'),
                 CheckboxListTile(
                   key: const Key('move-empty-source-attestation'),
@@ -869,7 +871,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                             _clearReview();
                           }),
                   title: Text(_macExecution
-                      ? 'I checked every device and confirm this Eero network has no accessories.'
+                      ? 'I checked every device and confirm this Eero Thread network has no accessories.'
                       : 'I established a controlled inventory and confirm Network to move has no attached devices.'),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
@@ -885,7 +887,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                               _clearReview();
                             }),
                     title: const Text(
-                        'I checked in eero that this is my Eero network.'),
+                        'I checked in eero that this is my Eero Thread network.'),
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                   CheckboxListTile(
@@ -1051,7 +1053,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
                 title: Text('Details'),
                 children: [
                   Text(
-                      'Offline devices remain unknown. The join can interrupt the source network. Manual recovery may be required; rollback is not guaranteed.'),
+                      'Offline devices remain unknown. The join can interrupt the Eero Thread network to move. Manual recovery may be required; rollback is not guaranteed.'),
                 ],
               ),
             Text('Review expires: ${plan.reviewValidUntil.toLocal()}'),
@@ -1110,7 +1112,7 @@ class _NetworkMoveScreenState extends State<NetworkMoveScreen>
               if (_macExecution) ...[
                 Text('Eeros selected: ${review.sourceRouterIds.length}'),
                 Text(
-                    'Join: ${_state.targetCredentialNetworkName ?? 'Network to keep'}'),
+                    'Network to keep: ${_state.targetCredentialNetworkName ?? 'network name unavailable'}'),
                 const Text(
                     'The checked settings are ready. This action starts the join once.'),
                 ExpansionTile(
