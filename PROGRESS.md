@@ -6,8 +6,8 @@ reviewed implementation onto main; no application code changed during licensing
 or packaging. Hosted workflows remain manual, and paid cloud review was not
 requested. Working household devices remain excluded.
 
-The Mac release ZIP is 20,595,381 bytes, SHA-256
-`6b2531e478ac2279dc8aaf5a65fddc65c8fd899407535c8fea9c9af8f6b1968b`.
+The Mac release ZIP is 20,612,297 bytes, SHA-256
+`7ce976201e2c42db7e52c7f1cf7f406859633d9fe26edaf8da370fc4320e5edd`.
 It retains the verified `7422ddc` app plus Apache-2.0 licensing, all 44 notice
 inputs and contributor/setup guides from `2672b9d`. Signatures, all application
 file/symlink bytes and ZIP integrity were verified. Source archives are supplied

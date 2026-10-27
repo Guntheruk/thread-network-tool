@@ -7,8 +7,8 @@
 | Field | Verified value |
 | --- | --- |
 | Asset | `Thread-Network-Tool-v0.1.0-alpha.1-macOS.zip` |
-| Size | 20,595,381 bytes |
-| SHA-256 | `6b2531e478ac2279dc8aaf5a65fddc65c8fd899407535c8fea9c9af8f6b1968b` |
+| Size | 20,612,297 bytes |
+| SHA-256 | `7ce976201e2c42db7e52c7f1cf7f406859633d9fe26edaf8da370fc4320e5edd` |
 | Compiled application source | `7422ddc8a3b14dec75acb2a005c59198b39d3bc9` |
 | Supporting documentation/licensing source | `2672b9dc9404409b3b4b0b6976159d91a4ee9323` |
 | Original project licence | Apache-2.0 |
