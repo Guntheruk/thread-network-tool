@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "scope": "isolated-synthetic-lab-only",
+  "openthread": "53e8322140dde7b26827332100504507cec9cc4e",
+  "frozen_app_source": "787ace4d43d2317744238d172d94e0b892b89677",
+  "patch_sha256": "10d162fa0969abc268a4930d146f6ccbaf4de03d0746f7aaf2aeb3778740b4ff",
+  "native_regression": {
+    "red_exit": 255,
+    "green_exit": 0,
+    "same_key_preserves_counter": true,
+    "key_references": false,
+    "multi_radio": false,
+    "trel": false,
+    "test_sha256": "3fd56ed4e42c994c4fca424ca042fd20f2076ce1477c44af01dcc77afaefefa7",
+    "runner_sha256": "db4a0007e72fda2bf6f265077ae6848e97811860119c165a341500bd78864ba9"
+  },
+  "unchanged_application_files": 3132,
+  "unchanged_application_manifest_sha256": "f02d886051cb48a4d19403e7f5b3d045e95dc50bf700269f9c0327d197c9a775",
+  "diagnostic_sha256": "9626e4ff773c64b24a354034f3a83c79a76f399342a25183449bdf89dfa0405f",
+  "mac_binaries_changed": false,
+  "retail_compatibility_verified": false,
+  "unpatched": {
+    "image": "sha256:5a8f1acb35081de5188db0eebebd8e3c2b315dd9b42cf19f9c7a664401e356e9",
+    "elapsed_seconds": 547.9,
+    "result": {
+      "app_exit_code": 1,
+      "app_process_runs": 2,
+      "fixture_refreshes": 162,
+      "lab": "app-execution-bridge",
+      "last_app_event": "observing",
+      "last_app_outcome": {
+        "category": "oracle_incomplete",
+        "reason": "verification_failed",
+        "stage": "needs_attention"
+      },
+      "last_app_phase": "recover",
+      "oracle": {
+        "connectivity_verified": false,
+        "same_partition": true,
+        "sample_age_ms": 1,
+        "sample_count": 162,
+        "sample_fresh": true,
+        "source_full_match_target": true,
+        "source_no_pending": true,
+        "source_router_roles": true,
+        "target_no_pending": true,
+        "target_unchanged": true
+      },
+      "scenario": "key-change-older-target",
+      "stage": "recover",
+      "status": "failed"
+    },
+    "final_directional_pings": {
+      "peer_to_source_mleid": true,
+      "peer_to_target_mleid": false,
+      "peer_to_target_rloc": false,
+      "source_to_target_mleid": false,
+      "source_to_target_rloc": false,
+      "target_to_peer_mleid": false,
+      "target_to_peer_rloc": false
+    },
+    "container_removed": true,
+    "network": "none",
+    "host_binds": false,
+    "devices": false,
+    "read_only_root": true,
+    "user": "65534:65534",
+    "evidence_sha256": "4738b4d603b64134d387ea6726f62466c1a58477e9465f8e538a3e5908a5a544",
+    "runtime_sha256": "d139264d011be2c365b636f9ab88b47931ea1a1e30e766984b79441a67e196c8"
+  },
+  "patched": {
+    "image": "sha256:4340ad605da9d31c84243a85b4e6807267720c673a0de240639a35708dcf632e",
+    "elapsed_seconds": 375.3,
+    "result": {
+      "app_exit_code": 0,
+      "app_process_runs": 2,
+      "fixture_refreshes": 133,
+      "lab": "app-execution-bridge",
+      "last_app_event": "redaction",
+      "last_app_outcome": {
+        "category": "verified",
+        "reason": "verification_complete",
+        "stage": "verified_complete"
+      },
+      "last_app_phase": "recover",
+      "oracle": {
+        "connectivity_verified": true,
+        "same_partition": true,
+        "sample_age_ms": 0,
+        "sample_count": 133,
+        "sample_fresh": true,
+        "source_full_match_target": true,
+        "source_no_pending": true,
+        "source_router_roles": true,
+        "target_no_pending": true,
+        "target_unchanged": true
+      },
+      "scenario": "key-change-older-target",
+      "stage": "complete",
+      "status": "passed"
+    },
+    "final_directional_pings": {
+      "peer_to_source_mleid": true,
+      "peer_to_target_mleid": true,
+      "peer_to_target_rloc": true,
+      "source_to_target_mleid": true,
+      "source_to_target_rloc": true,
+      "target_to_peer_mleid": true,
+      "target_to_peer_rloc": true
+    },
+    "container_removed": true,
+    "network": "none",
+    "host_binds": false,
+    "devices": false,
+    "read_only_root": true,
+    "user": "65534:65534",
+    "evidence_sha256": "b56abceb32d64df00e45d7f3831a854ff42a918914e2078421db910643b0628c",
+    "runtime_sha256": "0ad174636054b785868c71ba98b6bb670a43b3bdb69a16edeb957077d50f3de2"
+  }
+}

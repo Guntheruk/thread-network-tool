@@ -1,0 +1,29 @@
+name: Bug report
+description: Report a reproducible problem with a sanitized example
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please use synthetic data. Do not include operational datasets, keys, tokens, addresses, household or network names, device identities, private recovery files, or raw household logs. Review screenshots and redacted reports before sharing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the expected result and the actual result.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use synthetic inputs and describe the stage reached.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and evidence
+      description: Include the exact source commit or package, OS version and architecture, relevant tool versions, and sanitized results.
+    validations:
+      required: true

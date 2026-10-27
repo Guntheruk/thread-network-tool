@@ -1,6 +1,7 @@
 #include "probe.hpp"
 #include <commissioner/commissioner.hpp>
 #include <commissioner/network_data.hpp>
+#include <iomanip>
 #include <sstream>
 namespace tnt {
 namespace {
@@ -13,6 +14,14 @@ struct PskcWiper {
     ot::commissioner::ByteArray& value;
     ~PskcWiper() {volatile uint8_t* p=value.data();for(size_t i=0;i<value.size();++i)p[i]=0;}
 };
+}
+std::string ActiveTimestampJson(const ot::commissioner::ActiveOperationalDataset& active) {
+    using ot::commissioner::ActiveOperationalDataset;
+    if ((active.mPresentFlags & ActiveOperationalDataset::kActiveTimestampBit)==0) return "null";
+    std::ostringstream out;
+    out<<'"'<<std::hex<<std::nouppercase<<std::setw(16)<<std::setfill('0')
+       <<active.mActiveTimestamp.Encode()<<'"';
+    return out.str();
 }
 ProbeResult Probe(const std::string& address,unsigned port,const Dataset& imported) {
     using namespace ot::commissioner;
@@ -45,6 +54,7 @@ ProbeResult Probe(const std::string& address,unsigned port,const Dataset& import
      <<"\",\"authenticated\":true,\"active_status\":\"read\",\"identity_match\":";
     if(!has_xpan||!has_name||!has_channel) o<<"\"unknown\"";
     else o<<(matched?"\"match\"":"\"mismatch\"");
+    o<<",\"active_timestamp\":"<<ActiveTimestampJson(active);
     o<<",\"active_network_name\":";
     if(has_name)o<<JsonString(active.mNetworkName);else o<<"null";
     o<<",\"active_extended_pan_id\":";

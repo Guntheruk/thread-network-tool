@@ -3,10 +3,75 @@ import 'native/session.dart';
 
 /// Direct in-process adapter for desktop Flutter. It uses the same bounded
 /// native calls and state transitions as the loopback helper, without HTTP.
-class NativeLiveApi implements LiveApi {
-  NativeLiveApi({required NativeCall native}) : _session = LiveSession(native);
+class NativeLiveApi implements NetworkMoveExecutionApi, ExecutionProfileInfo {
+  NativeLiveApi({required NativeCall native, LiveSession? session})
+      : _session = session ?? LiveSession(native);
 
   final LiveSession _session;
+
+  @override
+  bool get executionAvailable => _session.executionAvailable;
+
+  @override
+  bool get executionRecoveryAvailable => _session.executionRecoveryAvailable;
+
+  @override
+  String get executionProfileId => _session.executionProfileId;
+
+  Future<Object?> _execution(String action, Map<String, dynamic> body) async {
+    try {
+      return await _session.perform(action, body);
+    } catch (_) {
+      throw const LiveApiException();
+    }
+  }
+
+  @override
+  Future<NetworkMoveExecutionReview> prepareExecution(String reviewId) async =>
+      NetworkMoveExecutionReview.fromJson(
+        await _execution('network-move/execution/prepare', {
+          'review_id': reviewId,
+        }),
+      );
+
+  @override
+  Future<NetworkMoveExecutionStatus> confirmExecution(String reviewId) async =>
+      NetworkMoveExecutionStatus.fromJson(
+        await _execution('network-move/execution/confirm', {
+          'review_id': reviewId,
+        }),
+      );
+
+  @override
+  Future<NetworkMoveExecutionStatus?> currentExecution() async {
+    final result = await _execution('network-move/execution/current', {});
+    if (result is! Map<String, dynamic> || !result.containsKey('status')) {
+      throw const LiveApiException();
+    }
+    return result['status'] == null
+        ? null
+        : NetworkMoveExecutionStatus.fromJson(result['status']);
+  }
+
+  @override
+  Future<NetworkMoveExecutionStatus> checkExecution(
+    String operationId, {
+    bool resume = false,
+  }) async =>
+      NetworkMoveExecutionStatus.fromJson(
+        await _execution('network-move/execution/check', {
+          'operation_id': operationId,
+          'resume': resume,
+        }),
+      );
+
+  @override
+  Future<NetworkMoveExecutionStatus> stopExecution(String operationId) async =>
+      NetworkMoveExecutionStatus.fromJson(
+        await _execution('network-move/execution/stop', {
+          'operation_id': operationId,
+        }),
+      );
 
   Future<LiveState> _perform(String action, Map<String, dynamic> body) async {
     try {
@@ -29,6 +94,39 @@ class NativeLiveApi implements LiveApi {
   @override
   Future<LiveState> probe(String routerId) =>
       _perform('probe', {'router_id': routerId});
+
+  @override
+  Future<LiveState> credentialsForRole(String role, String dataset) =>
+      _perform('credentials', {'role': role, 'dataset': dataset});
+
+  @override
+  Future<LiveState> probeForRole(String role, String routerId) =>
+      _perform('probe', {'role': role, 'router_id': routerId});
+
+  @override
+  Future<NetworkMovePlan> networkMovePlan({
+    required String targetRouterId,
+    required EmptySourceAttestationInput attestation,
+    required int delaySeconds,
+  }) async {
+    try {
+      return NetworkMovePlan.fromJson(
+        await _session.perform('network-move/plan', {
+          'target_router_id': targetRouterId,
+          'empty_source_attestation': attestation.toJson(),
+          'delay_seconds': delaySeconds,
+        }),
+      );
+    } catch (_) {
+      throw const LiveApiException();
+    }
+  }
+
+  @override
+  Future<NetworkMovePlan?> currentNetworkMovePlan() async {
+    final current = _session.currentReview;
+    return current == null ? null : NetworkMovePlan.fromJson(current);
+  }
 }
 
 /// A desktop or phone with no supported native helper remains visibly live

@@ -1,0 +1,14 @@
+{
+  "release": "v0.1.0-alpha.1",
+  "bytes": 20612297,
+  "sha256": "7ce976201e2c42db7e52c7f1cf7f406859633d9fe26edaf8da370fc4320e5edd",
+  "supporting_source_commit": "2672b9dc9404409b3b4b0b6976159d91a4ee9323",
+  "app_source_commit": "7422ddc8a3b14dec75acb2a005c59198b39d3bc9",
+  "unchanged_app_manifest_entries": 32,
+  "signature_verification": true,
+  "notice_inputs_verified": 44,
+  "zip_integrity": true,
+  "project_license": "Apache-2.0",
+  "asset_name": "Thread-Network-Tool-v0.1.0-alpha.1-macOS.zip",
+  "release_url": "https://github.com/Guntheruk/thread-network-tool/releases/tag/v0.1.0-alpha.1"
+}

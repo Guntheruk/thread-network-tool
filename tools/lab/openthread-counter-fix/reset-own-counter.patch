@@ -1,0 +1,10 @@
+--- a/src/core/thread/key_manager.cpp
++++ b/src/core/thread/key_manager.cpp
+@@ -280,6 +280,7 @@
+ 
+     Get<Notifier>().Signal(kEventThreadKeySeqCounterChanged);
+ 
++    SetAllMacFrameCounters(0, /* aSetIfLarger */ false);
+     mKeySequence = 0;
+     UpdateKeyMaterial();
+     ResetFrameCounters();

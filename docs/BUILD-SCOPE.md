@@ -1,10 +1,19 @@
 # Build scope — 25 October 2026
 
+Current scope is the [Mac Eero alpha](MAC-ALPHA.md), authorized on 26 October.
+On 27 October the owner selected Apache 2.0 and authorized the public developer
+prerelease; historical private/publication restrictions below are superseded
+for that release. Household operations remain excluded.
+Default packages remain read-only; `TNT_MAC_ALPHA=1` includes the real join flow
+for an operator-confirmed empty Eero source network. Use manual or existing
+Home Assistant credentials. The initial-build acceptance below is historical;
+it does not prohibit the separately authorized alpha worker.
+
 Owner approved building the four-platform Flutter/C++ plan. Latest correction: automatic transfer of devices from the old Eero network is not a requirement for the first release. Investigate a simple fix, but do not make seamless end-device migration a gate for the whole product.
 
 First product target: discover networks, import authorized credentials, inspect live state, plan joining compatible border routers to a selected existing network, and make limitations clear. An empty/new source network is a useful initial scenario. Thread disabled in a vendor app must be detected/explained, not silently enabled or represented as discoverable.
 
-This initial build delivers a portable read-only engine, native CLI, synthetic-fixture Flutter flow, and meaningful tests. Migration stays disabled pending explicit lab validation. No existing home settings are changed as part of this build.
+The initial build delivered a portable read-only engine, native CLI, synthetic-fixture Flutter flow, and meaningful tests. Its migration control stayed disabled. No existing home settings are changed as part of the current alpha work either.
 
 Architecture: Flutter/Dart shared UI; a small C ABI around a C++ engine; Swift/Kotlin integrations later for protected credential APIs. Mac protocol baseline is OpenThread Commissioner commit 448f807e3246c46e5b82e4cdc12a9b0fb2a646ae. Windows native networking and iOS linking require separate validation. Google Home Android/iOS integrations are planned; no actual Nest model is verified.
 
@@ -15,4 +24,12 @@ Acceptance for this build:
 4. Flutter screens cover discovery, credential import, assessment, and a disabled migration review; demo data is visibly labelled.
 5. Build/test evidence distinguishes Mac native core, Flutter web preview, native desktop packaging, and other-platform gaps.
 
-Use a fresh separate repo; do not modify Recursive Systems. No remote repository exists yet. Release licensing and vendor entitlements remain decisions before publication.
+Use a separate repo; do not modify Recursive Systems. The owner requested the private GitHub repository `Guntheruk/thread-network-tool` for PR review. Release licensing and vendor entitlements remain decisions before public distribution.
+
+Later owner direction: use Recursive Systems' visual style for a simpler interface,
+document Google Home integration, and plan separate beta flows for router/network
+and individual-device moves. These are described in INTERFACE.md, GOOGLE-HOME.md
+and MIGRATION-BETA.md. Joining remains disabled in default packages; the Mac
+alpha exception is described above. The owner
+also requested a GitHub repository and PR review workflow; the initial repository
+is private while release licensing and compatibility remain unresolved.

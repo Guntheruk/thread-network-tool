@@ -1,0 +1,3 @@
+# Verification-only derivative: no production/default gate is changed.
+FROM tnt-network-move-lab:20261025@sha256:d06ee88cce40159e84fc2041f835c6743c4333be95abe064c8626a53cf26de99
+RUN cmake -G Ninja -S /opt/move-source -B /opt/default-build -DTNT_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release && cmake --build /opt/default-build -j2 && ctest --test-dir /opt/default-build --output-on-failure && test ! -e /opt/default-build/thread-network-move-lab && /opt/default-build/thread-network capabilities

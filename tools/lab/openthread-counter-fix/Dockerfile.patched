@@ -1,0 +1,6 @@
+# The runner verifies this cached local tag equals the frozen full image ID before and after build.
+FROM tnt-full-app:787ace4
+USER root
+COPY reset-own-counter.patch /counter-fix/reset-own-counter.patch
+COPY build-patched.sh /counter-fix/build-patched.sh
+RUN bash /counter-fix/build-patched.sh

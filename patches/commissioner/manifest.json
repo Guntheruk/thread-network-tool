@@ -1,0 +1,21 @@
+{
+  "patch": "legacy-wakeup-channel.patch",
+  "patch_sha256": "bd24b1717c9ad9fe787b121f801d97cf72f8326a10735253cb45d93cf7c1f3ff",
+  "prepared_tree_sha256": "69f848c0395b356c7594aec2fd27539d03bce062d3dfb007c617d3266aaa66f7",
+  "profile": "legacy-wakeup-channel-raw-pending-page0-11-26-v2",
+  "required_options": {
+    "OT_COMM_APP": "OFF",
+    "OT_COMM_CCM": "OFF",
+    "OT_COMM_JAVA_BINDING": "OFF",
+    "OT_COMM_TEST": "OFF"
+  },
+  "revision": "448f807e3246c46e5b82e4cdc12a9b0fb2a646ae",
+  "schema_version": 1,
+  "submodules": {
+    "third_party/fmtlib/repo": "40626af88bd7df9a5fb80be7b25ac85b122d6c21",
+    "third_party/libevent/repo": "4c908dde58ef780eeefcc9df4db3063ca62ea862",
+    "third_party/mbedtls/repo": "c765c831e5c2a0971410692f92f7a81d6ec65ec2",
+    "third_party/mbedtls/repo/framework": "2a3e2c5ea053c14b745dbdf41f609b1edc6a72fa"
+  },
+  "upstream": "https://github.com/openthread/ot-commissioner"
+}
