@@ -1,3 +1,21 @@
+# Developer alpha release — 27 October 2026
+
+The owner selected Apache 2.0 and authorized public GitHub publication.
+`v0.1.0-alpha.1` is the developer prerelease. PR #9 consolidates the previously
+reviewed implementation onto main; no application code changed during licensing
+or packaging. Hosted workflows remain manual, and paid cloud review was not
+requested. Working household devices remain excluded.
+
+The Mac release ZIP is 20,595,381 bytes, SHA-256
+`6b2531e478ac2279dc8aaf5a65fddc65c8fd899407535c8fea9c9af8f6b1968b`.
+It retains the verified `7422ddc` app plus Apache-2.0 licensing, all 44 notice
+inputs and contributor/setup guides from `2672b9d`. Signatures, all application
+file/symlink bytes and ZIP integrity were verified. Source archives are supplied
+by the release tag. Exact provenance and limitations are in
+`docs/RELEASE-ASSETS.md`; root CONTRIBUTING.md and issue templates explain how
+to help. Existing default builds stay read-only; the included Mac alpha has the
+explicit whole-empty-source flow with no verified retail model/firmware pair.
+
 # Progress — Mac alpha continuation, 26 October 2026
 
 Current owner scope is the real Mac Eero source-network join flow, with guided

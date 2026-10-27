@@ -1,3 +1,19 @@
+# Developer alpha publication — 27 October 2026
+
+Owner authorization: Apache-2.0 for original project code, public GitHub
+developer prerelease, and pushes. Release tag: `v0.1.0-alpha.1`. Read
+`RELEASE-ASSETS.md`, `LICENSING.md` and root CONTRIBUTING.md for the exact ZIP,
+source provenance, notices and contribution route. PR #9 consolidates this
+release onto main. Hosted workflows remain manual; no paid cloud review or
+household operation is authorized by this publication.
+
+The application bytes remain those of `7422ddc`; packaging/licensing source is
+`2672b9d`. The pinned Linux simulator correction passes all seven gates and
+actual bidirectional traffic. It does not establish retail Eero migration or
+recovery. Developer ID/notarization, clean-Mac installation, physical Intel,
+Apple credential access and wider platform networking remain contribution areas.
+The older pause, push hold and licence-pending notes below are historical.
+
 # Mac alpha continuation — 26 October 2026
 
 The owner resumed work and explicitly requested the actual Mac Eero join flow,
