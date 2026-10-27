@@ -70,5 +70,7 @@ labels, device identities or raw household logs. Do not retry an uncertain
 network change. The [pilot gates](PILOT.md) remain separate from this developer
 preview and must be met before inviting general household participants.
 
-<!-- Internal draft: publication, licence choice and the push/cloud-cost hold
-remain owner decisions. This document has not been published. -->
+Original project code is available under [Apache 2.0](../LICENSE).
+[Contribution guidance](../CONTRIBUTING.md) and issue templates are available.
+The owner authorized the public developer alpha on 27 October 2026; hosted
+workflows remain manual and no paid cloud review is part of this release.

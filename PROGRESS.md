@@ -11,7 +11,9 @@ Mac source-only Commissioner worker, shared durable no-replay controller,
 explicit whole-source review, pinned-endpoint recovery and a separate
 `verified_configuration` result that makes no accessory/mesh connectivity claim.
 Default packages remain read-only; `TNT_MAC_ALPHA=1` includes the signed worker
-and journal. All changes remain local under the existing push/cloud-cost hold.
+and journal. The owner authorized pushing and the public developer alpha on
+27 October 2026, choosing Apache 2.0 for original project code. Hosted workflows
+remain manual; paid cloud review was not requested.
 
 The production app at `7422ddc8a3b14dec75acb2a005c59198b39d3bc9` is built at
 `build/mac-alpha-7422ddc/Thread Network Tool.app`, with a local ZIP beside it.
@@ -83,8 +85,10 @@ receipt are in `tools/lab/openthread-counter-fix/`.
 
 `docs/CONTRIBUTOR-PREVIEW.md` prepares a developer source preview and names
 contribution areas, separate from general household pilot acceptance. Source
-sharing does not require Apple signing. Publication, licensing and the existing
-push/cloud-cost hold remain owner decisions; nothing has been published.
+sharing does not require Apple signing. The owner has now selected Apache 2.0
+and authorized the public developer prerelease. Root CONTRIBUTING.md, report
+forms, licensing and release notes prepare that publication through PR #9.
+See `docs/RELEASE-ASSETS.md` for the published artifact/source receipt.
 
 
 ---

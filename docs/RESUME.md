@@ -17,8 +17,10 @@ configuration-only verification and explicit alpha packaging are implemented.
 reproduced and repaired in `c92b4a9`. Native/helper fixtures never address the
 household. No router/account changes or paid/cloud jobs are authorized here.
 
-Push/cloud-review hold remains. All commits are local. Packaging and controlled
-wire tests are not retail compatibility or publication. Production package
+On 27 October 2026 the owner selected Apache 2.0 and authorized pushing and
+publishing the developer alpha. PR #9 consolidates the continuation onto main.
+Hosted workflows stay manual; paid cloud review was not requested. Packaging
+and controlled wire tests do not establish retail compatibility. Production package
 `build/mac-alpha-7422ddc/Thread Network Tool.app` has passed local window
 acceptance; its worker/journal bytes match the passing signed-parent wire tests.
 Read `MAC-ALPHA-ACCEPTANCE.md` for exact source, tests, artifacts and remaining
@@ -46,9 +48,10 @@ the native counter regression is red/green; the unchanged frozen `787ace4` app
 passes all seven gates in corrected image `4340ad60`, with two-process recovery,
 one send and real bidirectional connectivity. The fix affects the lab's pinned
 OpenThread host stack, not the Mac app or Eero firmware. All task containers
-were removed; no repeat operation is queued. A new contributor-preview guide
-supports source sharing once the owner's licensing/publication and push-hold
-choices are resolved. Do not revive the old unexplained-simulator-failure status.
+were removed; no repeat operation is queued. The contributor-preview guide,
+root CONTRIBUTING.md and issue templates support public developer participation.
+See LICENSING.md for the Apache 2.0 decision and RELEASE-ASSETS.md for the
+prerelease artifact. Do not revive the old unexplained-simulator-failure status.
 
 
 ---

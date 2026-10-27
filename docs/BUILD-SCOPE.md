@@ -1,6 +1,9 @@
 # Build scope — 25 October 2026
 
 Current scope is the [Mac Eero alpha](MAC-ALPHA.md), authorized on 26 October.
+On 27 October the owner selected Apache 2.0 and authorized the public developer
+prerelease; historical private/publication restrictions below are superseded
+for that release. Household operations remain excluded.
 Default packages remain read-only; `TNT_MAC_ALPHA=1` includes the real join flow
 for an operator-confirmed empty Eero source network. Use manual or existing
 Home Assistant credentials. The initial-build acceptance below is historical;

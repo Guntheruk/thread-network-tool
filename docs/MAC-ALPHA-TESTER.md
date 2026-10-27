@@ -1,12 +1,12 @@
-# Mac Eero alpha: local tester quickstart
+# Mac Eero developer alpha: tester quickstart
 
-This is a local development build, not a released or broadly supported product. The packaged join has been tested with synthetic peers, not a retail Eero move. The local package is ad hoc signed, not notarized; clean-Mac installation and full-app execution on Intel hardware have not been verified. Do not invite pilot participants until the [pilot gates](PILOT.md) are met. See the [acceptance record](MAC-ALPHA-ACCEPTANCE.md) for the exact package and evidence.
+This developer prerelease welcomes code review and isolated testing. The packaged join has been tested with synthetic peers; retail Eero migration and recovery remain unverified. The Mac package is ad hoc signed, with no Developer ID or notarization; clean-Mac installation and full-app execution on Intel hardware are unverified. General household pilot participation has separate [pilot gates](PILOT.md). See the [acceptance record](MAC-ALPHA-ACCEPTANCE.md) for compiled-code evidence and the [release assets](RELEASE-ASSETS.md) for the published ZIP's source and checksum.
 
 **Do not use a working household as a test network.** A real join needs a separately authorized, controlled setup. The action changes the entire source Thread network, not just the Eero you select. It can interrupt that network, does not move accessories, and has no automatic rollback. The source must have no accessories; independently inventory it and all source Eeros. A missing advertisement or an empty list in the app does not prove the network is empty or that every Eero is present.
 
 ## Prepare
 
-- Use the exact local alpha package named in the acceptance record. The ordinary package is read-only; only the explicitly built Mac alpha includes the join worker. Launch it on the build Mac. If macOS blocks the app, stop and report the message; trusted signing, notarization and installation are separate outstanding work.
+- Use the exact prerelease package named in the release asset record. The ordinary package is read-only; the Mac alpha download includes the join worker. If macOS blocks it, report the message; trusted signing, notarization and installation are open work. Developers can build locally using [the packaging guide](MACOS-BUILD.md).
 - Identify the **network to join** (the one you keep) and the **Eero network to move** (the empty source). You need the complete Active operational dataset for each. Treat both datasets as passwords: do not put them in messages, screenshots, reports or command lines.
 - For the Eero source, choose the guided eero route and copy its Active operational dataset from the eero app. The guide does not prescribe a fixed vendor menu path. For the network to join, use an existing authorized Home Assistant import or Advanced entry. Home Assistant is optional; the Mac app cannot retrieve Apple credentials. Do not regenerate credentials to make a test possible.
 

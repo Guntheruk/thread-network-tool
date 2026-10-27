@@ -107,7 +107,16 @@ collector's default input. Framework and Dart SDK top-level license texts are
 also collected separately from the SDK. App-specific fonts/icons and any
 platform SDK artifacts should be inventoried if a later package adds them.
 
-## Distribution gaps
+## Release decision — 27 October 2026
+
+For `v0.1.0-alpha.1`, the owner chose Apache-2.0 for original project code and
+documentation. The release distributes Mbed TLS and p256-m under their offered
+Apache-2.0 option, retaining original dual-licence texts. All 44 notice inputs
+in the unchanged Mac artifact were collected and hash-checked. See
+[Licensing](LICENSING.md). The inventory below retains its historical gaps;
+it is not a claim that every target/platform has a current binary inventory.
+
+## Historical distribution gaps
 
 - The project has no selected project license. Keep that separate from third-
   party notice collection.

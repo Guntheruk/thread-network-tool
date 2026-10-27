@@ -36,3 +36,10 @@ The optional Mac alpha changes the whole source network, needs complete credenti
 ## Reports and privacy
 
 Use synthetic data in examples. Do not post operational datasets, keys, tokens, addresses, household or network names, device identities, private recovery files, or raw household logs. Review screenshots and redacted reports before sharing. For an uncertain network change, stop and preserve the result; do not retry or reset devices. See the [tester quickstart](docs/MAC-ALPHA-TESTER.md).
+
+## Licence for contributions
+
+By intentionally submitting a contribution for inclusion, you license it under
+[Apache 2.0](LICENSE), unless explicitly stated otherwise. You retain your
+copyright; this project does not require a copyright assignment or separate CLA.
+Retain applicable third-party notices when adapting existing code.

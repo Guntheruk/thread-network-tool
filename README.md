@@ -2,7 +2,18 @@
 
 A local application for understanding Thread networks and joining compatible border routers to a chosen existing network.
 
-**Development candidate.** Default packages inspect credentials, discover routers and perform authenticated reads. The explicit [Mac Eero alpha](docs/MAC-ALPHA.md) also includes the real source-network join worker, confirmation and recovery flow. It requires an empty source network and complete credentials for both networks, using guided eero copying, existing Home Assistant or Advanced input. Automatic Apple credential retrieval is outside this alpha. Physical/vendor compatibility remains unverified for this packaged app. A separate Linux profile exercises guarded moves against isolated software routers. Home Assistant and AI are not required by the core.
+**Developer alpha — v0.1.0-alpha.1.** Default packages inspect credentials, discover routers and perform authenticated reads. The explicit [Mac Eero alpha](docs/MAC-ALPHA.md) also includes the real source-network join worker, confirmation and recovery flow. It requires an empty source network and complete credentials for both networks, using guided eero copying, existing Home Assistant or Advanced input. Automatic Apple credential retrieval is outside this alpha. Physical/vendor compatibility remains unverified for this packaged app. A separate Linux profile exercises guarded moves against isolated software routers. Home Assistant and AI are not required by the core.
+
+## Try it or contribute
+
+[Developer alpha release and Mac download](https://github.com/Guntheruk/thread-network-tool/releases/tag/v0.1.0-alpha.1)
+· [Contributing](CONTRIBUTING.md)
+· [Offer help or report a problem](https://github.com/Guntheruk/thread-network-tool/issues/new/choose)
+
+The Mac download is locally ad hoc signed. Developer ID signing, notarization,
+clean-Mac installation and retail Eero acceptance remain open contribution areas.
+Use synthetic fixtures or a coordinated isolated setup with spare equipment.
+[The developer preview](docs/CONTRIBUTOR-PREVIEW.md) explains the available paths.
 
 ## Run the interface
 
@@ -118,10 +129,15 @@ Run helper regression checks with `dart run tool/local_server_test.dart` from `a
 - [Dependency notice inventory](docs/DEPENDENCY-INVENTORY.md)
 - [Progress and evidence](PROGRESS.md)
 
-Source and pull requests are in the private [GitHub repository](https://github.com/Guntheruk/thread-network-tool).
-Hosted build/test workflows are manual to avoid automatic GitHub Actions usage
-on PR updates. Codex code review is separate. No public release exists; licensing
-and platform-provider distribution requirements remain open.
+Source, issues and pull requests are in the [GitHub repository](https://github.com/Guntheruk/thread-network-tool).
+Hosted build/test workflows remain manual to avoid automatic GitHub Actions
+usage on PR updates. Codex code review is separate.
+
+## Licence
+
+Original project code and documentation use [Apache 2.0](LICENSE).
+Third-party components retain their own licences; the selected release terms
+and notice locations are in [Licensing](docs/LICENSING.md).
 
 ## Local verification
 

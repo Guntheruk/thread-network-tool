@@ -43,3 +43,11 @@ original/patched source hashes and regression are retained in
 This is a local patch, not an upstream acceptance claim. The simulated router
 stack is not bundled with the Mac app; its Commissioner library and collected
 binary notices are unchanged by this lab repair.
+
+## Developer alpha licence decision
+
+The owner selected Apache-2.0 for original project code on 27 October 2026.
+The Mac developer prerelease uses the Apache-2.0 option for dual-licensed Mbed
+TLS/p256-m, preserving original licence texts and separate Everest notices.
+See [Licensing](LICENSING.md) and the exact release asset receipt. This decision
+does not relicense upstream code or establish platform SDK access permissions.
